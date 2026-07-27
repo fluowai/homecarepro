@@ -177,4 +177,13 @@ export interface OfflineSyncItem {
   };
 }
 
+export interface TriageResult {
+  urgency: 'Crítica' | 'Alta' | 'Média' | 'Baixa';
+  urgencyScore: number;
+  specialty: 'Enfermeiro' | 'Técnico de Enfermagem' | 'Fisioterapeuta' | 'Fonoaudiólogo' | 'Médico' | 'Nutricionista';
+  responseTime: string;
+  clinicalRationale: string;
+  recommendedActions: string[];
+}
+
 

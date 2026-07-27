@@ -1,6 +1,6 @@
 {
   "name": "HomeCare Pro",
   "description": "Sistema SaaS completo de alta performance para gestão de empresas de atendimento domiciliar (homecare), incluindo controle de pacientes, escalas, profissionais, CRM, WhatsApp CRM e recursos de IA.",
-  "requestFramePermissions": [],
+  "requestFramePermissions": ["microphone"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

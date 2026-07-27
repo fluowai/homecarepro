@@ -184,59 +184,59 @@ ${rawNotes}
       </div>
 
       {/* Gerenciador Offline & Painel de Sincronização */}
-      <div className={`p-5 rounded-2xl border transition-all ${
+      <div className={`p-4 sm:p-5 rounded-2xl border transition-all ${
         isOffline 
           ? 'bg-amber-50/70 border-amber-200 shadow-sm' 
           : 'bg-slate-50 border-slate-200'
       }`}>
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div className="flex items-start gap-3">
-            <div className={`p-2.5 rounded-xl mt-0.5 ${isOffline ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
+            <div className={`p-2 rounded-xl mt-0.5 shrink-0 ${isOffline ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
               {isOffline ? (
                 <WifiOff className="w-5 h-5 animate-pulse" />
               ) : (
                 <Wifi className="w-5 h-5" />
               )}
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-                  Gerenciador de Estado de Conexão
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="text-[10px] font-bold text-slate-800 uppercase tracking-wider">
+                  Status de Conexão
                 </h3>
-                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide ${
+                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wide ${
                   isOffline ? 'bg-amber-100 text-amber-800 animate-pulse' : 'bg-emerald-100 text-emerald-800'
                 }`}>
-                  ● {isOffline ? 'Offline (Sem Conexão)' : 'Online (Conectado)'}
+                  ● {isOffline ? 'Offline' : 'Online'}
                 </span>
               </div>
-              <p className="text-xs text-slate-500 mt-1">
+              <p className="text-[11px] text-slate-500 mt-1 line-clamp-2 sm:line-clamp-none">
                 {isOffline 
-                  ? 'Você está preenchendo check-ins de campo no modo offline. Seus registros estão seguros localmente e serão enviados assim que restabelecer conexão.' 
-                  : 'Seu dispositivo possui internet ativa. Os check-ins e evoluções clínicas são transmitidos em tempo real para os prontuários dos pacientes.'
+                  ? 'Modo offline ativo. Registros seguros localmente.' 
+                  : 'Transmitindo em tempo real para os prontuários.'
                 }
               </p>
               {offlineSyncQueue.length > 0 && (
-                <div className="mt-2 flex items-center gap-1.5 text-xs text-amber-800 font-bold bg-amber-100/50 border border-amber-200/60 px-2.5 py-1 rounded-lg w-fit">
-                  <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
-                  <span>{offlineSyncQueue.length} {offlineSyncQueue.length === 1 ? 'registro aguardando sincronização' : 'registros aguardando sincronização'}</span>
+                <div className="mt-2 flex items-center gap-1.5 text-[10px] text-amber-800 font-bold bg-amber-100/50 border border-amber-200/60 px-2 py-0.5 rounded-lg w-fit">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping" />
+                  <span>{offlineSyncQueue.length} aguardando sincronização</span>
                 </div>
               )}
             </div>
           </div>
           
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3 border-t lg:border-t-0 border-slate-200 lg:border-none pt-3 lg:pt-0">
             {/* Simulation Toggle Switch */}
-            <div className="bg-white px-3.5 py-2 rounded-xl border border-slate-200/60 shadow-sm flex items-center gap-3">
-              <span className="text-[10px] font-bold text-slate-500 uppercase">Simular Sem Conexão (Offline):</span>
+            <div className="bg-white px-3 py-1.5 rounded-xl border border-slate-200/60 shadow-sm flex items-center gap-3">
+              <span className="text-[9px] font-bold text-slate-500 uppercase">Simular Offline:</span>
               <button
                 type="button"
                 onClick={() => setOfflineMode(!isOffline)}
-                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                className={`relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
                   isOffline ? 'bg-amber-400' : 'bg-slate-300'
                 }`}
               >
                 <span
-                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                  className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
                     isOffline ? 'translate-x-5' : 'translate-x-0'
                   }`}
                 />
@@ -250,22 +250,22 @@ ${rawNotes}
                   <button
                     type="button"
                     onClick={() => syncOfflineData()}
-                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center gap-1.5"
+                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] rounded-xl shadow-md transition-all flex items-center gap-1.5"
                   >
-                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                    <span>Sincronizar Agora</span>
+                    <RefreshCw className="w-3 h-3 animate-spin" />
+                    <span>Sincronizar</span>
                   </button>
                 ) : (
-                  <span className="text-[10px] text-amber-700 font-semibold italic bg-amber-50 px-2 py-1 rounded">
+                  <span className="text-[9px] text-amber-700 font-semibold italic bg-amber-50 px-2 py-1 rounded">
                     Reconecte para sincronizar
                   </span>
                 )}
                 <button
                   type="button"
                   onClick={() => clearOfflineQueue()}
-                  className="px-3 py-2 bg-white hover:bg-red-50 hover:text-red-600 text-slate-500 font-bold text-xs rounded-xl border border-slate-200 transition-all"
+                  className="px-3 py-1.5 bg-white hover:bg-red-50 hover:text-red-600 text-slate-500 font-bold text-[10px] rounded-xl border border-slate-200 transition-all"
                 >
-                  Limpar Fila
+                  Limpar
                 </button>
               </div>
             )}
@@ -522,20 +522,20 @@ ${rawNotes}
                     </div>
 
                     {/* AI generation button & loader */}
-                    <div className="flex items-center justify-between border-t border-slate-100 pt-4">
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between border-t border-slate-100 pt-4 gap-3">
                       <button
                         type="button"
                         onClick={handleGenerateAiReport}
                         disabled={isAiLoading || !rawNotes}
-                        className="px-4 py-2.5 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center gap-1.5 disabled:opacity-50"
+                        className="px-4 py-2.5 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
                       >
                         <Sparkles className="w-3.5 h-3.5 fill-white animate-pulse" />
-                        <span>{isAiLoading ? 'Redigindo Prontuário...' : 'Gerar Evolução Científica com IA'}</span>
+                        <span>{isAiLoading ? 'Redigindo...' : 'Gerar Evolução com IA'}</span>
                       </button>
 
                       <button
                         onClick={handleCheckOut}
-                        className="px-5 py-2.5 bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center gap-1"
+                        className="px-5 py-2.5 bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-1"
                       >
                         <span>Efetuar Check-Out (Salvar)</span>
                         <ArrowRight className="w-3.5 h-3.5" />

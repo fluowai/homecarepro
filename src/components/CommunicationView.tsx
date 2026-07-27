@@ -32,12 +32,21 @@ export default function CommunicationView() {
   // Active unit patients
   const tenantPatients = patients.filter(p => p.tenantId === activeTenantId && p.status === 'active');
 
+  const [showListMobile, setShowListMobile] = useState(true);
+
   // Auto-select first patient conversation if none is selected
   useEffect(() => {
     if (!activePatientId && tenantPatients.length > 0) {
       setActivePatientId(tenantPatients[0].id);
     }
   }, [tenantPatients, activePatientId]);
+
+  // Handle mobile view state
+  useEffect(() => {
+    if (activePatientId && window.innerWidth < 768) {
+      setShowListMobile(false);
+    }
+  }, [activePatientId]);
 
   // Mark active patient messages as read
   useEffect(() => {
@@ -97,17 +106,17 @@ export default function CommunicationView() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 h-full flex flex-col">
       {/* Header */}
-      <div>
-        <h2 className="text-2xl font-bold text-slate-800 tracking-tight">Painel de Comunicação Integrada (WhatsApp CRM)</h2>
-        <p className="text-slate-500 text-sm mt-1">Inbox unificado de atendimento ao paciente, disparadores de lembretes automáticos e notificações da central.</p>
+      <div className="shrink-0">
+        <h2 className="text-2xl font-bold text-slate-800 tracking-tight">Painel de Comunicação Integrada</h2>
+        <p className="text-slate-500 text-sm mt-1">Inbox unificado de atendimento ao paciente e disparadores automáticos.</p>
       </div>
 
-      <div className="bg-white border border-slate-200 shadow-sm rounded-2xl flex h-[580px] overflow-hidden">
+      <div className="bg-white border border-slate-200 shadow-sm rounded-2xl flex flex-1 h-[580px] md:h-[650px] overflow-hidden relative">
         
         {/* Left Side: Conversations List */}
-        <div className="w-80 border-r border-slate-200 flex flex-col h-full bg-slate-50/50">
+        <div className={`${showListMobile ? 'flex' : 'hidden'} md:flex w-full md:w-80 border-r border-slate-200 flex-col h-full bg-slate-50/50`}>
           <div className="p-4 border-b border-slate-200 bg-white">
             <h3 className="font-bold text-xs text-slate-400 uppercase tracking-wider">Conversas por Paciente</h3>
           </div>
@@ -122,9 +131,12 @@ export default function CommunicationView() {
               return (
                 <div
                   key={pat.id}
-                  onClick={() => setActivePatientId(pat.id)}
+                  onClick={() => {
+                    setActivePatientId(pat.id);
+                    setShowListMobile(false);
+                  }}
                   className={`p-4 cursor-pointer hover:bg-slate-50 transition-colors flex items-center justify-between gap-3 ${
-                    isSelected ? 'bg-blue-50/60 border-l-4 border-blue-500' : ''
+                    isSelected ? 'bg-blue-50/60 md:border-l-4 md:border-blue-500' : ''
                   }`}
                 >
                   <div className="flex items-center gap-3 min-w-0 flex-1">
@@ -158,47 +170,55 @@ export default function CommunicationView() {
 
         {/* Right Side: Conversations Window */}
         {activePatient ? (
-          <div className="flex-1 flex flex-col h-full bg-white relative">
+          <div className={`${!showListMobile ? 'flex' : 'hidden'} md:flex flex-1 flex-col h-full bg-white relative`}>
             
             {/* Chat header */}
-            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-white z-10">
+            <div className="px-4 md:px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-white z-10 sticky top-0">
               <div className="flex items-center gap-3">
+                <button 
+                  onClick={() => setShowListMobile(true)}
+                  className="md:hidden p-1.5 -ml-1 text-slate-500 hover:bg-slate-100 rounded-lg"
+                >
+                  <Smartphone className="w-5 h-5 rotate-180" />
+                </button>
                 <img
                   src={activePatient.avatar}
                   alt={activePatient.name}
-                  className="w-10 h-10 rounded-xl object-cover"
+                  className="w-9 h-9 md:w-10 md:h-10 rounded-xl object-cover"
                   referrerPolicy="no-referrer"
                 />
-                <div>
-                  <h3 className="font-bold text-xs text-slate-800">{activePatient.name}</h3>
-                  <span className="text-[10px] text-emerald-600 font-semibold flex items-center gap-1 mt-0.5">
+                <div className="min-w-0">
+                  <h3 className="font-bold text-xs text-slate-800 truncate">{activePatient.name}</h3>
+                  <span className="text-[9px] md:text-[10px] text-emerald-600 font-semibold flex items-center gap-1 mt-0.5">
                     <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-                    <span>WhatsApp Conectado (Familiar Responsável)</span>
+                    <span className="truncate">WhatsApp (Familiar)</span>
                   </span>
                 </div>
               </div>
 
               {/* CRM Trigger actions */}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
                 <button
                   onClick={triggerVisitReminder}
-                  className="px-3 py-1.5 border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-lg text-xs font-semibold transition-all flex items-center gap-1"
+                  className="p-2 md:px-3 md:py-1.5 border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-lg text-xs font-semibold transition-all flex items-center gap-1"
+                  title="Lembrete de Visita"
                 >
                   <BellRing className="w-3.5 h-3.5 text-blue-500" />
-                  <span>Lembrete de Visita</span>
+                  <span className="hidden lg:inline">Lembrete</span>
                 </button>
                 <button
                   onClick={triggerVisitConfirmation}
-                  className="px-3 py-1.5 border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-lg text-xs font-semibold transition-all flex items-center gap-1"
+                  className="p-2 md:px-3 md:py-1.5 border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-lg text-xs font-semibold transition-all flex items-center gap-1"
+                  title="Confirmação"
                 >
                   <CalendarCheck className="w-3.5 h-3.5 text-emerald-500" />
-                  <span>Confirmação</span>
+                  <span className="hidden lg:inline">Confirmar</span>
                 </button>
               </div>
             </div>
 
             {/* Messages Scroll Area */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-slate-50">
+            <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 bg-slate-50">
               {activeChatMessages.map((msg) => {
                 const isOperator = msg.sender === 'operator';
                 const isSystem = msg.sender === 'system';

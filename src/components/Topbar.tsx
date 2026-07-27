@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
-import { Search, Bell, Sparkles, User, LogOut, CheckCircle2, ShieldAlert } from 'lucide-react';
+import { Search, Bell, Sparkles, User, LogOut, CheckCircle2, ShieldAlert, Menu, X } from 'lucide-react';
 import { useHomeCareStore } from '../store';
 
 interface TopbarProps {
   onSearch: (query: string) => void;
+  onMenuClick?: () => void;
 }
 
-export default function Topbar({ onSearch }: TopbarProps) {
+export default function Topbar({ onSearch, onMenuClick }: TopbarProps) {
   const { patients, activeTenantId } = useHomeCareStore();
   const [showNotifications, setShowNotifications] = useState(false);
+  const [isSearchExpanded, setIsSearchExpanded] = useState(false);
   
   // Get active tenant patients
   const tenantPatients = patients.filter(p => p.tenantId === activeTenantId);
@@ -39,19 +41,37 @@ export default function Topbar({ onSearch }: TopbarProps) {
   ];
 
   return (
-    <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-8 z-10 shadow-sm sticky top-0 w-full">
+    <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4 lg:px-8 z-10 shadow-sm sticky top-0 w-full">
+      {/* Mobile Menu Toggle */}
+      <button 
+        onClick={onMenuClick}
+        className="lg:hidden p-2 -ml-2 text-gray-500 hover:text-blue-600 transition-colors"
+      >
+        <Menu className="w-6 h-6" />
+      </button>
+
       {/* Global Search */}
-      <div className="flex-1 max-w-md">
-        <div className="relative">
+      <div className={`flex-1 max-w-md ml-2 lg:ml-0 ${isSearchExpanded ? 'fixed inset-0 bg-white z-50 p-4 flex items-center' : ''}`}>
+        <div className="relative w-full">
           <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
             <Search className="w-5 h-5" />
           </span>
           <input
             type="text"
-            placeholder="Pesquisar pacientes ou visitas..."
+            placeholder="Pesquisar..."
+            onFocus={() => setIsSearchExpanded(true)}
+            onBlur={() => setTimeout(() => setIsSearchExpanded(false), 200)}
             onChange={(e) => onSearch(e.target.value)}
             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-white text-gray-800"
           />
+          {isSearchExpanded && (
+            <button 
+              className="absolute right-3 top-1/2 -translate-y-1/2 lg:hidden text-gray-400"
+              onClick={() => setIsSearchExpanded(false)}
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
         </div>
       </div>
 

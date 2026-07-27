@@ -12,16 +12,19 @@ import {
   Heart,
   Pill,
   Star,
-  Bell
+  Bell,
+  X
 } from 'lucide-react';
 import { useHomeCareStore } from '../store';
 
 interface SidebarProps {
   currentView: string;
   setView: (view: string) => void;
+  isOpen?: boolean;
+  onClose?: () => void;
 }
 
-export default function Sidebar({ currentView, setView }: SidebarProps) {
+export default function Sidebar({ currentView, setView, isOpen, onClose }: SidebarProps) {
   const { tenants, activeTenantId, setActiveTenant } = useHomeCareStore();
   const activeTenant = tenants.find(t => t.id === activeTenantId) || tenants[0];
 
@@ -40,14 +43,36 @@ export default function Sidebar({ currentView, setView }: SidebarProps) {
   ];
 
   return (
-    <aside id="sidebar-container" className="w-64 bg-white border-r border-gray-200 flex flex-col h-screen fixed left-0 top-0 z-20">
-      {/* Brand Header */}
-      <div className="p-6 flex items-center gap-3">
-        <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-          <Heart className="w-5 h-5 text-white fill-white" />
+    <>
+      {/* Mobile Overlay */}
+      {isOpen && (
+        <div 
+          className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-30 lg:hidden"
+          onClick={onClose}
+        />
+      )}
+
+      <aside 
+        id="sidebar-container" 
+        className={`w-64 bg-white border-r border-gray-200 flex flex-col h-screen fixed left-0 top-0 z-40 transition-transform duration-300 lg:translate-x-0 ${
+          isOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
+      >
+        {/* Brand Header */}
+        <div className="p-6 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+              <Heart className="w-5 h-5 text-white fill-white" />
+            </div>
+            <span className="font-bold text-xl tracking-tight text-gray-800">HomeCare Pro</span>
+          </div>
+          <button 
+            onClick={onClose}
+            className="lg:hidden p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-lg transition-colors"
+          >
+            <X className="w-6 h-6" />
+          </button>
         </div>
-        <span className="font-bold text-xl tracking-tight text-gray-800">HomeCare Pro</span>
-      </div>
 
       {/* Tenant Switcher */}
       <div className="p-4 mx-4 my-2 bg-gray-100/80 rounded-xl">
@@ -108,5 +133,6 @@ export default function Sidebar({ currentView, setView }: SidebarProps) {
         <span>API de WhatsApp Ativa</span>
       </div>
     </aside>
+    </>
   );
 }

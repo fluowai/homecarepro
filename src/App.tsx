@@ -6,6 +6,7 @@
 import React, { useState } from 'react';
 import Sidebar from './components/Sidebar';
 import Topbar from './components/Topbar';
+import MobileNav from './components/MobileNav';
 import DashboardView from './components/DashboardView';
 import PatientsView from './components/PatientsView';
 import SchedulesView from './components/SchedulesView';
@@ -21,11 +22,18 @@ import AlertsView from './components/AlertsView';
 export default function App() {
   const [currentView, setView] = useState<string>('dashboard');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  const handleSetView = (view: string) => {
+    setView(view);
+    setIsSidebarOpen(false);
+    window.scrollTo(0, 0);
+  };
 
   const renderActiveView = () => {
     switch (currentView) {
       case 'dashboard':
-        return <DashboardView setView={setView} searchQuery={searchQuery} />;
+        return <DashboardView setView={handleSetView} searchQuery={searchQuery} />;
       case 'patients':
         return <PatientsView searchQuery={searchQuery} />;
       case 'schedules':
@@ -47,24 +55,39 @@ export default function App() {
       case 'crm':
         return <CrmView />;
       default:
-        return <DashboardView setView={setView} searchQuery={searchQuery} />;
+        return <DashboardView setView={handleSetView} searchQuery={searchQuery} />;
     }
   };
 
   return (
     <div className="min-h-screen bg-slate-50 flex font-sans antialiased text-slate-800">
       {/* SaaS Navigation Sidebar */}
-      <Sidebar currentView={currentView} setView={setView} />
+      <Sidebar 
+        currentView={currentView} 
+        setView={handleSetView} 
+        isOpen={isSidebarOpen}
+        onClose={() => setIsSidebarOpen(false)}
+      />
 
       {/* Main Panel Area */}
-      <div className="flex-1 pl-64 flex flex-col min-h-screen">
+      <div className="flex-1 lg:pl-64 flex flex-col min-h-screen pb-16 lg:pb-0">
         {/* Topbar with Search & Notification Panel */}
-        <Topbar onSearch={setSearchQuery} />
+        <Topbar 
+          onSearch={setSearchQuery} 
+          onMenuClick={() => setIsSidebarOpen(true)}
+        />
 
         {/* Dynamic View container */}
-        <main className="flex-1 p-8 max-w-7xl w-full mx-auto">
+        <main className="flex-1 p-4 md:p-6 lg:p-8 max-w-7xl w-full mx-auto">
           {renderActiveView()}
         </main>
+
+        {/* Mobile Navigation Bar */}
+        <MobileNav 
+          currentView={currentView} 
+          setView={handleSetView}
+          onMenuClick={() => setIsSidebarOpen(true)}
+        />
       </div>
     </div>
   );

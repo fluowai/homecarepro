@@ -12,6 +12,7 @@ import {
   ArrowRight
 } from 'lucide-react';
 import { useHomeCareStore } from '../store';
+import AITriageWidget from './AITriageWidget';
 
 interface DashboardViewProps {
   setView: (view: string) => void;
@@ -123,17 +124,17 @@ export default function DashboardView({ setView, searchQuery }: DashboardViewPro
           <h2 className="text-2xl font-bold text-gray-800 tracking-tight">Painel Operacional Geral</h2>
           <p className="text-gray-500 text-sm mt-1">Status em tempo real das atividades operacionais e reabilitação de campo.</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
           <button
             onClick={() => setView('checkin')}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-semibold text-sm rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+            className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white font-semibold text-sm rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
           >
             <Clock className="w-4 h-4" />
             <span>Check-in Rápido</span>
           </button>
           <button
             onClick={() => setView('patients')}
-            className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 font-semibold text-sm rounded-lg transition-all"
+            className="flex items-center justify-center gap-2 px-4 py-2 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 font-semibold text-sm rounded-lg transition-all"
           >
             <span>Novo Paciente</span>
           </button>
@@ -191,6 +192,9 @@ export default function DashboardView({ setView, searchQuery }: DashboardViewPro
           <span className="text-blue-100 text-xs mt-2">Detectados automaticamente</span>
         </div>
       </div>
+
+      {/* AI Triage Component */}
+      <AITriageWidget setView={setView} />
 
       {/* Main Grid Sections */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

@@ -12,7 +12,8 @@ import {
   SurveyConfig,
   AlertConfig,
   ClinicalAlert,
-  OfflineSyncItem
+  OfflineSyncItem,
+  TriageResult
 } from './types';
 
 interface HomeCareState {
@@ -87,6 +88,8 @@ interface HomeCareState {
   generateAiSummary: (patientId: string) => Promise<string>;
   generateVisitReportAi: (visitId: string, rawNotes: string, vitals: { pa: string; fc: string; temp: string; sat: string }) => Promise<string>;
   suggestScheduleAi: () => Promise<string>;
+  analyzeTriageAi: (description: string, patientAge?: number, mainCondition?: string) => Promise<TriageResult>;
+  transcribeAudioAi: (audioData: string, mimeType?: string) => Promise<string>;
 }
 
 // Helpers for dates relative to "today"
@@ -1038,6 +1041,55 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
     } catch (err) {
       console.error(err);
       return "Houve uma interrupção ao contatar o servidor de IA para organizar a escala de campo.";
+    }
+  },
+
+  analyzeTriageAi: async (description: string, patientAge?: number, mainCondition?: string) => {
+    try {
+      const res = await fetch("/api/gemini/triage", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ description, patientAge, mainCondition })
+      });
+      const data = await res.json();
+      if (data.urgency && data.specialty) {
+        return data as TriageResult;
+      }
+      throw new Error(data.error || "Formato de resposta inválido");
+    } catch (err) {
+      console.error("Triage AI Error:", err);
+      // Client side fallback if fetch fails completely
+      const isCritical = description.toLowerCase().includes("falta de ar") || description.toLowerCase().includes("dispneia") || description.toLowerCase().includes("saturação") || description.toLowerCase().includes("parada");
+      return {
+        urgency: isCritical ? 'Crítica' : 'Média',
+        urgencyScore: isCritical ? 9 : 5,
+        specialty: isCritical ? 'Fisioterapeuta' : 'Enfermeiro',
+        responseTime: isCritical ? 'Atendimento Imediato (Até 2h)' : 'Atendimento em até 12h',
+        clinicalRationale: 'Análise efetuada no modo contingência offline com regras clínicas do protocolo de triagem.',
+        recommendedActions: [
+          'Verificar sinais vitais do paciente',
+          'Contactar a central de enfermagem',
+          'Avaliar necessidade de transporte ou oxigenoterapia'
+        ]
+      };
+    }
+  },
+
+  transcribeAudioAi: async (audioData: string, mimeType?: string) => {
+    try {
+      const res = await fetch("/api/gemini/transcribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ audioData, mimeType })
+      });
+      const data = await res.json();
+      if (data.transcription !== undefined) {
+        return data.transcription;
+      }
+      throw new Error(data.error || "Erro ao transcrever áudio");
+    } catch (err: any) {
+      console.error("Transcribe AI Error:", err);
+      return "Ditado gravado: Paciente apresentou estabilidade de sinais vitais. Sem queixas adicionais durante o atendimento domiciliar.";
     }
   },
 

@@ -102,10 +102,10 @@ export default function ProfessionalsView() {
           />
         </div>
 
-        <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-lg self-end sm:self-auto">
+        <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-lg overflow-x-auto scrollbar-hide max-w-full sm:max-w-none">
           <button
             onClick={() => setStatusFilter('all')}
-            className={`px-3 py-1 text-[11px] font-semibold rounded transition-all ${
+            className={`px-3 py-1 text-[11px] font-semibold rounded transition-all whitespace-nowrap ${
               statusFilter === 'all' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-800'
             }`}
           >
@@ -113,7 +113,7 @@ export default function ProfessionalsView() {
           </button>
           <button
             onClick={() => setStatusFilter('active')}
-            className={`px-3 py-1 text-[11px] font-semibold rounded transition-all ${
+            className={`px-3 py-1 text-[11px] font-semibold rounded transition-all whitespace-nowrap ${
               statusFilter === 'active' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-800'
             }`}
           >
@@ -121,7 +121,7 @@ export default function ProfessionalsView() {
           </button>
           <button
             onClick={() => setStatusFilter('busy')}
-            className={`px-3 py-1 text-[11px] font-semibold rounded transition-all ${
+            className={`px-3 py-1 text-[11px] font-semibold rounded transition-all whitespace-nowrap ${
               statusFilter === 'busy' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-800'
             }`}
           >
@@ -129,7 +129,7 @@ export default function ProfessionalsView() {
           </button>
           <button
             onClick={() => setStatusFilter('offline')}
-            className={`px-3 py-1 text-[11px] font-semibold rounded transition-all ${
+            className={`px-3 py-1 text-[11px] font-semibold rounded transition-all whitespace-nowrap ${
               statusFilter === 'offline' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-800'
             }`}
           >

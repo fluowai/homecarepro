@@ -11,15 +11,23 @@ import {
   Trash2, 
   Calendar,
   Layers,
-  ArrowRight
+  ArrowRight,
+  Mic,
+  Volume2
 } from 'lucide-react';
 import { useHomeCareStore } from '../store';
 import { LeadStatus, CRMLead } from '../types';
+import AudioDictationModal from './AudioDictationModal';
 
 export default function CrmView() {
   const { leads, activeTenantId, addLead, updateLead, deleteLead } = useHomeCareStore();
   const [showAddModal, setShowAddModal] = useState(false);
   
+  // Audio dictation states
+  const [showDictationModal, setShowDictationModal] = useState(false);
+  const [activeDictationLead, setActiveDictationLead] = useState<CRMLead | null>(null);
+  const [isDictatingForNewLeadForm, setIsDictatingForNewLeadForm] = useState(false);
+
   // Form states
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -77,6 +85,34 @@ export default function CrmView() {
     }
   };
 
+  const handleOpenDictationForLead = (lead: CRMLead) => {
+    setActiveDictationLead(lead);
+    setIsDictatingForNewLeadForm(false);
+    setShowDictationModal(true);
+  };
+
+  const handleOpenDictationForNewForm = () => {
+    setActiveDictationLead(null);
+    setIsDictatingForNewLeadForm(true);
+    setShowDictationModal(true);
+  };
+
+  const handleTranscriptionComplete = (transcribedText: string) => {
+    if (isDictatingForNewLeadForm) {
+      setNotes(prev => prev ? `${prev}\n${transcribedText}` : transcribedText);
+    } else if (activeDictationLead) {
+      const formattedEntry = `[Ditado IA ${new Date().toLocaleDateString('pt-BR')}] ${transcribedText}`;
+      const updatedNotes = activeDictationLead.notes 
+        ? `${activeDictationLead.notes}\n${formattedEntry}` 
+        : formattedEntry;
+
+      updateLead(activeDictationLead.id, {
+        lastInteraction: transcribedText,
+        notes: updatedNotes
+      });
+    }
+  };
+
   // Compute column balances
   const getColSum = (colId: LeadStatus) => {
     return tenantLeads
@@ -98,6 +134,26 @@ export default function CrmView() {
         >
           <Plus className="w-4 h-4" />
           <span>Adicionar Oportunidade</span>
+        </button>
+      </div>
+
+      {/* Voice Note Quick Bar Banner */}
+      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200/80 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 bg-blue-600 text-white rounded-xl shadow-md shadow-blue-200 shrink-0">
+            <Mic className="w-5 h-5 animate-pulse" />
+          </div>
+          <div>
+            <h4 className="font-bold text-xs text-slate-800">Ditado Rápido de Evolução & Anotações de Pacientes (IA)</h4>
+            <p className="text-[11px] text-slate-500 mt-0.5">Capture notas por voz via microfone. O Gemini transcreve, pontua e salva nos registros do CRM.</p>
+          </div>
+        </div>
+        <button
+          onClick={() => handleOpenDictationForNewForm()}
+          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-sm transition-all flex items-center justify-center gap-1.5 shrink-0"
+        >
+          <Mic className="w-3.5 h-3.5" />
+          <span>Ditar Nota Geral</span>
         </button>
       </div>
 
@@ -159,8 +215,17 @@ export default function CrmView() {
                           <span>R$ {lead.estimatedValue.toLocaleString('pt-BR')}</span>
                         </div>
 
-                        {/* Progression Buttons */}
+                        {/* Progression & Dictation Buttons */}
                         <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => handleOpenDictationForLead(lead)}
+                            className="p-1 text-blue-600 hover:bg-blue-50 border border-blue-200/80 rounded transition-colors mr-1 flex items-center gap-1 text-[10px] font-bold"
+                            title="Ditar nota de evolução por áudio com IA"
+                          >
+                            <Mic className="w-3.5 h-3.5 text-blue-600" />
+                            <span className="hidden xl:inline">Ditar</span>
+                          </button>
+
                           <button
                             onClick={() => {
                               if (confirm("Deseja remover esta oportunidade do funil?")) {
@@ -303,7 +368,17 @@ export default function CrmView() {
               </div>
 
               <div>
-                <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Observações da última interação</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase">Observações da última interação</label>
+                  <button
+                    type="button"
+                    onClick={handleOpenDictationForNewForm}
+                    className="text-[11px] text-blue-600 hover:text-blue-800 font-bold flex items-center gap-1 bg-blue-50 border border-blue-100 px-2.5 py-0.5 rounded-lg transition-colors"
+                  >
+                    <Mic className="w-3.5 h-3.5 text-blue-600" />
+                    <span>Ditar com Voz (IA)</span>
+                  </button>
+                </div>
                 <textarea
                   rows={3}
                   value={notes}
@@ -332,6 +407,14 @@ export default function CrmView() {
           </div>
         </div>
       )}
+
+      {/* Audio Dictation & AI Transcription Modal */}
+      <AudioDictationModal
+        isOpen={showDictationModal}
+        onClose={() => setShowDictationModal(false)}
+        leadName={activeDictationLead ? activeDictationLead.name : (name || 'Oportunidade Comercial')}
+        onTranscriptionComplete={handleTranscriptionComplete}
+      />
     </div>
   );
 }

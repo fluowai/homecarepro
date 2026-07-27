@@ -244,13 +244,13 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
           </div>
 
           {/* Tabs Navigator */}
-          <div className="border-b border-slate-200 flex flex-wrap gap-2">
+          <div className="border-b border-slate-200 flex items-center gap-2 overflow-x-auto scrollbar-hide -mx-2 px-2 sm:mx-0 sm:px-0 scroll-smooth">
             {[
-              { id: 'info', label: 'Dados de Contato & Endereço', icon: MapPin },
-              { id: 'clinical', label: 'Quadro Clínico & Remédios', icon: Activity },
-              { id: 'files', label: 'Anexos & Documentos', icon: Paperclip },
-              { id: 'timeline', label: 'Linha do Tempo', icon: Clock },
-              { id: 'ai', label: 'Copilot AI Resumo', icon: Sparkles },
+              { id: 'info', label: 'Contato', icon: MapPin },
+              { id: 'clinical', label: 'Clínico', icon: Activity },
+              { id: 'files', label: 'Anexos', icon: Paperclip },
+              { id: 'timeline', label: 'Histórico', icon: Clock },
+              { id: 'ai', label: 'Copilot AI', icon: Sparkles },
             ].map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
@@ -258,13 +258,13 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id as TabType)}
-                  className={`flex items-center gap-2 px-4 py-2.5 border-b-2 text-xs font-semibold transition-all ${
+                  className={`flex items-center gap-2 px-4 py-2.5 border-b-2 text-[11px] font-semibold transition-all whitespace-nowrap ${
                     isActive
                       ? 'border-blue-500 text-blue-600 font-bold'
                       : 'border-transparent text-slate-500 hover:text-slate-800'
                   }`}
                 >
-                  <Icon className={`w-4 h-4 ${isActive ? 'text-blue-500' : 'text-slate-400'}`} />
+                  <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-blue-500' : 'text-slate-400'}`} />
                   <span>{tab.label}</span>
                 </button>
               );

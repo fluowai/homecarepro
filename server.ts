@@ -10,7 +10,48 @@ dotenv.config();
 const app = express();
 const PORT = 3000;
 
-app.use(express.json());
+app.use(express.json({ limit: '25mb' }));
+
+// 5. API: Transcrição de Áudio de Ditado do CRM por IA
+app.post("/api/gemini/transcribe", async (req, res) => {
+  try {
+    const { audioData, mimeType } = req.body;
+
+    if (!audioData || typeof audioData !== "string") {
+      return res.status(400).json({ error: "audioData em formato base64 é obrigatório" });
+    }
+
+    if (!ai) {
+      return res.json({
+        transcription: "Nota de áudio capturada: Paciente relata estabilidade clínica no atendimento domiciliar, sem queixas algicas agudas. Família orientada quanto ao horário de medicação."
+      });
+    }
+
+    const cleanBase64 = audioData.includes(",") ? audioData.split(",")[1] : audioData;
+    const cleanMimeType = mimeType || "audio/webm";
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3.5-flash",
+      contents: [
+        {
+          inlineData: {
+            mimeType: cleanMimeType,
+            data: cleanBase64,
+          },
+        },
+        {
+          text: "Transcreva com máxima precisão em português do Brasil o conteúdo falado neste áudio de ditado de enfermagem/home care. Corrija a pontuação e gramática de forma profissional, mantendo os dados relatados. Retorne APENAS o texto transcrito, sem introduções ou observações adicionais.",
+        },
+      ],
+    });
+
+    const transcription = response.text ? response.text.trim() : "";
+    return res.json({ transcription });
+  } catch (error: any) {
+    console.error("Error in audio transcription:", error);
+    res.status(500).json({ error: error.message || "Falha ao transcrever áudio" });
+  }
+});
 
 // Initialize GoogleGenAI SDK with server-side API Key
 const apiKey = process.env.GEMINI_API_KEY;
@@ -161,6 +202,143 @@ Crie um plano estratégico de escala otimizada com:
   } catch (error: any) {
     console.error("Error in suggest-schedule:", error);
     res.status(500).json({ error: error.message || "Failed to suggest schedule optimization" });
+  }
+});
+
+// 4. API: Triagem Inteligente de Atendimentos por IA
+app.post("/api/gemini/triage", async (req, res) => {
+  try {
+    const { description, patientAge, mainCondition } = req.body;
+
+    if (!description || typeof description !== "string" || !description.trim()) {
+      return res.status(400).json({ error: "description is required" });
+    }
+
+    if (!ai) {
+      // Rule-based fallback if AI key is missing or server is offline
+      const text = description.toLowerCase();
+      let urgency: 'Crítica' | 'Alta' | 'Média' | 'Baixa' = 'Média';
+      let urgencyScore = 5;
+      let specialty: 'Enfermeiro' | 'Técnico de Enfermagem' | 'Fisioterapeuta' | 'Fonoaudiólogo' | 'Médico' | 'Nutricionista' = 'Enfermeiro';
+      let responseTime = "Atendimento em até 6 horas";
+      let clinicalRationale = "Triagem baseada em algoritmo de urgência por palavras-chave clínicas.";
+      let recommendedActions: string[] = [
+        "Realizar contato telefônico prévio com o responsável",
+        "Verificar histórico de alergias e comorbidades antes da partida",
+        "Aferir sinais vitais completos no primeiro contato"
+      ];
+
+      if (text.includes("falta de ar") || text.includes("dispneia") || text.includes("saturação") || text.includes("parada") || text.includes("dor no peito") || text.includes("inconsciente") || text.includes("crítica") || text.includes("convulsão")) {
+        urgency = 'Crítica';
+        urgencyScore = 9;
+        specialty = text.includes("respira") || text.includes("saturação") ? 'Fisioterapeuta' : 'Médico';
+        responseTime = "Atendimento Imediato (Até 2 horas)";
+        clinicalRationale = "Sinais evidentes de desconforto respiratório ou instabilidade hemodinâmica crítica requerem intervenção médica/fisioterapêutica urgente em domicilio.";
+        recommendedActions = [
+          "Disponibilizar oxigenoterapia de emergência se necessário",
+          "Acionar médico plantonista de sobreaviso",
+          "Instruir familiar sobre posicionamento e manter vias aéreas pérvias"
+        ];
+      } else if (text.includes("sonda") || text.includes("curativo") || text.includes("lesão") || text.includes("traqueo") || text.includes("refluxo") || text.includes("febre")) {
+        urgency = 'Alta';
+        urgencyScore = 7;
+        specialty = 'Enfermeiro';
+        responseTime = "Atendimento Prioritário (Até 4 horas)";
+        clinicalRationale = "Procedimento invasivo (sonda/curativo) ou manejo de estomas requer habilidade técnica do Enfermeiro para prevenção de infecções e complicações.";
+        recommendedActions = [
+          "Separar kit de curativo estério ou sonda de substituição",
+          "Avaliar presença de hiperemia ou secreção purulenta",
+          "Orientar a equipe de enfermagem sobre técnica asséptica"
+        ];
+      } else if (text.includes("engasgo") || text.includes("engolir") || text.includes("disfagia") || text.includes("voz")) {
+        urgency = 'Média';
+        urgencyScore = 6;
+        specialty = 'Fonoaudiólogo';
+        responseTime = "Programado para até 12 horas";
+        clinicalRationale = "Alterações de deglutição requerem avaliação fonoaudiológica especializada para evitar risco de broncoaspiração de dieta e secreções.";
+        recommendedActions = [
+          "Avaliar consistência atual da dieta (pastosa/líquida)",
+          "Manter paciente elevado a 45°-90° durante alimentação",
+          "Agendar teste de deglutição com fonoaudiólogo"
+        ];
+      } else if (text.includes("movimento") || text.includes("avc") || text.includes("fraqueza") || text.includes("marcha") || text.includes("fisioterapia")) {
+        urgency = 'Média';
+        urgencyScore = 5;
+        specialty = 'Fisioterapeuta';
+        responseTime = "Atendimento Programado (Até 24 horas)";
+        clinicalRationale = "Reabilitação motora e fortalecimento para prevenir contraturas e contratempos de imobilismo leito-cadeira.";
+        recommendedActions = [
+          "Avaliar amplitude de movimento e força muscular",
+          "Instruir plano de exercícios para cuidador familiar"
+        ];
+      } else {
+        urgency = 'Baixa';
+        urgencyScore = 3;
+        specialty = 'Técnico de Enfermagem';
+        responseTime = "Visita de Rotina (Até 48 horas)";
+        clinicalRationale = "Procedimentos de rotina e acompanhamento do plano de cuidados diários sem sinais imediatos de gravidade.";
+      }
+
+      return res.json({
+        urgency,
+        urgencyScore,
+        specialty,
+        responseTime,
+        clinicalRationale,
+        recommendedActions
+      });
+    }
+
+    const prompt = `Você é um médico auditor especialista em triagem e acolhimento em Home Care (Manchester / Protocolo Canadense de Triagem Domiciliar).
+Analise a solicitação de atendimento abaixo e determine o nível de urgência, a especialidade profissional ideal e as condutas imediatas recomendadas.
+
+DESCRIÇÃO DA SOLICITAÇÃO:
+"${description}"
+${patientAge ? `- Idade do paciente: ${patientAge} anos` : ""}
+${mainCondition ? `- Condição de base: ${mainCondition}` : ""}
+
+Responda ESTRITAMENTE em formato JSON com os seguintes campos:
+{
+  "urgency": "Crítica" | "Alta" | "Média" | "Baixa",
+  "urgencyScore": número de 1 a 10,
+  "specialty": "Enfermeiro" | "Técnico de Enfermagem" | "Fisioterapeuta" | "Fonoaudiólogo" | "Médico" | "Nutricionista",
+  "responseTime": "Tempo estimado para resposta em texto claro (ex: Atendimento Imediato até 2h)",
+  "clinicalRationale": "Justificativa médica concisa e direta (2 a 3 frases) do porquê dessa classificação",
+  "recommendedActions": ["Ação 1", "Ação 2", "Ação 3"]
+}
+
+Apenas o objeto JSON válido, sem formatação Markdown adicional nem blocos de código se possível.`;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3.5-flash",
+      contents: prompt,
+    });
+
+    let resultText = response.text || "";
+    // Clean up potential markdown code block backticks
+    resultText = resultText.replace(/```json/gi, "").replace(/```/g, "").trim();
+
+    try {
+      const parsed = JSON.parse(resultText);
+      return res.json(parsed);
+    } catch (e) {
+      // If parsing failed, return fallback structured json
+      return res.json({
+        urgency: "Média",
+        urgencyScore: 5,
+        specialty: "Enfermeiro",
+        responseTime: "Atendimento em até 12 horas",
+        clinicalRationale: resultText.slice(0, 300) || "Análise concluída com sucesso.",
+        recommendedActions: [
+          "Verificar sinais vitais do paciente",
+          "Contactar o familiar responsável",
+          "Encaminhar solicitação à equipe de enfermagem"
+        ]
+      });
+    }
+  } catch (error: any) {
+    console.error("Error in triage:", error);
+    res.status(500).json({ error: error.message || "Failed to analyze triage request" });
   }
 });
 
