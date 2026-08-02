@@ -67,6 +67,29 @@ export default function DashboardView({ setView, searchQuery }: DashboardViewPro
     }
   });
 
+  // 3. Profissionais com documentos vencidos ou pendentes
+  tenantProfessionals.forEach(p => {
+    const expiredDocs = p.documents?.filter(d => d.status === 'expired') || [];
+    const pendingDocs = p.documents?.filter(d => d.status === 'pending') || [];
+    
+    if (expiredDocs.length > 0) {
+      riskAlerts.push({
+        id: `alert-doc-exp-${p.id}`,
+        patient: `Equipe: ${p.name}`,
+        severity: 'alto',
+        reason: `Documento Vencido: ${expiredDocs.map(d => d.name).join(', ')}. Regularize imediatamente para não bloquear escalas.`
+      });
+    }
+    if (pendingDocs.length > 0) {
+      riskAlerts.push({
+        id: `alert-doc-pend-${p.id}`,
+        patient: `Equipe: ${p.name}`,
+        severity: 'moderado',
+        reason: `Documentação Pendente: ${pendingDocs.map(d => d.name).join(', ')}. Aguardando envio ou validação.`
+      });
+    }
+  });
+
   // 3. Append dynamic calculated alerts (Low stock, missing visits, expired drugs)
   if (getCalculatedAlerts) {
     const calculatedAlerts = getCalculatedAlerts();
@@ -87,8 +110,8 @@ export default function DashboardView({ setView, searchQuery }: DashboardViewPro
       value: activePatientsCount, 
       desc: 'Em acompanhamento domiciliar', 
       icon: Users, 
-      color: 'bg-blue-500 text-blue-500', 
-      bgColor: 'bg-blue-50' 
+      color: 'bg-green-600 text-green-600', 
+      bgColor: 'bg-green-50' 
     },
     { 
       label: 'Visitas Hoje', 
@@ -121,20 +144,20 @@ export default function DashboardView({ setView, searchQuery }: DashboardViewPro
       {/* Intro and quick actions */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-gray-800 tracking-tight">Painel Operacional Geral</h2>
+          <h2 className="text-2xl font-bold text-gray-900 tracking-tight">Painel Operacional Geral</h2>
           <p className="text-gray-500 text-sm mt-1">Status em tempo real das atividades operacionais e reabilitação de campo.</p>
         </div>
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
           <button
             onClick={() => setView('checkin')}
-            className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white font-semibold text-sm rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+            className="flex items-center justify-center gap-2 px-4 py-2 bg-green-50 border border-green-200 text-green-700 font-semibold text-sm rounded-xl hover:bg-green-100 transition-colors shadow-sm"
           >
             <Clock className="w-4 h-4" />
             <span>Check-in Rápido</span>
           </button>
           <button
             onClick={() => setView('patients')}
-            className="flex items-center justify-center gap-2 px-4 py-2 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 font-semibold text-sm rounded-lg transition-all"
+            className="flex items-center justify-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold text-sm rounded-xl transition-all shadow-sm"
           >
             <span>Novo Paciente</span>
           </button>
@@ -143,54 +166,21 @@ export default function DashboardView({ setView, searchQuery }: DashboardViewPro
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {/* Card 1 */}
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col">
-          <span className="text-sm text-gray-500 font-medium">Pacientes Ativos</span>
-          <div className="flex items-baseline gap-2 mt-2">
-            <span className="text-3xl font-bold text-gray-900">{activePatientsCount}</span>
-            <span className="text-xs text-green-600 font-bold px-1.5 py-0.5 bg-green-50 rounded-md">+4.5%</span>
+        {stats.map((stat, idx) => (
+          <div key={idx} className="bg-white p-6 rounded-2xl shadow-soft border border-gray-200 flex flex-col h-full hover:-translate-y-1 transition-transform duration-300 group cursor-default">
+            <div className="flex items-center gap-3 mb-4">
+              <div className={`p-2.5 rounded-xl ${stat.bgColor} ${stat.color} group-hover:scale-110 transition-transform`}>
+                <stat.icon className="w-5 h-5" />
+              </div>
+              <span className="text-sm font-semibold text-gray-500 tracking-wide">{stat.label}</span>
+            </div>
+            <div className="flex items-baseline gap-3">
+              <span className="text-4xl font-bold text-gray-900 tracking-tight">{stat.value.toString().padStart(2, '0')}</span>
+              {idx === 0 && <span className="text-sm font-bold text-green-600">+12%</span>}
+            </div>
+            <span className="text-xs font-medium text-gray-400 mt-auto pt-4">{stat.desc}</span>
           </div>
-          <span className="text-gray-400 text-xs mt-2">Em acompanhamento domiciliar</span>
-        </div>
-
-        {/* Card 2 */}
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col">
-          <span className="text-sm text-gray-500 font-medium">Visitas de Hoje</span>
-          <div className="flex items-baseline gap-2 mt-2">
-            <span className="text-3xl font-bold text-gray-900">{todayVisits.length}</span>
-            <span className="text-xs text-blue-600 font-medium px-1.5 py-0.5 bg-blue-50 rounded-md">
-              {completedVisitsTodayCount} concluídas
-            </span>
-          </div>
-          <span className="text-gray-400 text-xs mt-2">{inProgressVisitsCount} em andamento campo</span>
-        </div>
-
-        {/* Card 3 */}
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col">
-          <span className="text-sm text-gray-500 font-medium">Em Campo</span>
-          <div className="flex items-baseline gap-2 mt-2">
-            <span className="text-3xl font-bold text-green-600">{activeProfessionalsCount}</span>
-            <span className="text-xs text-gray-500 px-1.5 py-0.5 bg-gray-100 rounded-md">
-              de {tenantProfessionals.length} profissionais
-            </span>
-          </div>
-          <span className="text-gray-400 text-xs mt-2">Profissionais ativos no momento</span>
-        </div>
-
-        {/* Card 4 (Solid clean accent to highlight Alerts) */}
-        <div 
-          onClick={() => setView('alerts')}
-          className="bg-blue-600 p-6 rounded-2xl shadow-sm border border-blue-700 flex flex-col text-white cursor-pointer hover:bg-blue-700/90 transition-all active:scale-95"
-        >
-          <span className="text-sm text-blue-100 font-medium">Alertas Pendentes</span>
-          <div className="flex items-baseline gap-2 mt-2">
-            <span className="text-3xl font-bold">{riskAlerts.length.toString().padStart(2, '0')}</span>
-            <span className="text-xs text-blue-200 font-medium px-1.5 py-0.5 bg-blue-700/55 rounded-md">
-              Ação requerida
-            </span>
-          </div>
-          <span className="text-blue-100 text-xs mt-2">Detectados automaticamente</span>
-        </div>
+        ))}
       </div>
 
       {/* AI Triage Component */}
@@ -210,7 +200,7 @@ export default function DashboardView({ setView, searchQuery }: DashboardViewPro
               </div>
               <div className="flex items-center gap-4 text-xs font-semibold">
                 <div className="flex items-center gap-1">
-                  <span className="w-2.5 h-2.5 rounded-full bg-blue-500" />
+                  <span className="w-2.5 h-2.5 rounded-full bg-green-600" />
                   <span className="text-gray-600">Presencial</span>
                 </div>
                 <div className="flex items-center gap-1">
@@ -300,7 +290,7 @@ export default function DashboardView({ setView, searchQuery }: DashboardViewPro
               
               <div className="space-y-3">
                 {[
-                  { name: 'Enfermagem', count: tenantProfessionals.filter(p => p.specialty === 'Enfermeiro' || p.specialty === 'Técnico de Enfermagem').length, pct: '50%', color: 'bg-blue-600' },
+                  { name: 'Enfermagem', count: tenantProfessionals.filter(p => p.specialty === 'Enfermeiro' || p.specialty === 'Técnico de Enfermagem').length, pct: '50%', color: 'bg-green-600' },
                   { name: 'Fisioterapia', count: tenantProfessionals.filter(p => p.specialty === 'Fisioterapeuta').length, pct: '30%', color: 'bg-emerald-500' },
                   { name: 'Medicina', count: tenantProfessionals.filter(p => p.specialty === 'Médico').length, pct: '15%', color: 'bg-indigo-600' },
                   { name: 'Outros', count: 1, pct: '5%', color: 'bg-purple-500' },
@@ -352,7 +342,7 @@ export default function DashboardView({ setView, searchQuery }: DashboardViewPro
         {/* Right Side: Smart Alerts AI & Quick Visit Feed */}
         <div className="space-y-8">
           {/* AI Insight (Clean minimalist light gradient style) */}
-          <div className="bg-gradient-to-br from-indigo-50 to-blue-50 border border-indigo-100 p-6 rounded-2xl">
+          <div className="bg-gradient-to-br from-indigo-50 to-green-50 border border-indigo-100 p-6 rounded-2xl">
             <div className="flex items-center gap-2 mb-3">
               <Sparkles className="w-5 h-5 text-indigo-600" />
               <h3 className="text-indigo-800 font-bold text-sm uppercase tracking-wider">Resumo Inteligente</h3>
@@ -366,38 +356,33 @@ export default function DashboardView({ setView, searchQuery }: DashboardViewPro
           </div>
 
           {/* Smart Alerts Tray */}
-          <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+          <div className="bg-[#FEFCE8] p-6 rounded-2xl border border-[#FDE68A] shadow-soft cursor-pointer hover:shadow-md transition-shadow" onClick={() => setView('alerts')}>
             <div className="flex items-center gap-2 mb-4">
-              <div className="p-2 bg-indigo-50 rounded-lg text-indigo-600">
-                <Sparkles className="w-5 h-5 animate-pulse" />
-              </div>
+              <ShieldAlert className="w-5 h-5 text-amber-500" />
               <div>
-                <h3 className="font-bold text-sm text-gray-800">Alertas Clínicos Ativos</h3>
-                <span className="text-[10px] text-gray-400 font-semibold tracking-wide uppercase">Vigilância IA</span>
+                <h3 className="font-bold text-sm text-gray-900">Alertas Clínicos Ativos</h3>
+                <span className="text-xs text-gray-600">{riskAlerts.length.toString().padStart(2, '0')} pendentes • {riskAlerts.filter(a => a.severity === 'alto').length.toString().padStart(2, '0')} críticos</span>
               </div>
             </div>
 
             {riskAlerts.length > 0 ? (
-              <div className="space-y-3">
-                {riskAlerts.map((alert, i) => (
-                  <div key={i} className="p-3.5 bg-gray-50 border border-gray-100 rounded-xl">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-xs text-gray-800 truncate max-w-[160px]">{alert.patient}</span>
-                      <span className={`text-[9px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded ${
-                        alert.severity === 'alto' 
-                          ? 'bg-red-50 text-red-600 border border-red-200' 
-                          : 'bg-amber-50 text-amber-700 border border-amber-200'
-                      }`}>
-                        Risco {alert.severity}
-                      </span>
+              <div className="space-y-3 mt-4">
+                {riskAlerts.slice(0, 3).map((alert, i) => (
+                  <div key={i} className="flex items-stretch bg-white border border-amber-100 rounded-xl overflow-hidden shadow-sm hover:-translate-y-0.5 transition-transform">
+                    <div className={`w-1.5 flex-shrink-0 ${alert.severity === 'alto' ? 'bg-red-500' : 'bg-amber-400'}`} />
+                    <div className="p-3">
+                      <span className="font-bold text-xs text-gray-900 truncate block">{alert.patient}</span>
+                      <p className="text-xs text-gray-500 mt-1 line-clamp-1">{alert.reason}</p>
                     </div>
-                    <p className="text-[11px] text-gray-600 mt-2 leading-relaxed">{alert.reason}</p>
                   </div>
                 ))}
+                <button className="text-xs font-semibold text-amber-700 hover:text-amber-800 flex items-center gap-1 mt-4">
+                  Ver detalhes <ArrowRight className="w-3.5 h-3.5" />
+                </button>
               </div>
             ) : (
-              <div className="py-8 text-center text-gray-400 text-xs">
-                Nenhum sinal de risco crítico detectado pela triagem clínica.
+              <div className="py-4 text-center text-gray-500 text-xs">
+                Nenhum alerta crítico ativo.
               </div>
             )}
           </div>
@@ -408,7 +393,7 @@ export default function DashboardView({ setView, searchQuery }: DashboardViewPro
               <h3 className="font-bold text-gray-800 text-base">Escala de Hoje ({todayVisits.length})</h3>
               <button 
                 onClick={() => setView('schedules')}
-                className="text-xs text-blue-600 font-semibold hover:underline"
+                className="text-xs text-green-600 font-semibold hover:underline"
               >
                 Ver tudo
               </button>
@@ -429,7 +414,7 @@ export default function DashboardView({ setView, searchQuery }: DashboardViewPro
                           </span>
                         </div>
                         <span className="text-[11px] text-gray-500 truncate block">
-                          Profissional: {prof?.name || 'Não alocado'} • <strong className="text-blue-600 font-medium">{prof?.specialty}</strong>
+                          Profissional: {prof?.name || 'Não alocado'} • <strong className="text-green-600 font-medium">{prof?.specialty}</strong>
                         </span>
                         <div className="flex items-center gap-1 mt-1 text-[10px] text-gray-400 font-medium">
                           <Clock className="w-3 h-3" />
@@ -441,7 +426,7 @@ export default function DashboardView({ setView, searchQuery }: DashboardViewPro
                           visit.status === 'concluida' 
                             ? 'bg-green-50 text-green-700 border border-green-100' 
                             : visit.status === 'em_andamento'
-                            ? 'bg-blue-50 text-blue-700 animate-pulse'
+                            ? 'bg-green-50 text-green-700 animate-pulse'
                             : 'bg-amber-50 text-amber-700'
                         }`}>
                           {visit.status === 'concluida' && 'Concluída'}

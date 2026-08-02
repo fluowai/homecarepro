@@ -9,10 +9,15 @@ import {
   Award, 
   X,
   Trash2,
-  Users
+  Users,
+  FileText,
+  Upload,
+  MapPin,
+  Key,
+  AlertTriangle
 } from 'lucide-react';
 import { useHomeCareStore } from '../store';
-import { ProfessionalStatus } from '../types';
+import { ProfessionalStatus, ProfessionalSpecialty } from '../types';
 
 export default function ProfessionalsView() {
   const { 
@@ -20,7 +25,8 @@ export default function ProfessionalsView() {
     activeTenantId, 
     addProfessional, 
     updateProfessional, 
-    deleteProfessional 
+    deleteProfessional,
+    currentUserRole
   } = useHomeCareStore();
 
   const [showAddModal, setShowAddModal] = useState(false);
@@ -28,11 +34,20 @@ export default function ProfessionalsView() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'busy' | 'offline'>('all');
 
   // Form states
+  const [modalTab, setModalTab] = useState<'personal' | 'professional' | 'address' | 'docs'>('personal');
   const [name, setName] = useState('');
-  const [specialty, setSpecialty] = useState<'Enfermeiro' | 'Técnico de Enfermagem' | 'Fisioterapeuta' | 'Fonoaudiólogo' | 'Médico' | 'Nutricionista'>('Enfermeiro');
+  const [cpf, setCpf] = useState('');
+  const [gender, setGender] = useState<'M' | 'F' | 'O'>('F');
+  const [specialty, setSpecialty] = useState<ProfessionalSpecialty>('Enfermeiro');
   const [registration, setRegistration] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
+  const [street, setStreet] = useState('');
+  const [number, setNumber] = useState('');
+  const [city, setCity] = useState('');
+  const [state, setState] = useState('SP');
+  const [zipCode, setZipCode] = useState('');
+  const [docsUploaded, setDocsUploaded] = useState<string[]>([]);
 
   // Filter professionals
   const tenantProfessionals = professionals.filter(p => p.tenantId === activeTenantId);
@@ -54,20 +69,39 @@ export default function ProfessionalsView() {
 
     addProfessional({
       name,
+      cpf,
+      gender,
       specialty,
       registration,
       status: 'active',
       email,
       phone,
-      avatar: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&q=80&w=120',
-      rating: 5.0
+      avatar: gender === 'M' 
+        ? 'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?auto=format&fit=crop&q=80&w=120' 
+        : 'https://images.unsplash.com/photo-1594824813573-246434de83fb?auto=format&fit=crop&q=80&w=120',
+      rating: 5.0,
+      address: { street, number, city, state, zipCode },
+      documents: docsUploaded.map(d => ({ type: 'document', name: d, url: '#' }))
     });
 
     setName('');
+    setCpf('');
     setRegistration('');
     setEmail('');
     setPhone('');
+    setStreet('');
+    setNumber('');
+    setCity('');
+    setZipCode('');
+    setDocsUploaded([]);
+    setModalTab('personal');
     setShowAddModal(false);
+  };
+
+  const handleMockUpload = (docName: string) => {
+    if (!docsUploaded.includes(docName)) {
+      setDocsUploaded([...docsUploaded, docName]);
+    }
   };
 
   return (
@@ -80,7 +114,7 @@ export default function ProfessionalsView() {
         </div>
         <button
           onClick={() => setShowAddModal(true)}
-          className="flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-500 hover:bg-blue-600 text-white font-semibold text-sm rounded-lg transition-all shadow-md shadow-blue-100"
+          className="flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-600 text-white font-semibold text-sm rounded-lg transition-all shadow-md shadow-green-100"
         >
           <Plus className="w-4 h-4" />
           <span>Cadastrar Profissional</span>
@@ -144,7 +178,7 @@ export default function ProfessionalsView() {
           {filteredProfessionals.map((prof) => (
             <div
               key={prof.id}
-              className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 hover:border-blue-200 hover:shadow-md transition-all flex flex-col justify-between"
+              className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 hover:border-green-200 hover:shadow-md transition-all flex flex-col justify-between"
             >
               <div>
                 {/* Header */}
@@ -158,9 +192,21 @@ export default function ProfessionalsView() {
                     />
                     <div>
                       <h3 className="font-bold text-slate-800 text-xs truncate max-w-[140px]">{prof.name}</h3>
-                      <span className="text-[10px] bg-blue-50 text-blue-700 font-bold px-2 py-0.5 rounded-full uppercase mt-1 inline-block">
+                      <span className="text-[10px] bg-green-50 text-green-700 font-bold px-2 py-0.5 rounded-full uppercase mt-1 inline-block">
                         {prof.specialty}
                       </span>
+                      {prof.documents.some(d => d.status === 'expired') && (
+                        <span className="text-[10px] bg-rose-50 text-rose-700 font-bold px-2 py-0.5 rounded-full uppercase mt-1 inline-flex items-center gap-1 ml-1">
+                          <AlertTriangle className="w-3 h-3" />
+                          Doc Vencido
+                        </span>
+                      )}
+                      {prof.documents.some(d => d.status === 'pending') && (
+                        <span className="text-[10px] bg-amber-50 text-amber-700 font-bold px-2 py-0.5 rounded-full uppercase mt-1 inline-flex items-center gap-1 ml-1">
+                          <AlertTriangle className="w-3 h-3" />
+                          Pendência
+                        </span>
+                      )}
                     </div>
                   </div>
 
@@ -205,17 +251,19 @@ export default function ProfessionalsView() {
                   <span className="text-[10px] text-slate-400">(Avaliador)</span>
                 </div>
 
-                <button
-                  onClick={() => {
-                    if (confirm(`Remover o cadastro de ${prof.name}?`)) {
-                      deleteProfessional(prof.id);
-                    }
-                  }}
-                  className="p-1 text-slate-400 hover:text-red-500 rounded transition-colors"
-                  title="Remover Profissional"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
+                {currentUserRole === 'admin' && (
+                  <button
+                    onClick={() => {
+                      if (confirm(`Remover o cadastro de ${prof.name}?`)) {
+                        deleteProfessional(prof.id);
+                      }
+                    }}
+                    className="p-1 text-slate-400 hover:text-red-500 rounded transition-colors"
+                    title="Remover Profissional"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
               </div>
             </div>
           ))}
@@ -245,69 +293,147 @@ export default function ProfessionalsView() {
               </button>
             </div>
 
-            <form onSubmit={handleCreateProfessional} className="p-6 space-y-4">
-              <div>
-                <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Nome Completo *</label>
-                <input
-                  type="text"
-                  required
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Ex: Dra. Mariana Costa"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg text-xs py-2 px-3 text-slate-700 focus:outline-none focus:border-blue-500"
-                />
-              </div>
+            <div className="flex border-b border-slate-100 px-6">
+              {[
+                { id: 'personal', label: 'Dados Pessoais', icon: UserCheck },
+                { id: 'professional', label: 'Profissional', icon: Award },
+                { id: 'address', label: 'Endereço', icon: MapPin },
+                { id: 'docs', label: 'Documentos', icon: FileText },
+              ].map(tab => {
+                const Icon = tab.icon;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setModalTab(tab.id as any)}
+                    className={`flex items-center gap-1.5 px-4 py-3 text-[11px] font-bold border-b-2 transition-colors ${
+                      modalTab === tab.id ? 'border-green-600 text-green-600' : 'border-transparent text-slate-400 hover:text-slate-600'
+                    }`}
+                  >
+                    <Icon className="w-3.5 h-3.5" />
+                    {tab.label}
+                  </button>
+                )
+              })}
+            </div>
 
-              <div>
-                <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Especialidade Clínica *</label>
-                <select
-                  value={specialty}
-                  onChange={(e) => setSpecialty(e.target.value as any)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg text-xs py-2 px-2 text-slate-700 focus:outline-none"
-                >
-                  <option value="Enfermeiro">Enfermeiro (Enfermagem Geral)</option>
-                  <option value="Técnico de Enfermagem">Técnico de Enfermagem</option>
-                  <option value="Fisioterapeuta">Fisioterapeuta (Motora / Respiratória)</option>
-                  <option value="Médico">Médico (Geriatra / Assistente)</option>
-                  <option value="Fonoaudiólogo">Fonoaudiólogo</option>
-                  <option value="Nutricionista">Nutricionista</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Inscrição Conselho de Classe (Ex: COREN-SP 123456) *</label>
-                <input
-                  type="text"
-                  required
-                  value={registration}
-                  onChange={(e) => setRegistration(e.target.value)}
-                  placeholder="COREN-SP 123.456"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg text-xs py-2 px-3 text-slate-700 focus:outline-none"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Telefone Celular</label>
-                  <input
-                    type="text"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="(11) 98888-8888"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg text-xs py-2 px-3 text-slate-700 focus:outline-none"
-                  />
+            <form onSubmit={handleCreateProfessional} className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
+              {modalTab === 'personal' && (
+                <div className="space-y-4 animate-fade-in">
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Nome Completo *</label>
+                    <input type="text" required value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex: Dra. Mariana Costa" className="w-full bg-slate-50 border border-slate-200 rounded-lg text-xs py-2 px-3 text-slate-700 focus:outline-none focus:border-green-600" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">CPF *</label>
+                      <input type="text" required value={cpf} onChange={(e) => setCpf(e.target.value)} placeholder="000.000.000-00" className="w-full bg-slate-50 border border-slate-200 rounded-lg text-xs py-2 px-3 text-slate-700 focus:outline-none focus:border-green-600" />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Sexo *</label>
+                      <select value={gender} onChange={(e) => setGender(e.target.value as any)} className="w-full bg-slate-50 border border-slate-200 rounded-lg text-xs py-2 px-2 text-slate-700 focus:outline-none">
+                        <option value="F">Feminino</option>
+                        <option value="M">Masculino</option>
+                        <option value="O">Outro</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Telefone / WhatsApp</label>
+                      <input type="text" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(11) 98888-8888" className="w-full bg-slate-50 border border-slate-200 rounded-lg text-xs py-2 px-3 text-slate-700 focus:outline-none" />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">E-mail Corporativo</label>
+                      <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="nome@homecarepro.com" className="w-full bg-slate-50 border border-slate-200 rounded-lg text-xs py-2 px-3 text-slate-700 focus:outline-none" />
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">E-mail Corporativo</label>
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="nome@homecarepro.com"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg text-xs py-2 px-3 text-slate-700 focus:outline-none"
-                  />
+              )}
+
+              {modalTab === 'professional' && (
+                <div className="space-y-4 animate-fade-in">
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Especialidade Clínica *</label>
+                    <select value={specialty} onChange={(e) => setSpecialty(e.target.value as any)} className="w-full bg-slate-50 border border-slate-200 rounded-lg text-xs py-2 px-2 text-slate-700 focus:outline-none">
+                      <option value="Enfermeiro">Enfermeiro (Enfermagem Geral)</option>
+                      <option value="Técnico de Enfermagem">Técnico de Enfermagem</option>
+                      <option value="Auxiliar de Enfermagem">Auxiliar de Enfermagem</option>
+                      <option value="Fisioterapeuta">Fisioterapeuta (Motora / Respiratória)</option>
+                      <option value="Fonoaudiólogo">Fonoaudiólogo</option>
+                      <option value="Médico">Médico (Geriatra / Assistente)</option>
+                      <option value="Nutricionista">Nutricionista</option>
+                      <option value="Psicólogo">Psicólogo</option>
+                      <option value="Terapeuta Ocupacional">Terapeuta Ocupacional</option>
+                      <option value="Assistente Social">Assistente Social</option>
+                      <option value="Cuidador de Idosos">Cuidador de Idosos</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Inscrição Conselho de Classe (Ex: COREN, CRM, CRP) *</label>
+                    <input type="text" required value={registration} onChange={(e) => setRegistration(e.target.value)} placeholder="COREN-SP 123.456" className="w-full bg-slate-50 border border-slate-200 rounded-lg text-xs py-2 px-3 text-slate-700 focus:outline-none" />
+                  </div>
                 </div>
-              </div>
+              )}
+
+              {modalTab === 'address' && (
+                <div className="space-y-4 animate-fade-in">
+                  <div className="grid grid-cols-4 gap-4">
+                    <div className="col-span-3">
+                      <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Logradouro / Rua</label>
+                      <input type="text" value={street} onChange={(e) => setStreet(e.target.value)} placeholder="Rua das Flores" className="w-full bg-slate-50 border border-slate-200 rounded-lg text-xs py-2 px-3 text-slate-700 focus:outline-none" />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Número</label>
+                      <input type="text" value={number} onChange={(e) => setNumber(e.target.value)} placeholder="123" className="w-full bg-slate-50 border border-slate-200 rounded-lg text-xs py-2 px-3 text-slate-700 focus:outline-none" />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="col-span-2">
+                      <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Cidade</label>
+                      <input type="text" value={city} onChange={(e) => setCity(e.target.value)} placeholder="São Paulo" className="w-full bg-slate-50 border border-slate-200 rounded-lg text-xs py-2 px-3 text-slate-700 focus:outline-none" />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Estado</label>
+                      <input type="text" value={state} onChange={(e) => setState(e.target.value)} placeholder="SP" className="w-full bg-slate-50 border border-slate-200 rounded-lg text-xs py-2 px-3 text-slate-700 focus:outline-none" />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">CEP</label>
+                    <input type="text" value={zipCode} onChange={(e) => setZipCode(e.target.value)} placeholder="00000-000" className="w-full bg-slate-50 border border-slate-200 rounded-lg text-xs py-2 px-3 text-slate-700 focus:outline-none" />
+                  </div>
+                </div>
+              )}
+
+              {modalTab === 'docs' && (
+                <div className="space-y-4 animate-fade-in">
+                  <p className="text-xs text-slate-500 mb-2">Faça o upload dos documentos obrigatórios para compor o prontuário do profissional.</p>
+                  
+                  {['Foto do RG / CNH', 'Foto da Carteirinha (Conselho)', 'Currículo (Opcional)', 'Comprovante de Endereço', 'Foto do Carimbo + Assinatura'].map(doc => (
+                    <div key={doc} className="flex items-center justify-between p-3 border border-slate-200 rounded-xl bg-slate-50">
+                      <div className="flex items-center gap-2">
+                        <FileText className="w-4 h-4 text-slate-400" />
+                        <span className="text-xs font-semibold text-slate-700">{doc}</span>
+                      </div>
+                      {docsUploaded.includes(doc) ? (
+                        <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md">Anexado</span>
+                      ) : (
+                        <button type="button" onClick={() => handleMockUpload(doc)} className="text-[10px] font-bold text-green-600 bg-green-50 hover:bg-green-100 px-3 py-1.5 rounded-md flex items-center gap-1 transition-colors">
+                          <Upload className="w-3 h-3" />
+                          Anexar
+                        </button>
+                      )}
+                    </div>
+                  ))}
+
+                  <div className="mt-6 pt-4 border-t border-slate-100">
+                    <button type="button" onClick={() => alert('Simulação: Credenciais de acesso enviadas para o e-mail do profissional.')} className="w-full py-2 bg-slate-800 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-2 hover:bg-slate-900 transition-colors">
+                      <Key className="w-4 h-4" />
+                      Gerar Login e Senha para o App
+                    </button>
+                  </div>
+                </div>
+              )}
 
               <div className="border-t border-slate-100 pt-5 flex justify-end gap-3 mt-6">
                 <button
@@ -319,7 +445,7 @@ export default function ProfessionalsView() {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-blue-500 hover:bg-blue-600 text-white font-bold text-xs rounded-lg shadow-md transition-all"
+                  className="px-5 py-2 bg-green-600 hover:bg-green-600 text-white font-bold text-xs rounded-lg shadow-md transition-all"
                 >
                   Confirmar Cadastro
                 </button>

@@ -120,7 +120,7 @@ export default function SchedulesView() {
             setProfessionalId(tenantProfessionals[0]?.id || '');
             setShowAddModal(true);
           }}
-          className="flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-500 hover:bg-blue-600 text-white font-semibold text-sm rounded-lg transition-all shadow-md shadow-blue-100"
+          className="flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-600 text-white font-semibold text-sm rounded-lg transition-all shadow-md shadow-green-100"
         >
           <Plus className="w-4 h-4" />
           <span>Agendar Visita</span>
@@ -144,7 +144,7 @@ export default function SchedulesView() {
               </button>
               
               <div className="flex items-center gap-2 text-slate-800 font-bold text-sm bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-100">
-                <CalendarIcon className="w-4 h-4 text-blue-500" />
+                <CalendarIcon className="w-4 h-4 text-green-600" />
                 <input
                   type="date"
                   value={selectedDate}
@@ -162,7 +162,7 @@ export default function SchedulesView() {
               
               <button
                 onClick={() => setSelectedDate(new Date().toISOString().split('T')[0])}
-                className="text-xs text-blue-600 hover:underline font-semibold ml-2"
+                className="text-xs text-green-600 hover:underline font-semibold ml-2"
               >
                 Hoje
               </button>
@@ -188,7 +188,7 @@ export default function SchedulesView() {
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
               <h3 className="font-bold text-slate-800 text-sm">Escalas Ativas no Dia</h3>
-              <span className="text-xs bg-blue-50 text-blue-600 px-2.5 py-0.5 rounded-full font-bold">
+              <span className="text-xs bg-green-50 text-green-600 px-2.5 py-0.5 rounded-full font-bold">
                 {filteredVisits.length} Atendimentos
               </span>
             </div>
@@ -229,6 +229,16 @@ export default function SchedulesView() {
                             <MapPin className="w-3.5 h-3.5 text-slate-400" />
                             <span className="truncate max-w-[220px]">Endereço: {pat?.address.street}, {pat?.address.number}</span>
                           </div>
+                          {(visit.checkInCoords || visit.checkOutCoords) && (
+                            <div className="flex items-center gap-1.5 text-xs text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg w-fit">
+                              <MapPin className="w-3 h-3" />
+                              <span className="font-semibold text-[10px]">
+                                GPS: {visit.checkInCoords ? `IN (${visit.checkInCoords.lat}, ${visit.checkInCoords.lng})` : ''} 
+                                {visit.checkInCoords && visit.checkOutCoords ? ' | ' : ''}
+                                {visit.checkOutCoords ? `OUT (${visit.checkOutCoords.lat}, ${visit.checkOutCoords.lng})` : ''}
+                              </span>
+                            </div>
+                          )}
                         </div>
                       </div>
 
@@ -244,7 +254,7 @@ export default function SchedulesView() {
                           onChange={(e) => updateVisit(visit.id, { status: e.target.value as VisitStatus })}
                           className={`text-xs rounded-lg font-semibold py-1.5 px-3 border focus:outline-none ${
                             visit.status === 'concluida' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
-                            visit.status === 'em_andamento' ? 'bg-blue-50 text-blue-700 border-blue-200 animate-pulse' :
+                            visit.status === 'em_andamento' ? 'bg-green-50 text-green-700 border-green-200 animate-pulse' :
                             visit.status === 'cancelada' ? 'bg-rose-50 text-rose-700 border-rose-200' :
                             'bg-slate-50 text-slate-700 border-slate-200'
                           }`}
@@ -303,7 +313,7 @@ export default function SchedulesView() {
             <button
               onClick={handleOptimizeEscalasAi}
               disabled={isAiLoading}
-              className="w-full py-3 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white font-bold text-xs rounded-xl shadow-lg shadow-indigo-950/45 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+              className="w-full py-3 bg-gradient-to-r from-green-600 to-indigo-600 hover:from-green-600 hover:to-indigo-700 text-white font-bold text-xs rounded-xl shadow-lg shadow-indigo-950/45 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
             >
               <Sparkles className="w-4 h-4 fill-white" />
               <span>{isAiLoading ? 'Agrupando Escalas...' : 'Otimizar Escalas por IA'}</span>
@@ -362,7 +372,7 @@ export default function SchedulesView() {
                   required
                   value={patientId}
                   onChange={(e) => setPatientId(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg text-xs py-2 px-3 text-slate-700 focus:outline-none focus:border-blue-500"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg text-xs py-2 px-3 text-slate-700 focus:outline-none focus:border-green-600"
                 >
                   {tenantPatients.map(p => (
                     <option key={p.id} value={p.id}>{p.name} ({p.planType})</option>
@@ -376,7 +386,7 @@ export default function SchedulesView() {
                   required
                   value={professionalId}
                   onChange={(e) => setProfessionalId(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg text-xs py-2 px-3 text-slate-700 focus:outline-none focus:border-blue-500"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg text-xs py-2 px-3 text-slate-700 focus:outline-none focus:border-green-600"
                 >
                   {tenantProfessionals.map(p => (
                     <option key={p.id} value={p.id}>{p.name} ({p.specialty})</option>
@@ -392,7 +402,7 @@ export default function SchedulesView() {
                     required
                     value={timeStart}
                     onChange={(e) => setTimeStart(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg text-xs py-2 px-3 text-slate-700 focus:outline-none focus:border-blue-500"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg text-xs py-2 px-3 text-slate-700 focus:outline-none focus:border-green-600"
                   />
                 </div>
                 <div>
@@ -402,7 +412,7 @@ export default function SchedulesView() {
                     required
                     value={timeEnd}
                     onChange={(e) => setTimeEnd(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg text-xs py-2 px-3 text-slate-700 focus:outline-none focus:border-blue-500"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg text-xs py-2 px-3 text-slate-700 focus:outline-none focus:border-green-600"
                   />
                 </div>
               </div>
@@ -415,7 +425,7 @@ export default function SchedulesView() {
                   min={0}
                   value={value}
                   onChange={(e) => setValue(Number(e.target.value))}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg text-xs py-2 px-3 text-slate-700 focus:outline-none focus:border-blue-500"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg text-xs py-2 px-3 text-slate-700 focus:outline-none focus:border-green-600"
                 />
               </div>
 
@@ -429,7 +439,7 @@ export default function SchedulesView() {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-blue-500 hover:bg-blue-600 text-white font-bold text-xs rounded-lg shadow-md transition-all"
+                  className="px-5 py-2 bg-green-600 hover:bg-green-600 text-white font-bold text-xs rounded-lg shadow-md transition-all"
                 >
                   Agendar na Escala
                 </button>

@@ -41,7 +41,7 @@ export default function CrmView() {
   const tenantLeads = leads.filter(l => l.tenantId === activeTenantId);
 
   const columns: { id: LeadStatus; label: string; color: string; border: string }[] = [
-    { id: 'lead', label: 'Lead / Contato Inicial', color: 'bg-blue-500', border: 'border-blue-100' },
+    { id: 'lead', label: 'Lead / Contato Inicial', color: 'bg-green-600', border: 'border-green-100' },
     { id: 'avaliacao', label: 'Avaliação Técnica', color: 'bg-amber-500', border: 'border-amber-100' },
     { id: 'proposta', label: 'Proposta Comercial', color: 'bg-indigo-500', border: 'border-indigo-100' },
     { id: 'fechado', label: 'Contrato Fechado', color: 'bg-emerald-500', border: 'border-emerald-100' }
@@ -130,7 +130,7 @@ export default function CrmView() {
         </div>
         <button
           onClick={() => setShowAddModal(true)}
-          className="flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-500 hover:bg-blue-600 text-white font-semibold text-sm rounded-lg transition-all shadow-md shadow-blue-100"
+          className="flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-600 text-white font-semibold text-sm rounded-lg transition-all shadow-md shadow-green-100"
         >
           <Plus className="w-4 h-4" />
           <span>Adicionar Oportunidade</span>
@@ -138,9 +138,9 @@ export default function CrmView() {
       </div>
 
       {/* Voice Note Quick Bar Banner */}
-      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200/80 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
+      <div className="bg-gradient-to-r from-green-50 to-indigo-50 border border-green-200/80 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-blue-600 text-white rounded-xl shadow-md shadow-blue-200 shrink-0">
+          <div className="p-2.5 bg-green-600 text-white rounded-xl shadow-md shadow-green-200 shrink-0">
             <Mic className="w-5 h-5 animate-pulse" />
           </div>
           <div>
@@ -150,7 +150,7 @@ export default function CrmView() {
         </div>
         <button
           onClick={() => handleOpenDictationForNewForm()}
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-sm transition-all flex items-center justify-center gap-1.5 shrink-0"
+          className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-bold text-xs rounded-xl shadow-sm transition-all flex items-center justify-center gap-1.5 shrink-0"
         >
           <Mic className="w-3.5 h-3.5" />
           <span>Ditar Nota Geral</span>
@@ -188,7 +188,7 @@ export default function CrmView() {
                   colLeads.map((lead) => (
                     <div
                       key={lead.id}
-                      className="bg-white p-4.5 rounded-xl border border-slate-100 hover:border-blue-300 hover:shadow-sm transition-all space-y-3 relative group"
+                      className="bg-white p-4.5 rounded-xl border border-slate-100 hover:border-green-300 hover:shadow-sm transition-all space-y-3 relative group"
                     >
                       {/* Card identification */}
                       <div>
@@ -219,10 +219,10 @@ export default function CrmView() {
                         <div className="flex items-center gap-1">
                           <button
                             onClick={() => handleOpenDictationForLead(lead)}
-                            className="p-1 text-blue-600 hover:bg-blue-50 border border-blue-200/80 rounded transition-colors mr-1 flex items-center gap-1 text-[10px] font-bold"
+                            className="p-1 text-green-600 hover:bg-green-50 border border-green-200/80 rounded transition-colors mr-1 flex items-center gap-1 text-[10px] font-bold"
                             title="Ditar nota de evolução por áudio com IA"
                           >
-                            <Mic className="w-3.5 h-3.5 text-blue-600" />
+                            <Mic className="w-3.5 h-3.5 text-green-600" />
                             <span className="hidden xl:inline">Ditar</span>
                           </button>
 
@@ -299,7 +299,7 @@ export default function CrmView() {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Ex: Amanda Oliveira"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg text-xs py-2 px-3 text-slate-700 focus:outline-none focus:border-blue-500"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg text-xs py-2 px-3 text-slate-700 focus:outline-none focus:border-green-600"
                 />
               </div>
 
@@ -373,9 +373,9 @@ export default function CrmView() {
                   <button
                     type="button"
                     onClick={handleOpenDictationForNewForm}
-                    className="text-[11px] text-blue-600 hover:text-blue-800 font-bold flex items-center gap-1 bg-blue-50 border border-blue-100 px-2.5 py-0.5 rounded-lg transition-colors"
+                    className="text-[11px] text-green-600 hover:text-green-800 font-bold flex items-center gap-1 bg-green-50 border border-green-100 px-2.5 py-0.5 rounded-lg transition-colors"
                   >
-                    <Mic className="w-3.5 h-3.5 text-blue-600" />
+                    <Mic className="w-3.5 h-3.5 text-green-600" />
                     <span>Ditar com Voz (IA)</span>
                   </button>
                 </div>
@@ -398,7 +398,7 @@ export default function CrmView() {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-blue-500 hover:bg-blue-600 text-white font-bold text-xs rounded-lg shadow-md transition-all"
+                  className="px-5 py-2 bg-green-600 hover:bg-green-600 text-white font-bold text-xs rounded-lg shadow-md transition-all"
                 >
                   Criar Negócio
                 </button>

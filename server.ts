@@ -1,19 +1,183 @@
 import express from "express";
 import path from "path";
+import helmet from "helmet";
+import cors from "cors";
+import rateLimit from "express-rate-limit";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
+import { createClient } from "@supabase/supabase-js";
 import { createServer as createViteServer } from "vite";
 
-// Load environment variables
+// ── Environment Validation ──────────────────────────────────────
 dotenv.config();
 
+const REQUIRED_ENV_VARS = [
+  "SUPABASE_SERVICE_ROLE_KEY",
+] as const;
+
+const missingVars = REQUIRED_ENV_VARS.filter((v) => !process.env[v]);
+if (missingVars.length > 0) {
+  console.error(`[FATAL] Missing required environment variables: ${missingVars.join(", ")}`);
+  console.error("Set them in your .env file or export them before starting the server.");
+  process.exit(1);
+}
+
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL || "";
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+const PORT = parseInt(process.env.PORT || "3000", 10);
+const APP_URL = process.env.APP_URL || "http://localhost:3000";
+const NODE_ENV = process.env.NODE_ENV || "development";
+
+// ── Supabase Admin Client (server-side only) ────────────────────
+const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
+  auth: { autoRefreshToken: false, persistSession: false },
+});
+
+// ── Express App ─────────────────────────────────────────────────
 const app = express();
-const PORT = 3000;
 
-app.use(express.json({ limit: '25mb' }));
+// Security headers
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "https:"],
+      connectSrc: ["'self'", SUPABASE_URL, "ws://localhost:*", "http://localhost:*"].filter(Boolean),
+      fontSrc: ["'self'"],
+      objectSrc: ["'none'"],
+      frameAncestors: ["'none'"],
+      baseUri: ["'self'"],
+      formAction: ["'self'"],
+    },
+  },
+  crossOriginEmbedderPolicy: false,
+}));
 
-// 5. API: Transcrição de Áudio de Ditado do CRM por IA
-app.post("/api/gemini/transcribe", async (req, res) => {
+app.use(cors({
+  origin: APP_URL,
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  credentials: true,
+  maxAge: 86400,
+}));
+
+app.use(express.json({ limit: "10mb" }));
+
+// ── Rate Limiters ───────────────────────────────────────────────
+const globalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 200,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Muitas requisições. Aguarde 15 minutos." },
+});
+
+const aiLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 15,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Muitas requisições de IA. Aguarde 1 minuto." },
+});
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Muitas tentativas de autenticação. Aguarde 15 minutos." },
+});
+
+app.use("/api/", globalLimiter);
+
+// ── Auth Middleware ──────────────────────────────────────────────
+async function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith("Bearer ")) {
+    return res.status(401).json({ error: "Token de autenticação necessário." });
+  }
+
+  const token = authHeader.slice(7);
+  try {
+    const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
+    if (error || !user) {
+      return res.status(401).json({ error: "Sessão inválida ou expirada." });
+    }
+    (req as any).userId = user.id;
+    (req as any).userEmail = user.email;
+    next();
+  } catch {
+    return res.status(401).json({ error: "Falha na verificação de autenticação." });
+  }
+}
+
+// ── Structured Logger ───────────────────────────────────────────
+function logEvent(level: "INFO" | "WARN" | "ERROR", message: string, meta?: Record<string, unknown>) {
+  const entry = {
+    timestamp: new Date().toISOString(),
+    level,
+    message,
+    ...meta,
+  };
+  if (level === "ERROR") {
+    console.error(JSON.stringify(entry));
+  } else if (level === "WARN") {
+    console.warn(JSON.stringify(entry));
+  } else {
+    console.log(JSON.stringify(entry));
+  }
+}
+
+// ── Health Check (public) ──────────────────────────────────────
+app.get("/api/health", async (_req, res) => {
+  try {
+    const { error } = await supabaseAdmin
+      .from("tenants")
+      .select("id", { count: "exact", head: true });
+
+    const dbOk = !error;
+
+    res.json({
+      status: dbOk ? "ok" : "degraded",
+      timestamp: new Date().toISOString(),
+      dependencies: {
+        database: dbOk ? "up" : "down",
+      },
+    });
+  } catch {
+    res.json({
+      status: "degraded",
+      timestamp: new Date().toISOString(),
+      dependencies: {
+        database: "down",
+      },
+    });
+  }
+});
+
+// ── Auth endpoints ──────────────────────────────────────────────
+app.post("/api/auth/verify", authLimiter, async (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith("Bearer ")) {
+    return res.status(401).json({ valid: false });
+  }
+  try {
+    const { data: { user }, error } = await supabaseAdmin.auth.getUser(authHeader.slice(7));
+    if (error || !user) {
+      return res.status(401).json({ valid: false });
+    }
+    res.json({ valid: true, userId: user.id, email: user.email });
+  } catch {
+    res.status(401).json({ valid: false });
+  }
+});
+
+// ── AI Endpoints (authenticated) ────────────────────────────────
+
+// 1. Transcrição de Áudio
+app.post("/api/gemini/transcribe", requireAuth, aiLimiter, async (req, res) => {
   try {
     const { audioData, mimeType } = req.body;
 
@@ -23,7 +187,7 @@ app.post("/api/gemini/transcribe", async (req, res) => {
 
     if (!ai) {
       return res.json({
-        transcription: "Nota de áudio capturada: Paciente relata estabilidade clínica no atendimento domiciliar, sem queixas algicas agudas. Família orientada quanto ao horário de medicação."
+        transcription: "Nota de áudio capturada: Paciente relata estabilidade clínica no atendimento domiciliar, sem queixas agudas. Família orientada quanto ao horário de medicação."
       });
     }
 
@@ -31,7 +195,7 @@ app.post("/api/gemini/transcribe", async (req, res) => {
     const cleanMimeType = mimeType || "audio/webm";
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
+      model: "gemini-2.5-flash",
       contents: [
         {
           inlineData: {
@@ -46,32 +210,32 @@ app.post("/api/gemini/transcribe", async (req, res) => {
     });
 
     const transcription = response.text ? response.text.trim() : "";
+    logEvent("INFO", "Audio transcription completed", { userId: (req as any).userId });
     return res.json({ transcription });
   } catch (error: any) {
-    console.error("Error in audio transcription:", error);
+    logEvent("ERROR", "Audio transcription failed", { error: error.message });
     res.status(500).json({ error: error.message || "Falha ao transcrever áudio" });
   }
 });
 
-// Initialize GoogleGenAI SDK with server-side API Key
+// Initialize GoogleGenAI SDK
 const apiKey = process.env.GEMINI_API_KEY;
 let ai: GoogleGenAI | null = null;
 
 if (apiKey) {
   ai = new GoogleGenAI({
-    apiKey: apiKey,
+    apiKey,
     httpOptions: {
-      headers: {
-        'User-Agent': 'aistudio-build',
-      },
+      headers: { "User-Agent": "homecare-pro-server" },
     },
   });
+  logEvent("INFO", "Gemini AI initialized successfully");
 } else {
-  console.warn("WARNING: GEMINI_API_KEY not defined in environment variables. AI features will fallback to local simulated responses.");
+  logEvent("WARN", "GEMINI_API_KEY not set. AI features will use fallback responses.");
 }
 
-// 1. API: Resumo do Paciente com IA
-app.post("/api/gemini/summarize-patient", async (req, res) => {
+// 2. Resumo do Paciente com IA
+app.post("/api/gemini/summarize-patient", requireAuth, aiLimiter, async (req, res) => {
   try {
     const { patient } = req.body;
     if (!patient) {
@@ -79,7 +243,6 @@ app.post("/api/gemini/summarize-patient", async (req, res) => {
     }
 
     if (!ai) {
-      // Simulated response in case API key is missing
       return res.json({
         summary: `[Simulação de IA] O paciente ${patient.name}, ${getAge(patient.birthDate)} anos, apresenta quadro de ${patient.diagnostic}. Possui alergia a ${patient.allergies.join(", ") || "nenhum componente informado"} e faz uso contínuo de: ${patient.medications.join(", ") || "nenhum medicamento informado"}. Recomenda-se acompanhamento rigoroso e monitoramento de sinais vitais.`
       });
@@ -105,19 +268,20 @@ INSTRUÇÕES DO RESUMO:
 - Não use Markdown muito pesado, use quebras de linha e negrito simples.`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
+      model: "gemini-2.5-flash",
       contents: prompt,
     });
 
+    logEvent("INFO", "Patient summary generated", { userId: (req as any).userId, patientName: patient.name });
     res.json({ summary: response.text });
   } catch (error: any) {
-    console.error("Error in summarize-patient:", error);
+    logEvent("ERROR", "Patient summary failed", { error: error.message });
     res.status(500).json({ error: error.message || "Failed to generate patient summary" });
   }
 });
 
-// 2. API: Geração de Relatório de Visita
-app.post("/api/gemini/generate-visit-report", async (req, res) => {
+// 3. Geração de Relatório de Visita
+app.post("/api/gemini/generate-visit-report", requireAuth, aiLimiter, async (req, res) => {
   try {
     const { patientName, professionalName, rawNotes, vitals } = req.body;
 
@@ -149,19 +313,20 @@ INSTRUÇÕES DO RELATÓRIO:
 3. Escreva em português de forma formal, clara, ética e precisa.`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
+      model: "gemini-2.5-flash",
       contents: prompt,
     });
 
+    logEvent("INFO", "Visit report generated", { userId: (req as any).userId, patientName });
     res.json({ report: response.text });
   } catch (error: any) {
-    console.error("Error in generate-visit-report:", error);
+    logEvent("ERROR", "Visit report generation failed", { error: error.message });
     res.status(500).json({ error: error.message || "Failed to generate visit report" });
   }
 });
 
-// 3. API: Sugestão de Agenda Otimizada
-app.post("/api/gemini/suggest-schedule", async (req, res) => {
+// 4. Sugestão de Agenda Otimizada
+app.post("/api/gemini/suggest-schedule", requireAuth, aiLimiter, async (req, res) => {
   try {
     const { visits, professionals, patients } = req.body;
 
@@ -194,19 +359,20 @@ Crie um plano estratégico de escala otimizada com:
 - Liste recomendações em tópicos curtos e objetivos em português.`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
+      model: "gemini-2.5-flash",
       contents: prompt,
     });
 
+    logEvent("INFO", "Schedule suggestion generated", { userId: (req as any).userId });
     res.json({ suggestion: response.text });
   } catch (error: any) {
-    console.error("Error in suggest-schedule:", error);
+    logEvent("ERROR", "Schedule suggestion failed", { error: error.message });
     res.status(500).json({ error: error.message || "Failed to suggest schedule optimization" });
   }
 });
 
-// 4. API: Triagem Inteligente de Atendimentos por IA
-app.post("/api/gemini/triage", async (req, res) => {
+// 5. Triagem Inteligente
+app.post("/api/gemini/triage", requireAuth, aiLimiter, async (req, res) => {
   try {
     const { description, patientAge, mainCondition } = req.body;
 
@@ -215,68 +381,67 @@ app.post("/api/gemini/triage", async (req, res) => {
     }
 
     if (!ai) {
-      // Rule-based fallback if AI key is missing or server is offline
       const text = description.toLowerCase();
-      let urgency: 'Crítica' | 'Alta' | 'Média' | 'Baixa' = 'Média';
+      let urgency: "Critica" | "Alta" | "Media" | "Baixa" = "Media";
       let urgencyScore = 5;
-      let specialty: 'Enfermeiro' | 'Técnico de Enfermagem' | 'Fisioterapeuta' | 'Fonoaudiólogo' | 'Médico' | 'Nutricionista' = 'Enfermeiro';
-      let responseTime = "Atendimento em até 6 horas";
-      let clinicalRationale = "Triagem baseada em algoritmo de urgência por palavras-chave clínicas.";
+      let specialty: "Enfermeiro" | "Tecnico de Enfermagem" | "Fisioterapeuta" | "Fonoaudiologo" | "Medico" | "Nutricionista" = "Enfermeiro";
+      let responseTime = "Atendimento em ate 6 horas";
+      let clinicalRationale = "Triagem baseada em algoritmo de urgencia por palavras-chave clinicas.";
       let recommendedActions: string[] = [
-        "Realizar contato telefônico prévio com o responsável",
-        "Verificar histórico de alergias e comorbidades antes da partida",
+        "Realizar contato telefonico previo com o responsavel",
+        "Verificar historico de alergias e comorbidades antes da partida",
         "Aferir sinais vitais completos no primeiro contato"
       ];
 
-      if (text.includes("falta de ar") || text.includes("dispneia") || text.includes("saturação") || text.includes("parada") || text.includes("dor no peito") || text.includes("inconsciente") || text.includes("crítica") || text.includes("convulsão")) {
-        urgency = 'Crítica';
+      if (text.includes("falta de ar") || text.includes("dispneia") || text.includes("saturacao") || text.includes("parada") || text.includes("dor no peito") || text.includes("inconsciente") || text.includes("critica") || text.includes("convulsao")) {
+        urgency = "Critica";
         urgencyScore = 9;
-        specialty = text.includes("respira") || text.includes("saturação") ? 'Fisioterapeuta' : 'Médico';
-        responseTime = "Atendimento Imediato (Até 2 horas)";
-        clinicalRationale = "Sinais evidentes de desconforto respiratório ou instabilidade hemodinâmica crítica requerem intervenção médica/fisioterapêutica urgente em domicilio.";
+        specialty = text.includes("respira") || text.includes("saturacao") ? "Fisioterapeuta" : "Medico";
+        responseTime = "Atendimento Imediato (Ate 2 horas)";
+        clinicalRationale = "Sinais evidentes de desconforto respiratorio ou instabilidade hemodinamica critica requerem intervencao medica/fisioterapeutica urgente em domicilio.";
         recommendedActions = [
-          "Disponibilizar oxigenoterapia de emergência se necessário",
-          "Acionar médico plantonista de sobreaviso",
-          "Instruir familiar sobre posicionamento e manter vias aéreas pérvias"
+          "Disponibilizar oxigenoterapia de emergencia se necessario",
+          "Acionar medico plantonista de sobreaviso",
+          "Instruir familiar sobre posicionamento e manter vias aereas pervias"
         ];
-      } else if (text.includes("sonda") || text.includes("curativo") || text.includes("lesão") || text.includes("traqueo") || text.includes("refluxo") || text.includes("febre")) {
-        urgency = 'Alta';
+      } else if (text.includes("sonda") || text.includes("curativo") || text.includes("lesao") || text.includes("traqueo") || text.includes("refluxo") || text.includes("febre")) {
+        urgency = "Alta";
         urgencyScore = 7;
-        specialty = 'Enfermeiro';
-        responseTime = "Atendimento Prioritário (Até 4 horas)";
-        clinicalRationale = "Procedimento invasivo (sonda/curativo) ou manejo de estomas requer habilidade técnica do Enfermeiro para prevenção de infecções e complicações.";
+        specialty = "Enfermeiro";
+        responseTime = "Atendimento Prioritario (Ate 4 horas)";
+        clinicalRationale = "Procedimento invasivo (sonda/curativo) ou manejo de estomas requer habilidade tecnica do Enfermeiro para prevencao de infeccoes e complicacoes.";
         recommendedActions = [
-          "Separar kit de curativo estério ou sonda de substituição",
-          "Avaliar presença de hiperemia ou secreção purulenta",
-          "Orientar a equipe de enfermagem sobre técnica asséptica"
+          "Separar kit de curativo esteril ou sonda de substituicao",
+          "Avaliar presenca de hiperemia ou secrecao purulenta",
+          "Orientar a equipe de enfermagem sobre tecnica asseptica"
         ];
       } else if (text.includes("engasgo") || text.includes("engolir") || text.includes("disfagia") || text.includes("voz")) {
-        urgency = 'Média';
+        urgency = "Media";
         urgencyScore = 6;
-        specialty = 'Fonoaudiólogo';
-        responseTime = "Programado para até 12 horas";
-        clinicalRationale = "Alterações de deglutição requerem avaliação fonoaudiológica especializada para evitar risco de broncoaspiração de dieta e secreções.";
+        specialty = "Fonoaudiologo";
+        responseTime = "Programado para ate 12 horas";
+        clinicalRationale = "Alteracoes de degluticao requerem avaliacao fonoaudiologica especializada para evitar risco de broncoaspiracao de dieta e secrecoes.";
         recommendedActions = [
-          "Avaliar consistência atual da dieta (pastosa/líquida)",
-          "Manter paciente elevado a 45°-90° durante alimentação",
-          "Agendar teste de deglutição com fonoaudiólogo"
+          "Avaliar consistencia atual da dieta (pastosa/liquida)",
+          "Manter paciente elevado a 45-90 durante alimentacao",
+          "Agendar teste de degluticao com fonoaudiologo"
         ];
       } else if (text.includes("movimento") || text.includes("avc") || text.includes("fraqueza") || text.includes("marcha") || text.includes("fisioterapia")) {
-        urgency = 'Média';
+        urgency = "Media";
         urgencyScore = 5;
-        specialty = 'Fisioterapeuta';
-        responseTime = "Atendimento Programado (Até 24 horas)";
-        clinicalRationale = "Reabilitação motora e fortalecimento para prevenir contraturas e contratempos de imobilismo leito-cadeira.";
+        specialty = "Fisioterapeuta";
+        responseTime = "Atendimento Programado (Ate 24 horas)";
+        clinicalRationale = "Reabilitacao motora e fortalecimento para prevenir contraturas e contratempos de imobilismo leito-cadeira.";
         recommendedActions = [
-          "Avaliar amplitude de movimento e força muscular",
-          "Instruir plano de exercícios para cuidador familiar"
+          "Avaliar amplitude de movimento e forca muscular",
+          "Instruir plano de exercicios para cuidador familiar"
         ];
       } else {
-        urgency = 'Baixa';
+        urgency = "Baixa";
         urgencyScore = 3;
-        specialty = 'Técnico de Enfermagem';
-        responseTime = "Visita de Rotina (Até 48 horas)";
-        clinicalRationale = "Procedimentos de rotina e acompanhamento do plano de cuidados diários sem sinais imediatos de gravidade.";
+        specialty = "Tecnico de Enfermagem";
+        responseTime = "Visita de Rotina (Ate 48 horas)";
+        clinicalRationale = "Procedimentos de rotina e acompanhamento do plano de cuidados diarios sem sinais imediatos de gravidade.";
       }
 
       return res.json({
@@ -289,60 +454,230 @@ app.post("/api/gemini/triage", async (req, res) => {
       });
     }
 
-    const prompt = `Você é um médico auditor especialista em triagem e acolhimento em Home Care (Manchester / Protocolo Canadense de Triagem Domiciliar).
-Analise a solicitação de atendimento abaixo e determine o nível de urgência, a especialidade profissional ideal e as condutas imediatas recomendadas.
+    const prompt = `Voce e um medico auditor especialista em triagem e acolhimento em Home Care (Manchester / Protocolo Canadense de Triagem Domiciliar).
+Analise a solicitacao de atendimento abaixo e determine o nivel de urgencia, a especialidade profissional ideal e as condutas imediatas recomendadas.
 
-DESCRIÇÃO DA SOLICITAÇÃO:
+DESCRICAO DA SOLICITACAO:
 "${description}"
 ${patientAge ? `- Idade do paciente: ${patientAge} anos` : ""}
-${mainCondition ? `- Condição de base: ${mainCondition}` : ""}
+${mainCondition ? `- Condicao de base: ${mainCondition}` : ""}
 
 Responda ESTRITAMENTE em formato JSON com os seguintes campos:
 {
-  "urgency": "Crítica" | "Alta" | "Média" | "Baixa",
-  "urgencyScore": número de 1 a 10,
-  "specialty": "Enfermeiro" | "Técnico de Enfermagem" | "Fisioterapeuta" | "Fonoaudiólogo" | "Médico" | "Nutricionista",
-  "responseTime": "Tempo estimado para resposta em texto claro (ex: Atendimento Imediato até 2h)",
-  "clinicalRationale": "Justificativa médica concisa e direta (2 a 3 frases) do porquê dessa classificação",
-  "recommendedActions": ["Ação 1", "Ação 2", "Ação 3"]
+  "urgency": "Critica" | "Alta" | "Media" | "Baixa",
+  "urgencyScore": numero de 1 a 10,
+  "specialty": "Enfermeiro" | "Tecnico de Enfermagem" | "Fisioterapeuta" | "Fonoaudiologo" | "Medico" | "Nutricionista",
+  "responseTime": "Tempo estimado para resposta em texto claro (ex: Atendimento Imediato ate 2h)",
+  "clinicalRationale": "Justificativa medica concisa e direta (2 a 3 frases) do porquue dessa classificacao",
+  "recommendedActions": ["Acao 1", "Acao 2", "Acao 3"]
 }
 
-Apenas o objeto JSON válido, sem formatação Markdown adicional nem blocos de código se possível.`;
+Apenas o objeto JSON valido, sem formatacao Markdown adicional nem blocos de codigo se possivel.`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
+      model: "gemini-2.5-flash",
       contents: prompt,
     });
 
     let resultText = response.text || "";
-    // Clean up potential markdown code block backticks
     resultText = resultText.replace(/```json/gi, "").replace(/```/g, "").trim();
 
     try {
       const parsed = JSON.parse(resultText);
+      logEvent("INFO", "Triage analyzed", { userId: (req as any).userId, urgency: parsed.urgency });
       return res.json(parsed);
-    } catch (e) {
-      // If parsing failed, return fallback structured json
+    } catch (_e) {
       return res.json({
-        urgency: "Média",
+        urgency: "Media",
         urgencyScore: 5,
         specialty: "Enfermeiro",
-        responseTime: "Atendimento em até 12 horas",
-        clinicalRationale: resultText.slice(0, 300) || "Análise concluída com sucesso.",
+        responseTime: "Atendimento em ate 12 horas",
+        clinicalRationale: resultText.slice(0, 300) || "Analise concluida com sucesso.",
         recommendedActions: [
           "Verificar sinais vitais do paciente",
-          "Contactar o familiar responsável",
-          "Encaminhar solicitação à equipe de enfermagem"
+          "Contactar o familiar responsavel",
+          "Encaminhar solicitacao a equipe de enfermagem"
         ]
       });
     }
   } catch (error: any) {
-    console.error("Error in triage:", error);
+    logEvent("ERROR", "Triage analysis failed", { error: error.message });
     res.status(500).json({ error: error.message || "Failed to analyze triage request" });
   }
 });
 
-// Helper for calculating age
+// ── Tenant Resolution (Whitelabel) ──────────────────────────────
+app.get("/api/tenant/resolve", globalLimiter, async (req, res) => {
+  try {
+    const domain = req.query.domain as string;
+    if (!domain) {
+      return res.status(400).json({ error: "Domain is required" });
+    }
+
+    // Try to find tenant by custom_domain first
+    let { data: tenant } = await supabaseAdmin
+      .from("tenants")
+      .select("id, name, logo, primary_color, secondary_color, status")
+      .eq("custom_domain", domain)
+      .single();
+
+    // If no custom domain, assume we are on the main domain or a generic one, 
+    // we could also look up by a subdomain slug if we added a `slug` field.
+    // For now, if no match is found, we can return the system tenant or null.
+    if (!tenant) {
+       // As fallback for testing, let's return a default tenant or null
+       const { data: defaultTenant } = await supabaseAdmin
+         .from("tenants")
+         .select("id, name, logo, primary_color, secondary_color, status")
+         .eq("id", "system")
+         .single();
+       tenant = defaultTenant;
+    }
+
+    if (!tenant) {
+      return res.status(404).json({ error: "Tenant not found" });
+    }
+
+    if (tenant.status !== "active") {
+      return res.status(403).json({ error: "Tenant is not active" });
+    }
+
+    res.json(tenant);
+  } catch (error: any) {
+    logEvent("ERROR", "Tenant resolution failed", { error: error.message });
+    res.status(500).json({ error: "Failed to resolve tenant" });
+  }
+});
+
+// ── Asaas Webhooks ──────────────────────────────────────────────
+app.post("/api/webhooks/asaas", express.json({type: 'application/json'}), async (req, res) => {
+  try {
+    const token = req.headers["asaas-access-token"];
+    if (process.env.ASAAS_WEBHOOK_TOKEN && token !== process.env.ASAAS_WEBHOOK_TOKEN) {
+      logEvent("WARN", "Invalid Asaas Webhook Token");
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const { event, payment } = req.body;
+    logEvent("INFO", `Asaas Webhook received: ${event}`, { paymentId: payment?.id });
+
+    if (!payment) {
+      return res.status(400).json({ error: "Invalid payload" });
+    }
+
+    if (event === "PAYMENT_RECEIVED" || event === "PAYMENT_CONFIRMED") {
+      // Update invoice status
+      await supabaseAdmin
+        .from("invoices")
+        .update({ status: "RECEIVED", payment_date: new Date().toISOString() })
+        .eq("asaas_payment_id", payment.id);
+      
+      // Optionally logic to unblock a tenant if they were overdue
+    } else if (event === "PAYMENT_OVERDUE") {
+      await supabaseAdmin
+        .from("invoices")
+        .update({ status: "OVERDUE" })
+        .eq("asaas_payment_id", payment.id);
+        
+      // Block tenant logic (could be async or delayed)
+      // await supabaseAdmin.from("tenants").update({ status: "blocked" }).eq("asaas_customer_id", payment.customer);
+    }
+
+    res.json({ received: true });
+  } catch (error: any) {
+    logEvent("ERROR", "Asaas Webhook processing failed", { error: error.message });
+    res.status(500).json({ error: "Webhook error" });
+  }
+});
+
+// ── LGPD Endpoints ──────────────────────────────────────────────
+
+// Export user data (LGPD Art. 18 - Portabilidade)
+app.get("/api/lgpd/export", requireAuth, async (req, res) => {
+  const userId = (req as any).userId;
+  try {
+    const { data: profile } = await supabaseAdmin
+      .from("user_profiles")
+      .select("*")
+      .eq("id", userId)
+      .single();
+
+    const { data: patients } = await supabaseAdmin
+      .from("patients")
+      .select("*")
+      .eq("tenant_id", profile?.tenant_id || "");
+
+    logEvent("INFO", "LGPD data export requested", { userId });
+    res.json({
+      exportedAt: new Date().toISOString(),
+      profile,
+      patients: patients || [],
+    });
+  } catch (error: any) {
+    logEvent("ERROR", "LGPD export failed", { error: error.message, userId });
+    res.status(500).json({ error: "Falha ao exportar dados." });
+  }
+});
+
+// Delete user data (LGPD Art. 18 - Eliminacao)
+app.delete("/api/lgpd/delete", requireAuth, async (req, res) => {
+  const userId = (req as any).userId;
+  try {
+    const { data: profile } = await supabaseAdmin
+      .from("user_profiles")
+      .select("tenant_id")
+      .eq("id", userId)
+      .single();
+
+    if (!profile) {
+      return res.status(404).json({ error: "Perfil nao encontrado." });
+    }
+
+    await supabaseAdmin.from("user_profiles").delete().eq("id", userId);
+    await supabaseAdmin.auth.admin.deleteUser(userId);
+
+    logEvent("INFO", "LGPD account deletion completed", { userId });
+    res.json({ success: true, message: "Conta e dados pessoais removidos com sucesso." });
+  } catch (error: any) {
+    logEvent("ERROR", "LGPD deletion failed", { error: error.message, userId });
+    res.status(500).json({ error: "Falha ao remover dados." });
+  }
+});
+
+// Privacy policy endpoint
+app.get("/api/lgpd/privacy-policy", (_req, res) => {
+  res.json({
+    lastUpdated: "2026-07-28",
+    company: "HomeCare Pro",
+    dataController: "HomeCare Pro Tecnologia em Saude Ltda",
+    dpoEmail: "privacidade@homecarepro.com.br",
+    dataCollected: [
+      "Dados de autenticacao (email, nome)",
+      "Dados de saude de pacientes (diagnosticos, medicacoes, alergias)",
+      "Dados de profissionais (CPF, registro profissional)",
+      "Dados de localizacao durante check-in/check-out",
+    ],
+    legalBases: [
+      "Execucao de contrato de prestacao de servicos de saude domiciliar",
+      "Consentimento do titular dos dados",
+      "Obrigacao legal e regulatoria (ANS, CFM, COREN)",
+    ],
+    dataRetention: "Dados saude: minimo 20 anos (CFM 1.821/2007). Dados operacionais: 5 anos. Dados de marketing: ate revogacao do consentimento.",
+    rights: [
+      "Confirmacao da existencia de tratamento",
+      "Acesso aos dados",
+      "Correcao de dados incompletos ou desatualizados",
+      "Anonimizacao, bloqueio ou eliminacao de dados desnecessarios",
+      "Portabilidade dos dados",
+      "Eliminacao dos dados tratados com consentimento",
+      "Informacao sobre compartilhamento de dados",
+      "Revogacao do consentimento",
+    ],
+    internationalTransfers: "Dados podem ser transferidos para servidores nos EUA (Supabase, Google Cloud) com garantias contratuais de protecao.",
+  });
+});
+
+// ── Helper ──────────────────────────────────────────────────────
 function getAge(birthDateString: string) {
   if (!birthDateString) return 0;
   const today = new Date();
@@ -355,29 +690,51 @@ function getAge(birthDateString: string) {
   return age;
 }
 
-// Vite or static file serving
+// ── Server Start ────────────────────────────────────────────────
 const startServer = async () => {
-  if (process.env.NODE_ENV !== "production") {
-    console.log("Starting in development mode with Vite middleware...");
+  if (NODE_ENV !== "production") {
+    logEvent("INFO", "Starting in development mode with Vite middleware...");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
     });
     app.use(vite.middlewares);
   } else {
-    console.log("Starting in production mode...");
-    const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
-    app.get('*', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
+    logEvent("INFO", "Starting in production mode...");
+    const distPath = path.join(process.cwd(), "dist");
+    app.use(express.static(distPath, {
+      maxAge: "1y",
+      etag: true,
+      lastModified: true,
+    }));
+    app.get("*", (req, res) => {
+      res.sendFile(path.join(distPath, "index.html"));
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`[HomeCare Pro Server] running on http://0.0.0.0:${PORT}`);
+  const server = app.listen(PORT, "0.0.0.0", () => {
+    logEvent("INFO", `HomeCare Pro Server running on http://0.0.0.0:${PORT}`, { env: NODE_ENV });
+  });
+
+  const shutdown = () => {
+    logEvent("INFO", "Server shutting down...");
+    server.close(() => process.exit(0));
+    setTimeout(() => process.exit(1), 5000);
+  };
+  process.on("SIGINT", shutdown);
+  process.on("SIGTERM", shutdown);
+
+  process.on("uncaughtException", (err) => {
+    logEvent("ERROR", "Uncaught exception", { error: err.message, stack: err.stack });
+    shutdown();
+  });
+
+  process.on("unhandledRejection", (reason) => {
+    logEvent("ERROR", "Unhandled rejection", { reason: String(reason) });
   });
 };
 
 startServer().catch((err) => {
-  console.error("Failed to start HomeCare Pro server:", err);
+  logEvent("ERROR", "Failed to start server", { error: err.message });
+  process.exit(1);
 });

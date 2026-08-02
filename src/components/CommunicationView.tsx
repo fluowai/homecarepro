@@ -136,7 +136,7 @@ export default function CommunicationView() {
                     setShowListMobile(false);
                   }}
                   className={`p-4 cursor-pointer hover:bg-slate-50 transition-colors flex items-center justify-between gap-3 ${
-                    isSelected ? 'bg-blue-50/60 md:border-l-4 md:border-blue-500' : ''
+                    isSelected ? 'bg-green-50/60 md:border-l-4 md:border-green-600' : ''
                   }`}
                 >
                   <div className="flex items-center gap-3 min-w-0 flex-1">
@@ -156,7 +156,7 @@ export default function CommunicationView() {
 
                   <div className="flex flex-col items-end shrink-0 gap-1.5">
                     {unreadCount > 0 && (
-                      <span className="bg-blue-500 text-white font-bold text-[9px] rounded-full h-4 min-w-4 px-1 flex items-center justify-center">
+                      <span className="bg-green-600 text-white font-bold text-[9px] rounded-full h-4 min-w-4 px-1 flex items-center justify-center">
                         {unreadCount}
                       </span>
                     )}
@@ -203,7 +203,7 @@ export default function CommunicationView() {
                   className="p-2 md:px-3 md:py-1.5 border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-lg text-xs font-semibold transition-all flex items-center gap-1"
                   title="Lembrete de Visita"
                 >
-                  <BellRing className="w-3.5 h-3.5 text-blue-500" />
+                  <BellRing className="w-3.5 h-3.5 text-green-600" />
                   <span className="hidden lg:inline">Lembrete</span>
                 </button>
                 <button
@@ -225,8 +225,8 @@ export default function CommunicationView() {
 
                 if (isSystem) {
                   return (
-                    <div key={msg.id} className="mx-auto max-w-md bg-blue-50 border border-blue-100 text-blue-800 p-3 rounded-2xl text-[11px] leading-relaxed shadow-sm flex gap-2">
-                      <Sparkles className="w-4 h-4 text-blue-500 fill-blue-500 shrink-0" />
+                    <div key={msg.id} className="mx-auto max-w-md bg-green-50 border border-green-100 text-green-800 p-3 rounded-2xl text-[11px] leading-relaxed shadow-sm flex gap-2">
+                      <Sparkles className="w-4 h-4 text-green-600 fill-green-600 shrink-0" />
                       <div>
                         <strong className="block font-bold">Disparo Automático de Lembrete:</strong>
                         <span>{msg.text}</span>
@@ -242,15 +242,15 @@ export default function CommunicationView() {
                   >
                     <div className={`max-w-md p-3.5 rounded-2xl shadow-sm text-xs leading-relaxed ${
                       isOperator 
-                        ? 'bg-blue-500 text-white rounded-br-none' 
+                        ? 'bg-green-600 text-white rounded-br-none' 
                         : 'bg-white text-slate-700 border border-slate-200 rounded-bl-none'
                     }`}>
                       <p>{msg.text}</p>
                       <div className="flex items-center justify-end gap-1 mt-1.5 text-[9px]">
-                        <span className={isOperator ? 'text-blue-100' : 'text-slate-400'}>
+                        <span className={isOperator ? 'text-green-100' : 'text-slate-400'}>
                           {new Date(msg.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                         </span>
-                        {isOperator && <CheckCheck className="w-3.5 h-3.5 text-blue-100" />}
+                        {isOperator && <CheckCheck className="w-3.5 h-3.5 text-green-100" />}
                       </div>
                     </div>
                   </div>
@@ -267,11 +267,11 @@ export default function CommunicationView() {
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
                 placeholder="Escreva a mensagem de retorno para a família..."
-                className="flex-1 bg-slate-50 border border-slate-200 rounded-xl text-xs px-4 py-3 text-slate-700 focus:outline-none focus:border-blue-500 focus:bg-white transition-all"
+                className="flex-1 bg-slate-50 border border-slate-200 rounded-xl text-xs px-4 py-3 text-slate-700 focus:outline-none focus:border-green-600 focus:bg-white transition-all"
               />
               <button
                 type="submit"
-                className="p-3 bg-blue-500 hover:bg-blue-600 text-white rounded-xl shadow-md shadow-blue-100 transition-all flex items-center justify-center"
+                className="p-3 bg-green-600 hover:bg-green-600 text-white rounded-xl shadow-md shadow-green-100 transition-all flex items-center justify-center"
               >
                 <Send className="w-4 h-4" />
               </button>

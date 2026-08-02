@@ -9,6 +9,37 @@ export interface Tenant {
   logo: string;
   cnpj: string;
   plan: string;
+  parentId?: string;
+  status?: 'active' | 'inactive' | 'blocked';
+  customDomain?: string;
+  primaryColor?: string;
+  secondaryColor?: string;
+}
+
+export type UserRole = 'mega_admin' | 'super_admin' | 'admin' | 'operator' | 'professional' | 'patient' | 'viewer';
+
+export interface UserProfile {
+  id: string;
+  tenantId: string;
+  fullName: string;
+  role: UserRole;
+  avatarUrl?: string;
+}
+
+export interface UserTenant {
+  userId: string;
+  tenantId: string;
+  role: UserRole;
+  createdAt: string;
+}
+
+export interface HealthInsurance {
+  id: string;
+  tenantId: string;
+  name: string;
+  phone: string;
+  email: string;
+  contactPerson?: string;
 }
 
 export interface PatientFile {
@@ -26,6 +57,14 @@ export interface TimelineEvent {
   description: string;
   type: 'clinical' | 'visit' | 'system' | 'billing';
   author: string;
+  photos?: string[];
+  vitals?: {
+    pa?: string;
+    fc?: string;
+    temp?: string;
+    sat?: string;
+    pain?: number;
+  };
 }
 
 export interface Patient {
@@ -34,16 +73,26 @@ export interface Patient {
   name: string;
   birthDate: string;
   cpf: string;
+  gender?: 'M' | 'F' | 'O';
   phone: string;
   email: string;
   status: PatientStatus;
-  planType: string; // ex: Bradesco Saúde, Particular, Unimed
+  planType: string;
+  insuranceId?: string;
+  monthlyPackageValue?: number;
+  padScope?: string;
   avatar: string;
   diagnostic: string;
   allergies: string[];
   medications: string[];
   files: PatientFile[];
   timeline: TimelineEvent[];
+  inventory?: {
+    medicineId: string;
+    medicineName: string;
+    quantity: number;
+    dosage: string;
+  }[];
   address: {
     street: string;
     number: string;
@@ -54,17 +103,47 @@ export interface Patient {
   summaryAi?: string;
 }
 
+export type ProfessionalSpecialty = 
+  | 'Enfermeiro' 
+  | 'Técnico de Enfermagem' 
+  | 'Auxiliar de Enfermagem'
+  | 'Fisioterapeuta' 
+  | 'Fonoaudiólogo' 
+  | 'Médico' 
+  | 'Nutricionista'
+  | 'Psicólogo'
+  | 'Terapeuta Ocupacional'
+  | 'Assistente Social'
+  | 'Cuidador de Idosos';
+
 export interface Professional {
   id: string;
   tenantId: string;
   name: string;
-  specialty: 'Enfermeiro' | 'Técnico de Enfermagem' | 'Fisioterapeuta' | 'Fonoaudiólogo' | 'Médico' | 'Nutricionista';
+  cpf: string;
+  gender: 'M' | 'F' | 'O';
+  specialty: ProfessionalSpecialty;
   registration: string; // ex: COREN-SP 123456
   status: ProfessionalStatus;
   email: string;
   phone: string;
   avatar: string;
   rating: number;
+  address: {
+    street: string;
+    number: string;
+    city: string;
+    state: string;
+    zipCode: string;
+  };
+  documents: {
+    type: string;
+    name: string;
+    url: string;
+    expirationDate?: string;
+    status?: 'valid' | 'expired' | 'pending';
+  }[];
+  stampSignatureUrl?: string;
 }
 
 export interface Visit {
@@ -80,6 +159,8 @@ export interface Visit {
   checkOutTime?: string;
   checkInLocation?: string;
   checkOutLocation?: string;
+  checkInCoords?: { lat: number; lng: number };
+  checkOutCoords?: { lat: number; lng: number };
   report?: string;
   value: number;
 }
@@ -180,7 +261,7 @@ export interface OfflineSyncItem {
 export interface TriageResult {
   urgency: 'Crítica' | 'Alta' | 'Média' | 'Baixa';
   urgencyScore: number;
-  specialty: 'Enfermeiro' | 'Técnico de Enfermagem' | 'Fisioterapeuta' | 'Fonoaudiólogo' | 'Médico' | 'Nutricionista';
+  specialty: ProfessionalSpecialty;
   responseTime: string;
   clinicalRationale: string;
   recommendedActions: string[];

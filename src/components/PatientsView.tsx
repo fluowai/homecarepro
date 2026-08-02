@@ -16,7 +16,9 @@ import {
   FileCheck2,
   Trash2,
   ArrowLeft,
-  Users
+  Users,
+  Pill,
+  Package
 } from 'lucide-react';
 import { useHomeCareStore } from '../store';
 import { Patient } from '../types';
@@ -25,7 +27,7 @@ interface PatientsViewProps {
   searchQuery: string;
 }
 
-type TabType = 'info' | 'clinical' | 'files' | 'timeline' | 'ai';
+type TabType = 'info' | 'clinical' | 'inventory' | 'files' | 'timeline' | 'ai';
 
 export default function PatientsView({ searchQuery }: PatientsViewProps) {
   const { 
@@ -36,7 +38,9 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
     deletePatient, 
     addPatientFile, 
     addTimelineEvent,
-    generateAiSummary
+    generateAiSummary,
+    insurances,
+    currentUserRole
   } = useHomeCareStore();
 
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
@@ -52,9 +56,13 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
   const [name, setName] = useState('');
   const [birthDate, setBirthDate] = useState('');
   const [cpf, setCpf] = useState('');
+  const [gender, setGender] = useState<'M'|'F'|'O'>('F');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [planType, setPlanType] = useState('Particular');
+  const [insuranceId, setInsuranceId] = useState('');
+  const [monthlyPackageValue, setMonthlyPackageValue] = useState<number | ''>('');
+  const [padScope, setPadScope] = useState('');
   const [diagnostic, setDiagnostic] = useState('');
   const [allergiesText, setAllergiesText] = useState('');
   const [medicationsText, setMedicationsText] = useState('');
@@ -66,8 +74,9 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
 
   // Manual event adding
   const [eventTitle, setEventTitle] = useState('');
-  const [eventDesc, setEventDesc] = useState('');
   const [eventType, setEventType] = useState<'clinical' | 'visit' | 'system' | 'billing'>('clinical');
+  const [eventDesc, setEventDesc] = useState('');
+  const [eventVitals, setEventVitals] = useState({ pa: '', fc: '', temp: '', sat: '', pain: '' });
 
   // File uploading simulator
   const [fileNameInput, setFileNameInput] = useState('');
@@ -96,11 +105,15 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
       name,
       birthDate,
       cpf,
+      gender,
       phone,
       email,
       status: 'active',
       planType,
-      avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=120',
+      insuranceId,
+      monthlyPackageValue: Number(monthlyPackageValue) || undefined,
+      padScope,
+      avatar: gender === 'M' ? 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&q=80&w=120' : 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=120',
       diagnostic,
       allergies: allergiesText.split(',').map(s => s.trim()).filter(Boolean),
       medications: medicationsText.split(',').map(s => s.trim()).filter(Boolean),
@@ -119,7 +132,14 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
     setName('');
     setBirthDate('');
     setCpf('');
+    setGender('F');
     setPhone('');
+    setEmail('');
+    setPlanType('Particular');
+    setInsuranceId('');
+    setMonthlyPackageValue('');
+    setPadScope('');
+    setDiagnostic('');
     setEmail('');
     setDiagnostic('');
     setAllergiesText('');
@@ -147,15 +167,31 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
     e.preventDefault();
     if (!selectedPatientId || !eventTitle || !eventDesc) return;
     
+    let photos: string[] | undefined = undefined;
+    let finalDesc = eventDesc;
+    if (eventDesc.includes("[FOTO_ANEXADA]")) {
+      photos = ["https://images.unsplash.com/photo-1581595220892-b0739db3ba8c?auto=format&fit=crop&q=80&w=300"];
+      finalDesc = eventDesc.replace(" [FOTO_ANEXADA]", "");
+    }
+
     addTimelineEvent(selectedPatientId, {
       title: eventTitle,
-      description: eventDesc,
+      description: finalDesc,
       type: eventType,
-      author: 'Admin Demo'
+      author: 'Admin Demo',
+      photos,
+      vitals: eventType === 'clinical' && (eventVitals.pa || eventVitals.fc || eventVitals.temp || eventVitals.sat || eventVitals.pain) ? {
+        pa: eventVitals.pa || undefined,
+        fc: eventVitals.fc || undefined,
+        temp: eventVitals.temp || undefined,
+        sat: eventVitals.sat || undefined,
+        pain: eventVitals.pain ? Number(eventVitals.pain) : undefined
+      } : undefined
     });
 
     setEventTitle('');
     setEventDesc('');
+    setEventVitals({ pa: '', fc: '', temp: '', sat: '', pain: '' });
   };
 
   const handleSimulateFileUpload = (e: React.FormEvent) => {
@@ -202,18 +238,20 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
               >
                 Alterar Status
               </button>
-              <button
-                onClick={() => {
-                  if (confirm("Deseja deletar permanentemente este prontuário?")) {
-                    deletePatient(selectedPatient.id);
-                    setSelectedPatientId(null);
-                  }
-                }}
-                className="p-1.5 border border-red-200 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                title="Excluir Prontuário"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
+              {currentUserRole === 'admin' && (
+                <button
+                  onClick={() => {
+                    if (confirm("Deseja deletar permanentemente este prontuário?")) {
+                      deletePatient(selectedPatient.id);
+                      setSelectedPatientId(null);
+                    }
+                  }}
+                  className="p-1.5 border border-red-200 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                  title="Excluir Prontuário"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              )}
             </div>
           </div>
 
@@ -232,14 +270,26 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
                 <span>•</span>
                 <span>Data de Nascimento: {selectedPatient.birthDate}</span>
                 <span>•</span>
-                <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-700 font-semibold uppercase text-[10px] tracking-wide">
-                  {selectedPatient.planType}
+                <span className="px-2 py-0.5 rounded bg-green-50 text-green-700 font-semibold uppercase text-[10px] tracking-wide">
+                  {selectedPatient.insuranceId ? (insurances.find(i => i.id === selectedPatient.insuranceId)?.name || selectedPatient.planType) : selectedPatient.planType}
                 </span>
+                {selectedPatient.monthlyPackageValue && (
+                  <>
+                    <span>•</span>
+                    <span className="text-emerald-600 font-bold">Pacote: R$ {selectedPatient.monthlyPackageValue}</span>
+                  </>
+                )}
               </div>
               <p className="text-slate-600 text-xs font-medium mt-3 bg-slate-50 border border-slate-100 p-2.5 rounded-lg inline-block text-left w-full">
                 <strong className="text-slate-700 block">Diagnóstico de Admissão:</strong>
                 {selectedPatient.diagnostic}
               </p>
+              {selectedPatient.padScope && (
+                <p className="text-slate-600 text-xs font-medium mt-2 bg-indigo-50 border border-indigo-100 p-2.5 rounded-lg inline-block text-left w-full">
+                  <strong className="text-slate-700 block">PAD (Plano de Atenção Domiciliar):</strong>
+                  {selectedPatient.padScope}
+                </p>
+              )}
             </div>
           </div>
 
@@ -248,6 +298,7 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
             {[
               { id: 'info', label: 'Contato', icon: MapPin },
               { id: 'clinical', label: 'Clínico', icon: Activity },
+              { id: 'inventory', label: 'Farmácia Domiciliar', icon: Pill },
               { id: 'files', label: 'Anexos', icon: Paperclip },
               { id: 'timeline', label: 'Histórico', icon: Clock },
               { id: 'ai', label: 'Copilot AI', icon: Sparkles },
@@ -260,11 +311,11 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
                   onClick={() => setActiveTab(tab.id as TabType)}
                   className={`flex items-center gap-2 px-4 py-2.5 border-b-2 text-[11px] font-semibold transition-all whitespace-nowrap ${
                     isActive
-                      ? 'border-blue-500 text-blue-600 font-bold'
+                      ? 'border-green-600 text-green-600 font-bold'
                       : 'border-transparent text-slate-500 hover:text-slate-800'
                   }`}
                 >
-                  <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-blue-500' : 'text-slate-400'}`} />
+                  <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-green-600' : 'text-slate-400'}`} />
                   <span>{tab.label}</span>
                 </button>
               );
@@ -331,7 +382,7 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
                     <ul className="space-y-2.5">
                       {selectedPatient.medications.map((med, index) => (
                         <li key={index} className="flex items-start gap-2 bg-slate-50 p-3 rounded-xl border border-slate-100 text-slate-700 text-xs font-medium">
-                          <span className="w-2 h-2 rounded-full bg-blue-500 mt-1.5" />
+                          <span className="w-2 h-2 rounded-full bg-green-600 mt-1.5" />
                           <span>{med}</span>
                         </li>
                       ))}
@@ -339,6 +390,60 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
                   ) : (
                     <p className="text-slate-400 text-xs">Nenhum medicamento de uso contínuo cadastrado.</p>
                   )}
+                </div>
+              </div>
+            )}
+
+            {/* NEW: INVENTORY TAB */}
+            {activeTab === 'inventory' && (
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-bold text-slate-800 text-sm uppercase tracking-wide">Maleta do Paciente (Estoque Domiciliar)</h3>
+                  <span className="text-xs text-slate-400">Materiais e Medicamentos na residência</span>
+                </div>
+                
+                <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-200">
+                        <th className="py-3 px-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Item</th>
+                        <th className="py-3 px-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Posologia</th>
+                        <th className="py-3 px-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Qtd. Domicílio</th>
+                        <th className="py-3 px-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {selectedPatient.inventory && selectedPatient.inventory.length > 0 ? (
+                        selectedPatient.inventory.map((item) => (
+                          <tr key={item.medicineId} className="hover:bg-slate-50/50 transition-colors">
+                            <td className="py-3 px-4 text-xs font-semibold text-slate-800">{item.medicineName}</td>
+                            <td className="py-3 px-4 text-xs text-slate-500">{item.dosage}</td>
+                            <td className="py-3 px-4 text-xs font-bold text-slate-700">{item.quantity} un</td>
+                            <td className="py-3 px-4">
+                              {item.quantity < 5 ? (
+                                <span className="inline-flex items-center gap-1 bg-rose-50 text-rose-700 text-[10px] font-bold px-2 py-0.5 rounded-md uppercase">
+                                  <AlertTriangle className="w-3 h-3" /> Reposição Urgente
+                                </span>
+                              ) : item.quantity < 15 ? (
+                                <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-700 text-[10px] font-bold px-2 py-0.5 rounded-md uppercase">
+                                  <Package className="w-3 h-3" /> Nível Baixo
+                                </span>
+                              ) : (
+                                <span className="bg-emerald-50 text-emerald-700 text-[10px] font-bold px-2 py-0.5 rounded-md uppercase">Estoque OK</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={4} className="py-8 text-center text-slate-400 text-xs">
+                            <Package className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                            Nenhum item alocado na maleta do paciente.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             )}
@@ -359,7 +464,7 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
                     placeholder="Nome do arquivo (ex: Receita_Agosto.pdf)"
                     value={fileNameInput}
                     onChange={(e) => setFileNameInput(e.target.value)}
-                    className="flex-1 bg-white border border-slate-200 rounded-lg text-xs px-3 py-2 text-slate-700 focus:outline-none focus:border-blue-500"
+                    className="flex-1 bg-white border border-slate-200 rounded-lg text-xs px-3 py-2 text-slate-700 focus:outline-none focus:border-green-600"
                   />
                   <button
                     type="submit"
@@ -376,7 +481,7 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
                     selectedPatient.files.map((file) => (
                       <div key={file.id} className="p-3 border border-slate-100 rounded-xl hover:bg-slate-50 transition-colors flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                          <FileText className="w-8 h-8 text-blue-500 bg-blue-50 p-1.5 rounded-lg" />
+                          <FileText className="w-8 h-8 text-green-600 bg-green-50 p-1.5 rounded-lg" />
                           <div>
                             <span className="font-semibold text-xs text-slate-800 block">{file.name}</span>
                             <span className="text-[10px] text-slate-400 block mt-0.5">{file.uploadedAt} • {file.size}</span>
@@ -384,7 +489,7 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
                         </div>
                         <button 
                           onClick={() => alert(`Simulação de Download: Baixando arquivo ${file.name}`)}
-                          className="text-xs text-blue-600 hover:underline font-semibold"
+                          className="text-xs text-green-600 hover:underline font-semibold"
                         >
                           Baixar
                         </button>
@@ -411,14 +516,30 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
                         {/* Bullet circle */}
                         <div className={`absolute -left-[31px] top-1 w-4 h-4 rounded-full border-2 border-white ring-4 ${
                           item.type === 'clinical' ? 'bg-indigo-500 ring-indigo-50' :
-                          item.type === 'visit' ? 'bg-blue-500 ring-blue-50' :
+                          item.type === 'visit' ? 'bg-green-600 ring-green-50' :
                           item.type === 'billing' ? 'bg-amber-500 ring-amber-50' : 'bg-slate-400 ring-slate-50'
                         }`} />
                         
                         <div>
                           <span className="text-[10px] text-slate-400 font-bold block">{item.date}</span>
                           <h4 className="font-bold text-xs text-slate-800 mt-1">{item.title}</h4>
+                          {item.vitals && (
+                            <div className="flex flex-wrap gap-2 mt-2 mb-1">
+                              {item.vitals.pa && <span className="text-[10px] bg-red-50 text-red-700 font-bold px-1.5 py-0.5 rounded border border-red-100">PA: {item.vitals.pa}</span>}
+                              {item.vitals.fc && <span className="text-[10px] bg-orange-50 text-orange-700 font-bold px-1.5 py-0.5 rounded border border-orange-100">FC: {item.vitals.fc}</span>}
+                              {item.vitals.temp && <span className="text-[10px] bg-amber-50 text-amber-700 font-bold px-1.5 py-0.5 rounded border border-amber-100">T: {item.vitals.temp}°C</span>}
+                              {item.vitals.sat && <span className="text-[10px] bg-green-50 text-green-700 font-bold px-1.5 py-0.5 rounded border border-green-100">SatO2: {item.vitals.sat}%</span>}
+                              {item.vitals.pain !== undefined && <span className="text-[10px] bg-purple-50 text-purple-700 font-bold px-1.5 py-0.5 rounded border border-purple-100">Dor: {item.vitals.pain}/10</span>}
+                            </div>
+                          )}
                           <p className="text-slate-500 text-xs mt-1.5 leading-relaxed bg-slate-50/50 p-2.5 rounded-lg border border-slate-100/50">{item.description}</p>
+                          {item.photos && item.photos.length > 0 && (
+                            <div className="mt-2 flex gap-2 overflow-x-auto">
+                              {item.photos.map((photo, idx) => (
+                                <img key={idx} src={photo} alt={`Anexo ${idx + 1}`} className="w-20 h-20 object-cover rounded-lg border border-slate-200 shadow-sm" referrerPolicy="no-referrer" />
+                              ))}
+                            </div>
+                          )}
                           <span className="text-[9px] text-slate-400 font-semibold block mt-1.5">Registrado por: {item.author}</span>
                         </div>
                       </div>
@@ -453,6 +574,20 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
                           <option value="system">Sistema</option>
                         </select>
                       </div>
+
+                      {eventType === 'clinical' && (
+                        <div className="bg-white p-3 rounded-lg border border-slate-200">
+                          <label className="text-[10px] font-bold text-slate-500 uppercase block mb-2">Sinais Vitais (Opcional)</label>
+                          <div className="grid grid-cols-2 gap-2">
+                            <input type="text" placeholder="PA (ex: 120/80)" value={eventVitals.pa} onChange={e => setEventVitals({...eventVitals, pa: e.target.value})} className="w-full bg-slate-50 border border-slate-200 text-[10px] rounded px-2 py-1.5 focus:outline-none" />
+                            <input type="text" placeholder="FC (ex: 78)" value={eventVitals.fc} onChange={e => setEventVitals({...eventVitals, fc: e.target.value})} className="w-full bg-slate-50 border border-slate-200 text-[10px] rounded px-2 py-1.5 focus:outline-none" />
+                            <input type="text" placeholder="Temp (°C)" value={eventVitals.temp} onChange={e => setEventVitals({...eventVitals, temp: e.target.value})} className="w-full bg-slate-50 border border-slate-200 text-[10px] rounded px-2 py-1.5 focus:outline-none" />
+                            <input type="text" placeholder="Sat O2 (%)" value={eventVitals.sat} onChange={e => setEventVitals({...eventVitals, sat: e.target.value})} className="w-full bg-slate-50 border border-slate-200 text-[10px] rounded px-2 py-1.5 focus:outline-none" />
+                            <input type="number" min="0" max="10" placeholder="Escala Dor (0-10)" value={eventVitals.pain} onChange={e => setEventVitals({...eventVitals, pain: e.target.value})} className="w-full col-span-2 bg-slate-50 border border-slate-200 text-[10px] rounded px-2 py-1.5 focus:outline-none" />
+                          </div>
+                        </div>
+                      )}
+
                       <div>
                         <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Detalhes do Evento</label>
                         <textarea
@@ -463,6 +598,20 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
                           placeholder="Escreva as observações técnicas..."
                           className="w-full bg-white border border-slate-200 text-xs rounded-lg px-3 py-2 text-slate-700 focus:outline-none"
                         />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <label className="text-[10px] font-bold text-slate-500 flex items-center gap-1 cursor-pointer hover:text-green-600 transition-colors">
+                          <Paperclip className="w-3 h-3" />
+                          <span>Anexar Foto (Simulação)</span>
+                          <input 
+                            type="checkbox" 
+                            className="ml-1 rounded text-green-600" 
+                            onChange={(e) => {
+                               if (e.target.checked) setEventDesc(prev => prev + " [FOTO_ANEXADA]");
+                               else setEventDesc(prev => prev.replace(" [FOTO_ANEXADA]", ""));
+                            }}
+                          />
+                        </label>
                       </div>
                       <button
                         type="submit"
@@ -488,7 +637,7 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
                   <button
                     onClick={() => handleTriggerAiSummary(selectedPatient.id)}
                     disabled={isAiLoading}
-                    className="px-4 py-2 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white font-bold text-xs rounded-lg shadow-md transition-all flex items-center gap-1.5 disabled:opacity-50"
+                    className="px-4 py-2 bg-gradient-to-r from-green-600 to-indigo-600 hover:from-green-600 hover:to-indigo-700 text-white font-bold text-xs rounded-lg shadow-md transition-all flex items-center gap-1.5 disabled:opacity-50"
                   >
                     <Sparkles className="w-3.5 h-3.5 fill-white animate-pulse" />
                     <span>{isAiLoading ? 'Analisando Histórico...' : 'Gerar Resumo por IA'}</span>
@@ -536,7 +685,7 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
             </div>
             <button
               onClick={() => setShowAddModal(true)}
-              className="flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-500 hover:bg-blue-600 text-white font-semibold text-sm rounded-lg transition-all shadow-md shadow-blue-100"
+              className="flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-600 text-white font-semibold text-sm rounded-lg transition-all shadow-md shadow-green-100"
             >
               <Plus className="w-4 h-4" />
               <span>Cadastrar Paciente</span>
@@ -584,7 +733,7 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
                     setSelectedPatientId(patient.id);
                     setActiveTab('info');
                   }}
-                  className="bg-white rounded-2xl border border-slate-200 hover:border-blue-300 hover:shadow-md transition-all p-5 cursor-pointer flex flex-col justify-between"
+                  className="bg-white rounded-2xl border border-slate-200 hover:border-green-300 hover:shadow-md transition-all p-5 cursor-pointer flex flex-col justify-between"
                 >
                   <div>
                     <div className="flex items-start justify-between gap-3">
@@ -596,7 +745,7 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
                           referrerPolicy="no-referrer"
                         />
                         <div className="min-w-0">
-                          <h3 className="font-bold text-xs text-slate-800 hover:text-blue-600 transition-colors truncate w-[140px] md:w-[160px]">
+                          <h3 className="font-bold text-xs text-slate-800 hover:text-green-600 transition-colors truncate w-[140px] md:w-[160px]">
                             {patient.name}
                           </h3>
                           <span className="text-[10px] text-slate-400 font-semibold">{patient.birthDate}</span>
@@ -631,7 +780,7 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
                     <span className="truncate max-w-[140px] text-slate-600">
                       📍 {patient.address.city}, {patient.address.state}
                     </span>
-                    <span className="text-blue-600 font-bold hover:underline flex items-center">
+                    <span className="text-green-600 font-bold hover:underline flex items-center">
                       Visualizar Prontuário <ChevronRight className="w-3.5 h-3.5" />
                     </span>
                   </div>
@@ -666,7 +815,7 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
                 <form onSubmit={handleCreatePatient} className="p-6 space-y-6">
                   {/* Seção 1: Dados Pessoais */}
                   <div>
-                    <h4 className="font-bold text-xs text-blue-600 uppercase tracking-wider mb-4 border-b pb-1 border-slate-100">1. Identificação Básica</h4>
+                    <h4 className="font-bold text-xs text-green-600 uppercase tracking-wider mb-4 border-b pb-1 border-slate-100">1. Identificação Básica</h4>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div className="md:col-span-2">
                         <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Nome Completo *</label>
@@ -676,7 +825,7 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
                           value={name}
                           onChange={(e) => setName(e.target.value)}
                           placeholder="Ex: Dona Francisca Ribeiro"
-                          className="w-full bg-slate-50 border border-slate-200 rounded-lg text-xs px-3 py-2 text-slate-700 focus:outline-none focus:border-blue-500"
+                          className="w-full bg-slate-50 border border-slate-200 rounded-lg text-xs px-3 py-2 text-slate-700 focus:outline-none focus:border-green-600"
                         />
                       </div>
                       <div>
@@ -686,8 +835,20 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
                           required
                           value={birthDate}
                           onChange={(e) => setBirthDate(e.target.value)}
-                          className="w-full bg-slate-50 border border-slate-200 rounded-lg text-xs px-2 py-2 text-slate-700 focus:outline-none focus:border-blue-500"
+                          className="w-full bg-slate-50 border border-slate-200 rounded-lg text-xs px-2 py-2 text-slate-700 focus:outline-none focus:border-green-600"
                         />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Sexo *</label>
+                        <select
+                          value={gender}
+                          onChange={(e) => setGender(e.target.value as any)}
+                          className="w-full bg-slate-50 border border-slate-200 rounded-lg text-xs px-2 py-2 text-slate-700 focus:outline-none"
+                        >
+                          <option value="F">Feminino</option>
+                          <option value="M">Masculino</option>
+                          <option value="O">Outro</option>
+                        </select>
                       </div>
                       <div>
                         <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">CPF</label>
@@ -696,7 +857,7 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
                           value={cpf}
                           onChange={(e) => setCpf(e.target.value)}
                           placeholder="000.000.000-00"
-                          className="w-full bg-slate-50 border border-slate-200 rounded-lg text-xs px-3 py-2 text-slate-700 focus:outline-none focus:border-blue-500"
+                          className="w-full bg-slate-50 border border-slate-200 rounded-lg text-xs px-3 py-2 text-slate-700 focus:outline-none focus:border-green-600"
                         />
                       </div>
                       <div>
@@ -724,7 +885,7 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
 
                   {/* Seção 2: Quadro Clínico */}
                   <div>
-                    <h4 className="font-bold text-xs text-blue-600 uppercase tracking-wider mb-4 border-b pb-1 border-slate-100">2. Admissão Clínica</h4>
+                    <h4 className="font-bold text-xs text-green-600 uppercase tracking-wider mb-4 border-b pb-1 border-slate-100">2. Admissão Clínica</h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="md:col-span-2">
                         <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Diagnóstico Geral *</label>
@@ -740,18 +901,44 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
                       <div>
                         <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Convênio / Plano de Saúde</label>
                         <select
-                          value={planType}
-                          onChange={(e) => setPlanType(e.target.value)}
+                          value={insuranceId}
+                          onChange={(e) => {
+                            setInsuranceId(e.target.value);
+                            if (!e.target.value) setPlanType('Particular');
+                            else {
+                              const ins = insurances.find(i => i.id === e.target.value);
+                              if (ins) setPlanType(ins.name);
+                            }
+                          }}
                           className="w-full bg-slate-50 border border-slate-200 rounded-lg text-xs px-2 py-2 text-slate-700 focus:outline-none"
                         >
-                          <option value="Particular">Particular</option>
-                          <option value="Bradesco Saúde">Bradesco Saúde</option>
-                          <option value="Unimed">Unimed</option>
-                          <option value="Amil">Amil</option>
-                          <option value="SulAmérica">SulAmérica</option>
+                          <option value="">Particular</option>
+                          {insurances.map(ins => (
+                            <option key={ins.id} value={ins.id}>{ins.name}</option>
+                          ))}
                         </select>
                       </div>
                       <div>
+                        <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Valor Mensal (R$)</label>
+                        <input
+                          type="number"
+                          value={monthlyPackageValue}
+                          onChange={(e) => setMonthlyPackageValue(e.target.value ? Number(e.target.value) : '')}
+                          placeholder="Ex: 5000"
+                          className="w-full bg-slate-50 border border-slate-200 rounded-lg text-xs px-3 py-2 text-slate-700 focus:outline-none"
+                        />
+                      </div>
+                      <div className="md:col-span-2">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Descrição do PAD (Plano de Atenção Domiciliar)</label>
+                        <input
+                          type="text"
+                          value={padScope}
+                          onChange={(e) => setPadScope(e.target.value)}
+                          placeholder="Ex: Fisio 3x semana, Fono 2x semana, Téc Enfermagem 12h diurnas"
+                          className="w-full bg-slate-50 border border-slate-200 rounded-lg text-xs px-3 py-2 text-slate-700 focus:outline-none"
+                        />
+                      </div>
+                      <div className="md:col-span-2">
                         <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Alergias (separadas por vírgula)</label>
                         <input
                           type="text"
@@ -776,7 +963,7 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
 
                   {/* Seção 3: Endereço */}
                   <div>
-                    <h4 className="font-bold text-xs text-blue-600 uppercase tracking-wider mb-4 border-b pb-1 border-slate-100">3. Endereço e Logística</h4>
+                    <h4 className="font-bold text-xs text-green-600 uppercase tracking-wider mb-4 border-b pb-1 border-slate-100">3. Endereço e Logística</h4>
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                       <div className="md:col-span-2">
                         <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Rua / Logradouro</label>
@@ -841,7 +1028,7 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
                     </button>
                     <button
                       type="submit"
-                      className="px-5 py-2 bg-blue-500 hover:bg-blue-600 text-white font-bold text-xs rounded-lg shadow-md transition-all"
+                      className="px-5 py-2 bg-green-600 hover:bg-green-600 text-white font-bold text-xs rounded-lg shadow-md transition-all"
                     >
                       Criar Prontuário
                     </button>

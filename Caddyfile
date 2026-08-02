@@ -1,0 +1,15 @@
+# Caddy reverse proxy for HomeCare Pro
+# Provides automatic HTTPS via Let's Encrypt
+
+homecarepro.com.br {
+  reverse_proxy homecarepro-web:3000
+  encode gzip
+  tls admin@homecarepro.com.br
+}
+
+# API subdomain (optional, if you want separate API routing)
+api.homecarepro.com.br {
+  reverse_proxy homecarepro-web:3000
+  encode gzip
+  tls admin@homecarepro.com.br
+}

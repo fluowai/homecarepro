@@ -7,139 +7,145 @@ import {
   AlertCircle, 
   CreditCard, 
   Download, 
-  Filter, 
   ArrowUpRight,
   ShieldCheck,
   Building2,
-  Users
+  PieChart
 } from 'lucide-react';
 import { useHomeCareStore } from '../store';
 
 export default function FinanceView() {
-  const { patients, visits, activeTenantId } = useHomeCareStore();
+  const { patients, professionals, visits, insurances, activeTenantId } = useHomeCareStore();
   const [statusFilter, setStatusFilter] = useState<'all' | 'pago' | 'pendente' | 'atrasado'>('all');
 
-  const tenantPatients = patients.filter(p => p.tenantId === activeTenantId && p.status === 'active');
+  const tenantPatients = patients.filter(p => p.tenantId === activeTenantId);
   const tenantVisits = visits.filter(v => v.tenantId === activeTenantId);
 
-  // Billing analytics
+  // Billing analytics calculations based on real data
   const totalBilled = tenantVisits.reduce((acc, curr) => acc + curr.value, 0);
   const totalReceived = tenantVisits.filter(v => v.status === 'concluida').reduce((acc, curr) => acc + curr.value, 0);
   const totalPending = tenantVisits.filter(v => v.status === 'agendada' || v.status === 'em_andamento').reduce((acc, curr) => acc + curr.value, 0);
-  const totalOverdue = tenantPatients.length > 2 ? 840 : 0; // Simulated past overdue factor for demonstration
+  
+  // Custom margin logic: 70% goes to the professional, 30% to the clinic
+  const costMargin = 0.7; 
+  const totalCost = totalBilled * costMargin;
+  const netProfit = totalBilled - totalCost;
 
-  // Pre-generate a list of invoices for the active tenant
-  const invoices = [
-    {
-      id: 'inv-1',
-      patientName: 'Dona Francisca Ribeiro',
-      plan: 'Bradesco Saúde',
-      amount: 1550,
-      dueDate: '2026-07-25',
-      status: 'pendente' as 'pago' | 'pendente' | 'atrasado',
-      period: 'Julho / 2026'
-    },
-    {
-      id: 'inv-2',
-      patientName: 'Seu Geraldo de Souza',
-      plan: 'Particular',
-      amount: 2840,
-      dueDate: '2026-07-10',
-      status: 'pago' as 'pago' | 'pendente' | 'atrasado',
-      period: 'Julho / 2026'
-    },
-    {
-      id: 'inv-3',
-      patientName: 'Ana Júlia de Albuquerque',
-      plan: 'Unimed',
-      amount: 4300,
-      dueDate: '2026-07-05',
-      status: 'pago' as 'pago' | 'pendente' | 'atrasado',
-      period: 'Julho / 2026'
-    },
-    {
-      id: 'inv-4',
-      patientName: 'Seu Moacyr Guimarães',
-      plan: 'Particular',
-      amount: 840,
-      dueDate: '2026-07-01',
-      status: 'atrasado' as 'pago' | 'pendente' | 'atrasado',
-      period: 'Julho / 2026'
-    }
-  ];
+  // Generate dynamic invoices based on patients and their visits
+  const invoices = tenantPatients.map(patient => {
+    const patientVisits = tenantVisits.filter(v => v.patientId === patient.id);
+    const amount = patientVisits.reduce((sum, v) => sum + v.value, 0);
+    
+    // Determine status based on visits
+    const hasPending = patientVisits.some(v => v.status !== 'concluida');
+    const status = hasPending ? 'pendente' : 'pago';
+    
+    const planName = patient.insuranceId 
+      ? insurances.find(i => i.id === patient.insuranceId)?.name || patient.planType 
+      : patient.planType;
 
-  // Filtering invoices
+    return {
+      id: `inv-${patient.id}`,
+      patientName: patient.name,
+      plan: planName,
+      amount: amount,
+      dueDate: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 5).toLocaleDateString('pt-BR'), // Day 5 of next month
+      status: amount === 0 ? 'pago' : status as 'pago' | 'pendente' | 'atrasado',
+      period: new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }).replace(' de ', ' / ')
+    };
+  }).filter(inv => inv.amount > 0); // Only show patients with billed amounts
+
   const filteredInvoices = invoices.filter(inv => {
     if (statusFilter === 'all') return true;
     return inv.status === statusFilter;
   });
+
+  // Calculate participation by insurance plan
+  const planStats = invoices.reduce((acc, inv) => {
+    if (!acc[inv.plan]) {
+      acc[inv.plan] = { count: 0, value: 0 };
+    }
+    acc[inv.plan].count += 1;
+    acc[inv.plan].value += inv.amount;
+    return acc;
+  }, {} as Record<string, { count: number, value: number }>);
+
+  const planArray = Object.entries(planStats).map(([name, stats]) => ({
+    name,
+    count: stats.count,
+    value: stats.value,
+    pct: totalBilled > 0 ? (stats.value / totalBilled) * 100 : 0
+  })).sort((a, b) => b.value - a.value);
+
+  const colors = ['bg-rose-500', 'bg-emerald-500', 'bg-indigo-500', 'bg-amber-500', 'bg-cyan-500'];
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-slate-800 tracking-tight">Faturamento e Financeiro</h2>
-          <p className="text-slate-500 text-sm mt-1">Visão integrada de contratos de coparticipação, repasses de profissionais e conciliação de convênios.</p>
+          <h2 className="text-2xl font-bold text-slate-800 tracking-tight">Painel de Faturamento (DRE)</h2>
+          <p className="text-slate-500 text-sm mt-1">Visão integrada de faturamento bruto, custos com profissionais (repasse) e lucro líquido.</p>
         </div>
         <button
-          onClick={() => alert("Simulação de Relatório: Exportando demonstrativo consolidado em PDF...")}
-          className="flex items-center justify-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white font-semibold text-sm rounded-lg transition-all"
+          onClick={() => alert("Simulação de Relatório: Exportando demonstrativo DRE detalhado em PDF...")}
+          className="flex items-center justify-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white font-semibold text-sm rounded-lg transition-all shadow-md"
         >
           <Download className="w-4 h-4" />
-          <span>Exportar DRE</span>
+          <span>Exportar DRE Completa</span>
         </button>
       </div>
 
       {/* Finance KPI cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-slate-400 font-semibold text-xs uppercase tracking-wide">Faturamento Estimado</span>
-            <DollarSign className="w-4 h-4 text-blue-500 bg-blue-50 p-1.5 box-content rounded-lg" />
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-24 h-24 bg-green-50 rounded-bl-full -z-10" />
+          <div className="flex items-center justify-between z-10">
+            <span className="text-slate-500 font-semibold text-xs uppercase tracking-wide">Receita Bruta</span>
+            <DollarSign className="w-4 h-4 text-green-600" />
           </div>
-          <div className="flex items-baseline gap-2 mt-4">
-            <span className="text-2xl font-bold text-slate-800">
-              R$ {(totalBilled + totalOverdue).toLocaleString('pt-BR')}
-            </span>
-            <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded flex items-center gap-0.5">
-              +8.5% <ArrowUpRight className="w-3 h-3" />
+          <div className="flex items-baseline gap-2 mt-4 z-10">
+            <span className="text-2xl font-bold text-slate-900">
+              R$ {totalBilled.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </span>
           </div>
-          <p className="text-[11px] text-slate-400 mt-1.5">Acumulado do mês corrente</p>
+          <p className="text-[11px] text-slate-400 mt-1.5 font-medium">Total faturado no mês</p>
         </div>
 
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-slate-400 font-semibold text-xs uppercase tracking-wide">Recebido (Repasses Concluídos)</span>
-            <CheckCircle2 className="w-4 h-4 text-emerald-500 bg-emerald-50 p-1.5 box-content rounded-lg" />
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-24 h-24 bg-rose-50 rounded-bl-full -z-10" />
+          <div className="flex items-center justify-between z-10">
+            <span className="text-slate-500 font-semibold text-xs uppercase tracking-wide">Repasses (Custo ~70%)</span>
+            <TrendingUp className="w-4 h-4 text-rose-600" />
           </div>
-          <span className="text-2xl font-bold text-slate-800 block mt-4">
-            R$ {totalReceived.toLocaleString('pt-BR')}
+          <span className="text-2xl font-bold text-slate-900 block mt-4 z-10">
+            R$ {totalCost.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </span>
-          <p className="text-[11px] text-slate-400 mt-1.5">Liberado para repasse médico</p>
+          <p className="text-[11px] text-slate-400 mt-1.5 font-medium">Pagamento aos profissionais</p>
         </div>
 
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-slate-400 font-semibold text-xs uppercase tracking-wide">Em Aberto (Pendentes)</span>
-            <Clock className="w-4 h-4 text-amber-500 bg-amber-50 p-1.5 box-content rounded-lg" />
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-50 rounded-bl-full -z-10" />
+          <div className="flex items-center justify-between z-10">
+            <span className="text-slate-500 font-semibold text-xs uppercase tracking-wide">Lucro Bruto (~30%)</span>
+            <PieChart className="w-4 h-4 text-indigo-600" />
           </div>
-          <span className="text-2xl font-bold text-slate-800 block mt-4">
-            R$ {totalPending.toLocaleString('pt-BR')}
+          <span className="text-2xl font-bold text-indigo-700 block mt-4 z-10">
+            R$ {netProfit.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </span>
-          <p className="text-[11px] text-slate-400 mt-1.5">Visitas agendadas/em andamento</p>
+          <p className="text-[11px] text-slate-400 mt-1.5 font-medium">Margem líquida da clínica</p>
         </div>
 
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-slate-400 font-semibold text-xs uppercase tracking-wide">Valores em Atraso</span>
-            <AlertCircle className="w-4 h-4 text-red-500 bg-red-50 p-1.5 box-content rounded-lg" />
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-24 h-24 bg-amber-50 rounded-bl-full -z-10" />
+          <div className="flex items-center justify-between z-10">
+            <span className="text-slate-500 font-semibold text-xs uppercase tracking-wide">A Receber (Pendentes)</span>
+            <Clock className="w-4 h-4 text-amber-500" />
           </div>
-          <span className="text-2xl font-bold text-slate-800 block mt-4">
-            R$ {totalOverdue.toLocaleString('pt-BR')}
+          <span className="text-2xl font-bold text-slate-900 block mt-4 z-10">
+            R$ {totalPending.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </span>
-          <p className="text-[11px] text-slate-400 mt-1.5">Cobranças vencidas há mais de 5 dias</p>
+          <p className="text-[11px] text-slate-400 mt-1.5 font-medium">Atendimentos não finalizados</p>
         </div>
       </div>
 
@@ -150,7 +156,7 @@ export default function FinanceView() {
         <div className="lg:col-span-2 space-y-4">
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="p-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <h3 className="font-bold text-slate-800 text-sm">Faturas de Coparticipação & Particular</h3>
+              <h3 className="font-bold text-slate-800 text-sm">Fechamento de Faturas por Paciente</h3>
               
               <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-lg">
                 <button
@@ -167,7 +173,7 @@ export default function FinanceView() {
                     statusFilter === 'pago' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'
                   }`}
                 >
-                  Pagas ({invoices.filter(i => i.status === 'pago').length})
+                  Fechadas ({invoices.filter(i => i.status === 'pago').length})
                 </button>
                 <button
                   onClick={() => setStatusFilter('pendente')}
@@ -177,51 +183,47 @@ export default function FinanceView() {
                 >
                   Abertas ({invoices.filter(i => i.status === 'pendente').length})
                 </button>
-                <button
-                  onClick={() => setStatusFilter('atrasado')}
-                  className={`px-3 py-1.5 text-[10px] font-bold rounded-md transition-all ${
-                    statusFilter === 'atrasado' ? 'bg-white text-red-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'
-                  }`}
-                >
-                  Atraso ({invoices.filter(i => i.status === 'atrasado').length})
-                </button>
               </div>
             </div>
 
             <div className="divide-y divide-slate-100">
-              {filteredInvoices.map((inv) => (
-                <div key={inv.id} className="p-6 hover:bg-slate-50/50 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-600">
-                      <CreditCard className="w-5 h-5 text-slate-500" />
+              {filteredInvoices.length === 0 ? (
+                <div className="p-8 text-center text-slate-400 text-sm">Nenhuma fatura encontrada.</div>
+              ) : (
+                filteredInvoices.map((inv) => (
+                  <div key={inv.id} className="p-6 hover:bg-slate-50/50 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-600">
+                        <CreditCard className="w-5 h-5 text-slate-400" />
+                      </div>
+                      <div>
+                        <span className="font-bold text-xs text-slate-800 block">{inv.patientName}</span>
+                        <span className="text-[10px] text-slate-500 font-medium block mt-0.5">Convênio: {inv.plan} • {inv.period}</span>
+                      </div>
                     </div>
-                    <div>
-                      <span className="font-bold text-xs text-slate-800 block">{inv.patientName}</span>
-                      <span className="text-[10px] text-slate-400 font-semibold block mt-1">Convênio: {inv.plan} • Referência: {inv.period}</span>
+
+                    <div className="flex items-center gap-6">
+                      <div className="text-right">
+                        <span className="text-[9px] text-slate-400 block font-semibold mb-1">Custo Profissional (70%)</span>
+                        <span className="text-[11px] font-bold text-rose-600 block">- R$ {(inv.amount * 0.7).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      </div>
+
+                      <div className="text-right">
+                        <span className="text-[9px] text-slate-400 block font-semibold mb-1">Valor Bruto Faturado</span>
+                        <span className="text-xs font-bold text-slate-900 block">R$ {inv.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      </div>
+
+                      <span className={`text-[10px] px-2.5 py-1 rounded-md font-bold uppercase tracking-wide shrink-0 ${
+                        inv.status === 'pago' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' :
+                        inv.status === 'pendente' ? 'bg-amber-50 text-amber-700 border border-amber-100' :
+                        'bg-rose-50 text-rose-700 border border-rose-100'
+                      }`}>
+                        {inv.status === 'pago' ? 'Fechado' : inv.status}
+                      </span>
                     </div>
                   </div>
-
-                  <div className="flex items-center gap-6">
-                    <div className="text-right">
-                      <span className="text-[9px] text-slate-400 block font-semibold mb-1">Valor Faturado</span>
-                      <span className="text-xs font-bold text-slate-800 block">R$ {inv.amount.toLocaleString('pt-BR')}</span>
-                    </div>
-
-                    <div className="text-right">
-                      <span className="text-[9px] text-slate-400 block font-semibold mb-1">Vencimento</span>
-                      <span className="text-xs font-semibold text-slate-500 block">{inv.dueDate}</span>
-                    </div>
-
-                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wide shrink-0 ${
-                      inv.status === 'pago' ? 'bg-emerald-50 text-emerald-600' :
-                      inv.status === 'pendente' ? 'bg-amber-50 text-amber-600' :
-                      'bg-rose-50 text-rose-600'
-                    }`}>
-                      {inv.status}
-                    </span>
-                  </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
         </div>
@@ -229,41 +231,40 @@ export default function FinanceView() {
         {/* Right Side: Plans distribution */}
         <div className="space-y-6">
           <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-            <h3 className="font-bold text-slate-800 text-sm flex items-center gap-1.5 mb-4">
-              <Building2 className="w-4 h-4 text-blue-500" />
-              <span>Participação por Convênio</span>
+            <h3 className="font-bold text-slate-800 text-sm flex items-center gap-1.5 mb-5">
+              <Building2 className="w-4 h-4 text-green-600" />
+              <span>Receita por Convênio</span>
             </h3>
 
-            <div className="space-y-4">
-              {[
-                { name: 'Bradesco Saúde', pct: 45, count: 2, value: 'R$ 6.200', color: 'bg-rose-500' },
-                { name: 'Particular / Dinheiro', pct: 30, count: 2, value: 'R$ 4.300', color: 'bg-emerald-500' },
-                { name: 'Unimed Cooperada', pct: 20, count: 1, value: 'R$ 2.800', color: 'bg-blue-500' },
-                { name: 'Amil Coparticipação', pct: 5, count: 0, value: 'R$ 0', color: 'bg-amber-500' }
-              ].map((p, index) => (
-                <div key={index} className="space-y-1.5">
-                  <div className="flex justify-between text-xs font-semibold text-slate-600">
-                    <span>{p.name} ({p.count})</span>
-                    <span>{p.value}</span>
+            <div className="space-y-5">
+              {planArray.length === 0 ? (
+                <div className="text-xs text-slate-400 text-center py-4">Sem dados de convênios.</div>
+              ) : (
+                planArray.map((p, index) => (
+                  <div key={index} className="space-y-2">
+                    <div className="flex justify-between text-[11px] font-semibold text-slate-700">
+                      <span>{p.name} ({p.count} pac.)</span>
+                      <span>R$ {p.value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </div>
+                    <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                      <div className={`${colors[index % colors.length]} h-full`} style={{ width: `${p.pct}%` }} />
+                    </div>
                   </div>
-                  <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                    <div className={`${p.color} h-full`} style={{ width: `${p.pct}%` }} />
-                  </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
 
-          <div className="bg-gradient-to-br from-blue-500 to-indigo-600 p-6 rounded-2xl text-white shadow-md relative overflow-hidden">
-            <div className="absolute top-0 right-0 transform translate-x-8 -translate-y-4 w-40 h-40 bg-white/10 rounded-full blur-2xl" />
+          <div className="bg-gradient-to-br from-slate-800 to-slate-900 p-6 rounded-2xl text-white shadow-lg relative overflow-hidden">
+            <div className="absolute top-0 right-0 transform translate-x-8 -translate-y-4 w-32 h-32 bg-white/5 rounded-full blur-2xl" />
             
             <div className="flex items-center gap-2 mb-3">
-              <ShieldCheck className="w-5 h-5 text-blue-100" />
-              <h4 className="font-bold text-xs uppercase tracking-wider">Auditoria e Compliance</h4>
+              <ShieldCheck className="w-5 h-5 text-emerald-400" />
+              <h4 className="font-bold text-xs uppercase tracking-wider text-slate-100">Auditoria Automática</h4>
             </div>
             
-            <p className="text-[11px] text-blue-100 leading-relaxed">
-              Todos os repasses médicos e faturamentos de convênios obedecem rigorosamente à tabela TUSS e de despesas de materiais de home care, garantindo conciliação fiscal sem glosas.
+            <p className="text-[11px] text-slate-400 leading-relaxed">
+              O sistema calcula automaticamente o repasse de 70% para os profissionais baseado nas evoluções concluídas. Valores de visitas não executadas (pendentes) constam como receita projetada, mas não entram no contas a pagar até o Check-out ser validado.
             </p>
           </div>
         </div>

@@ -216,7 +216,7 @@ export default function AudioDictationModal({
         {/* Header */}
         <div className="bg-gradient-to-r from-slate-900 to-indigo-950 p-5 text-white flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-500/20 border border-blue-400/30 rounded-xl text-blue-400">
+            <div className="p-2 bg-green-600/20 border border-green-400/30 rounded-xl text-green-400">
               <Mic className="w-5 h-5 animate-pulse" />
             </div>
             <div>
@@ -243,7 +243,7 @@ export default function AudioDictationModal({
                 <p className="font-semibold">{errorMsg}</p>
                 <button
                   onClick={handleSimulatedRecording}
-                  className="mt-1 text-blue-600 underline font-bold"
+                  className="mt-1 text-green-600 underline font-bold"
                 >
                   Clique aqui para testar com Ditado Simulado
                 </button>
@@ -280,7 +280,7 @@ export default function AudioDictationModal({
               </div>
             ) : isProcessing ? (
               <div className="py-6 space-y-3">
-                <div className="p-3 bg-blue-50 text-blue-600 rounded-full inline-block animate-bounce">
+                <div className="p-3 bg-green-50 text-green-600 rounded-full inline-block animate-bounce">
                   <Sparkles className="w-8 h-8" />
                 </div>
                 <div>
@@ -288,7 +288,7 @@ export default function AudioDictationModal({
                   <p className="text-xs text-slate-500 mt-1">Formatando e pontuando o relato médico do ditado.</p>
                 </div>
                 <div className="w-48 bg-slate-200 h-1.5 rounded-full mx-auto overflow-hidden">
-                  <div className="bg-blue-600 h-full w-full animate-pulse" />
+                  <div className="bg-green-600 h-full w-full animate-pulse" />
                 </div>
               </div>
             ) : (
@@ -297,7 +297,7 @@ export default function AudioDictationModal({
                   {/* Real Mic button */}
                   <button
                     onClick={startRecording}
-                    className="w-16 h-16 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-full flex items-center justify-center shadow-lg shadow-blue-200 transition-all transform hover:scale-105 active:scale-95"
+                    className="w-16 h-16 bg-gradient-to-r from-green-600 to-indigo-600 hover:from-green-700 hover:to-indigo-700 text-white rounded-full flex items-center justify-center shadow-lg shadow-green-200 transition-all transform hover:scale-105 active:scale-95"
                     title="Iniciar Gravação de Áudio"
                   >
                     <Mic className="w-7 h-7" />
@@ -312,7 +312,7 @@ export default function AudioDictationModal({
                 <div className="pt-2 border-t border-slate-200/60 flex items-center justify-center gap-3 text-xs">
                   <button
                     onClick={handleSimulatedRecording}
-                    className="text-slate-500 hover:text-blue-600 font-medium underline text-[11px]"
+                    className="text-slate-500 hover:text-green-600 font-medium underline text-[11px]"
                   >
                     Ou simular ditado rápido (Demonstração)
                   </button>
@@ -323,11 +323,11 @@ export default function AudioDictationModal({
 
           {/* Audio Player if recorded */}
           {audioUrl && !isRecording && !isProcessing && (
-            <div className="bg-blue-50/50 border border-blue-100 p-3 rounded-xl flex items-center justify-between">
+            <div className="bg-green-50/50 border border-green-100 p-3 rounded-xl flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <button
                   onClick={togglePlayAudio}
-                  className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  className="p-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
                 >
                   {isPlayingAudio ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
                 </button>
@@ -337,7 +337,7 @@ export default function AudioDictationModal({
                   onEnded={() => setIsPlayingAudio(false)}
                   className="hidden"
                 />
-                <span className="text-xs font-semibold text-blue-900">Áudio gravado ({formatTime(recordingTime)})</span>
+                <span className="text-xs font-semibold text-green-900">Áudio gravado ({formatTime(recordingTime)})</span>
               </div>
 
               <button
@@ -355,7 +355,7 @@ export default function AudioDictationModal({
             <div className="space-y-2 animate-fade-in">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                  <FileText className="w-4 h-4 text-blue-600" />
+                  <FileText className="w-4 h-4 text-green-600" />
                   <span>Texto Transcrito (Editável):</span>
                 </label>
                 <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100 flex items-center gap-1">
@@ -367,7 +367,7 @@ export default function AudioDictationModal({
                 value={transcribedText}
                 onChange={(e) => setTranscribedText(e.target.value)}
                 rows={4}
-                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 leading-relaxed font-medium focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 leading-relaxed font-medium focus:bg-white focus:ring-2 focus:ring-green-600 outline-none"
               />
             </div>
           )}
@@ -385,7 +385,7 @@ export default function AudioDictationModal({
           <button
             onClick={handleApply}
             disabled={!transcribedText.trim() || isRecording || isProcessing}
-            className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-5 py-2 bg-green-600 hover:bg-green-700 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Sparkles className="w-3.5 h-3.5" />
             <span>Inserir Nota no CRM</span>

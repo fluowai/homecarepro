@@ -114,10 +114,10 @@ export default function SatisfactionView() {
           <button
             onClick={() => setActiveTab('simulator')}
             className={`px-4 py-1.5 rounded-md text-xs font-semibold transition-all flex items-center gap-1 whitespace-nowrap ${
-              activeTab === 'simulator' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'
+              activeTab === 'simulator' ? 'bg-white text-green-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'
             }`}
           >
-            <span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-ping"></span>
+            <span className="w-1.5 h-1.5 bg-green-600 rounded-full animate-ping"></span>
             <span>Simulador de Resposta</span>
           </button>
         </div>
@@ -148,7 +148,7 @@ export default function SatisfactionView() {
             </div>
 
             <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
-              <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center">
+              <div className="w-12 h-12 bg-green-50 text-green-600 rounded-xl flex items-center justify-center">
                 <Send className="w-6 h-6" />
               </div>
               <div>
@@ -214,7 +214,7 @@ export default function SatisfactionView() {
                           <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase ${
                             s.channel === 'whatsapp' 
                               ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' 
-                              : 'bg-blue-50 text-blue-700 border border-blue-100'
+                              : 'bg-green-50 text-green-700 border border-green-100'
                           }`}>
                             {s.channel}
                           </span>
@@ -269,7 +269,7 @@ export default function SatisfactionView() {
                   type="checkbox"
                   checked={editingAuto}
                   onChange={(e) => setEditingAuto(e.target.checked)}
-                  className="w-4 h-4 rounded text-blue-500 focus:ring-blue-400"
+                  className="w-4 h-4 rounded text-green-600 focus:ring-green-400"
                 />
               </div>
 
@@ -294,11 +294,11 @@ export default function SatisfactionView() {
                     onClick={() => setEditingChannel('sms')}
                     className={`p-3.5 rounded-xl border flex items-center justify-center gap-2.5 transition-all text-xs font-bold ${
                       editingChannel === 'sms'
-                        ? 'border-blue-500 bg-blue-50/50 text-blue-800'
+                        ? 'border-green-600 bg-green-50/50 text-green-800'
                         : 'border-slate-200 hover:bg-slate-50 text-slate-600'
                     }`}
                   >
-                    <MessageSquare className="w-4 h-4 text-blue-500" />
+                    <MessageSquare className="w-4 h-4 text-green-600" />
                     <span>SMS Corporativo</span>
                   </button>
                 </div>
@@ -310,19 +310,19 @@ export default function SatisfactionView() {
                   rows={5}
                   value={editingTemplate}
                   onChange={(e) => setEditingTemplate(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl text-xs p-3 text-slate-700 font-mono focus:outline-none focus:border-blue-500 leading-relaxed"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl text-xs p-3 text-slate-700 font-mono focus:outline-none focus:border-green-600 leading-relaxed"
                 />
                 <div className="flex flex-wrap gap-2 mt-2">
                   <span className="text-[9px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded">Variáveis:</span>
-                  <span className="text-[9px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded font-mono font-bold">{"{professional_name}"}</span>
-                  <span className="text-[9px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded font-mono font-bold">{"{survey_link}"}</span>
+                  <span className="text-[9px] bg-green-50 text-green-600 px-1.5 py-0.5 rounded font-mono font-bold">{"{professional_name}"}</span>
+                  <span className="text-[9px] bg-green-50 text-green-600 px-1.5 py-0.5 rounded font-mono font-bold">{"{survey_link}"}</span>
                 </div>
               </div>
 
               <div className="border-t border-slate-100 pt-4 flex justify-end">
                 <button
                   type="submit"
-                  className="px-5 py-2.5 bg-blue-500 hover:bg-blue-600 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-100"
+                  className="px-5 py-2.5 bg-green-600 hover:bg-green-600 text-white rounded-xl text-xs font-bold shadow-md shadow-green-100"
                 >
                   Salvar Configurações
                 </button>
@@ -340,7 +340,7 @@ export default function SatisfactionView() {
                 12:45 • LTE
               </div>
               <div className="bg-slate-50 px-3 py-2 border-b border-slate-100 flex items-center gap-2">
-                <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center font-bold text-white text-[9px]">
+                <div className="w-6 h-6 bg-green-600 rounded-full flex items-center justify-center font-bold text-white text-[9px]">
                   H
                 </div>
                 <div>
@@ -435,14 +435,14 @@ export default function SatisfactionView() {
                     value={simComment}
                     onChange={(e) => setSimComment(e.target.value)}
                     placeholder="Ex: O profissional foi muito carinhoso, pontual e explicou todos os procedimentos com paciência."
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl text-xs p-3 text-slate-700 focus:outline-none focus:border-blue-500"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl text-xs p-3 text-slate-700 focus:outline-none focus:border-green-600"
                   />
                 </div>
 
                 <div className="border-t border-slate-100 pt-4 flex justify-end">
                   <button
                     type="submit"
-                    className="px-5 py-2.5 bg-blue-500 hover:bg-blue-600 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-100 flex items-center gap-1.5"
+                    className="px-5 py-2.5 bg-green-600 hover:bg-green-600 text-white rounded-xl text-xs font-bold shadow-md shadow-green-100 flex items-center gap-1.5"
                   >
                     <span>Enviar Resposta Simulada</span>
                     <Check className="w-4 h-4" />

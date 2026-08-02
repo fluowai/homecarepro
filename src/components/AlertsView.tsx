@@ -87,7 +87,7 @@ export default function AlertsView() {
               activeTab === 'alerts' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-800'
             }`}
           >
-            <Bell className="w-3.5 h-3.5 text-blue-500" />
+            <Bell className="w-3.5 h-3.5 text-green-600" />
             <span>Alertas Ativos ({activeAlerts.length})</span>
           </button>
           <button
@@ -131,7 +131,7 @@ export default function AlertsView() {
             </div>
 
             <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
-              <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center">
+              <div className="w-12 h-12 bg-green-50 text-green-600 rounded-xl flex items-center justify-center">
                 <Users className="w-6 h-6" />
               </div>
               <div>
@@ -273,7 +273,7 @@ export default function AlertsView() {
                     max={30}
                     value={maxDays}
                     onChange={(e) => setMaxDays(parseInt(e.target.value) || 7)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3 text-slate-700 font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3 text-slate-700 font-semibold focus:outline-none focus:ring-2 focus:ring-green-600/20"
                   />
                   <span className="text-[10px] text-slate-400 mt-1.5 block">Alerta se o paciente ficar mais de X dias sem visitas técnicas.</span>
                 </div>
@@ -286,7 +286,7 @@ export default function AlertsView() {
                     max={180}
                     value={expiryDays}
                     onChange={(e) => setExpiryDays(parseInt(e.target.value) || 30)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3 text-slate-700 font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3 text-slate-700 font-semibold focus:outline-none focus:ring-2 focus:ring-green-600/20"
                   />
                   <span className="text-[10px] text-slate-400 mt-1.5 block">Alertar sobre medicamentos vencendo nos próximos X dias.</span>
                 </div>
@@ -299,7 +299,7 @@ export default function AlertsView() {
                     max={100}
                     value={lowStockVal}
                     onChange={(e) => setLowStockVal(parseInt(e.target.value) || 5)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3 text-slate-700 font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3 text-slate-700 font-semibold focus:outline-none focus:ring-2 focus:ring-green-600/20"
                   />
                   <span className="text-[10px] text-slate-400 mt-1.5 block">Nível crítico mínimo padrão de estoque para farmácia central.</span>
                 </div>
@@ -312,7 +312,7 @@ export default function AlertsView() {
                       type="checkbox"
                       checked={enableNotify}
                       onChange={(e) => setEnableNotify(e.target.checked)}
-                      className="w-4 h-4 rounded text-blue-500 focus:ring-blue-400"
+                      className="w-4 h-4 rounded text-green-600 focus:ring-green-400"
                     />
                   </div>
                 </div>
@@ -321,7 +321,7 @@ export default function AlertsView() {
               <div className="border-t border-slate-100 pt-4 flex justify-end">
                 <button
                   type="submit"
-                  className="px-5 py-2.5 bg-blue-500 hover:bg-blue-600 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-100"
+                  className="px-5 py-2.5 bg-green-600 hover:bg-green-600 text-white rounded-xl text-xs font-bold shadow-md shadow-green-100"
                 >
                   Atualizar Parâmetros
                 </button>

@@ -158,7 +158,7 @@ export default function MedicinesView() {
         </div>
         <button
           onClick={() => setShowAddModal(true)}
-          className="flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-500 hover:bg-blue-600 text-white font-semibold text-sm rounded-lg transition-all shadow-md shadow-blue-100"
+          className="flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-600 text-white font-semibold text-sm rounded-lg transition-all shadow-md shadow-green-100"
         >
           <Plus className="w-4 h-4" />
           <span>Cadastrar Medicamento</span>
@@ -168,7 +168,7 @@ export default function MedicinesView() {
       {/* Stats Board */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
-          <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center">
+          <div className="w-12 h-12 bg-green-50 text-green-600 rounded-xl flex items-center justify-center">
             <Package className="w-6 h-6" />
           </div>
           <div>
@@ -215,7 +215,7 @@ export default function MedicinesView() {
             placeholder="Buscar por nome ou fabricante..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-slate-50 border border-slate-200 rounded-lg text-xs pl-9 pr-3 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+            className="w-full bg-slate-50 border border-slate-200 rounded-lg text-xs pl-9 pr-3 py-2.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-600/20 focus:border-green-600"
           />
         </div>
 
@@ -276,7 +276,7 @@ export default function MedicinesView() {
                           <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${
                             status.severity === 'critical' ? 'bg-rose-50 text-rose-500' :
                             status.severity === 'warning' ? 'bg-amber-50 text-amber-500' :
-                            'bg-blue-50 text-blue-500'
+                            'bg-green-50 text-green-600'
                           }`}>
                             <Pill className="w-5 h-5" />
                           </div>
@@ -527,7 +527,7 @@ export default function MedicinesView() {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-100"
+                  className="px-4 py-2 bg-green-600 hover:bg-green-600 text-white rounded-xl text-xs font-bold shadow-md shadow-green-100"
                 >
                   Salvar Registro
                 </button>

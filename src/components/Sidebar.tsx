@@ -13,7 +13,16 @@ import {
   Pill,
   Star,
   Bell,
-  X
+  X,
+  Shield,
+  FileText,
+  LineChart,
+  PieChart,
+  Settings,
+  Plug,
+  Lock,
+  ChevronDown,
+  Server
 } from 'lucide-react';
 import { useHomeCareStore } from '../store';
 
@@ -25,21 +34,61 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ currentView, setView, isOpen, onClose }: SidebarProps) {
-  const { tenants, activeTenantId, setActiveTenant } = useHomeCareStore();
+  const { tenants, activeTenantId, setActiveTenant, currentUserRole, setCurrentUserRole } = useHomeCareStore();
   const activeTenant = tenants.find(t => t.id === activeTenantId) || tenants[0];
 
-  const menuItems = [
-    { id: 'dashboard', label: 'Painel Geral', icon: Activity },
-    { id: 'patients', label: 'Pacientes', icon: Users },
-    { id: 'schedules', label: 'Escalas & Agenda', icon: Calendar },
-    { id: 'professionals', label: 'Profissionais', icon: UserSquare2 },
-    { id: 'checkin', label: 'Check-in de Visitas', icon: MapPin },
-    { id: 'medicines', label: 'Estoque de Medicamentos', icon: Pill },
-    { id: 'satisfaction', label: 'Pesquisas de Satisfação', icon: Star },
-    { id: 'alerts', label: 'Configurar Alertas', icon: Bell },
-    { id: 'communication', label: 'Comunicação', icon: MessageSquare },
-    { id: 'finance', label: 'Financeiro', icon: DollarSign },
-    { id: 'crm', label: 'CRM de Vendas', icon: TrendingUp },
+  const menuGroups = [
+    {
+      title: 'OPERAÇÃO',
+      items: [
+        { id: 'dashboard', label: 'Painel Geral', icon: Activity, roles: ['admin', 'auditor', 'professional'] },
+        { id: 'patients', label: 'Pacientes', icon: Users, roles: ['admin', 'auditor', 'professional'] },
+        { id: 'schedules', label: 'Agenda', icon: Calendar, roles: ['admin', 'auditor', 'professional'] },
+        { id: 'checkin', label: 'Check-ins', icon: MapPin, roles: ['admin', 'professional'] },
+        { id: 'professionals', label: 'Profissionais', icon: UserSquare2, roles: ['admin', 'auditor'] },
+      ]
+    },
+    {
+      title: 'CLÍNICO',
+      items: [
+        { id: 'records', label: 'Prontuários', icon: FileText, roles: ['admin', 'auditor', 'professional'] },
+        { id: 'medicines', label: 'Medicamentos', icon: Pill, roles: ['admin', 'auditor', 'professional'] },
+        { id: 'insurances', label: 'Convênios', icon: Building2, roles: ['admin'] },
+        { id: 'alerts', label: 'Alertas', icon: Bell, roles: ['admin', 'auditor'] },
+        { id: 'satisfaction', label: 'Pesquisas', icon: Star, roles: ['admin', 'auditor'] },
+      ]
+    },
+    {
+      title: 'COMERCIAL',
+      items: [
+        { id: 'crm', label: 'CRM', icon: TrendingUp, roles: ['admin'] },
+        { id: 'finance', label: 'Financeiro', icon: DollarSign, roles: ['admin'] },
+        { id: 'reports', label: 'Relatórios', icon: LineChart, roles: ['admin', 'auditor'] },
+      ]
+    },
+    {
+      title: 'INTELIGÊNCIA',
+      items: [
+        { id: 'ai', label: 'IA Clínica', icon: Heart, roles: ['admin', 'auditor', 'professional', 'super_admin'] },
+        { id: 'analytics', label: 'Analytics', icon: PieChart, roles: ['admin', 'super_admin'] },
+      ]
+    },
+    {
+      title: 'SAAS MULTI-NÍVEL',
+      items: [
+        { id: 'system_admin', label: 'Mega Admin (Sistema)', icon: Server, roles: ['mega_admin'] },
+        { id: 'reseller', label: 'Painel da Revenda', icon: Building2, roles: ['super_admin'] },
+      ]
+    },
+    {
+      title: 'ADMINISTRAÇÃO',
+      items: [
+        { id: 'users', label: 'Usuários', icon: Users, roles: ['admin'] },
+        { id: 'permissions', label: 'Permissões', icon: Lock, roles: ['admin'] },
+        { id: 'integrations', label: 'Integrações', icon: Plug, roles: ['admin'] },
+        { id: 'settings', label: 'Configurações', icon: Settings, roles: ['admin'] },
+      ]
+    }
   ];
 
   return (
@@ -47,92 +96,116 @@ export default function Sidebar({ currentView, setView, isOpen, onClose }: Sideb
       {/* Mobile Overlay */}
       {isOpen && (
         <div 
-          className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-30 lg:hidden"
+          className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm z-30 lg:hidden transition-opacity"
           onClick={onClose}
         />
       )}
 
       <aside 
         id="sidebar-container" 
-        className={`w-64 bg-white border-r border-gray-200 flex flex-col h-screen fixed left-0 top-0 z-40 transition-transform duration-300 lg:translate-x-0 ${
+        className={`w-[280px] bg-white border-r border-gray-200 flex flex-col h-screen fixed left-0 top-0 z-40 transition-transform duration-300 lg:translate-x-0 ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
         {/* Brand Header */}
         <div className="p-6 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+            <div className="w-8 h-8 bg-green-600 rounded-xl flex items-center justify-center shadow-soft shadow-green-600/20">
               <Heart className="w-5 h-5 text-white fill-white" />
             </div>
-            <span className="font-bold text-xl tracking-tight text-gray-800">HomeCare Pro</span>
+            <span className="font-bold text-xl tracking-tight text-gray-900">HomeCare Pro</span>
           </div>
           <button 
             onClick={onClose}
-            className="lg:hidden p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-lg transition-colors"
+            className="lg:hidden p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-xl transition-colors"
           >
             <X className="w-6 h-6" />
           </button>
         </div>
 
-      {/* Tenant Switcher */}
-      <div className="p-4 mx-4 my-2 bg-gray-100/80 rounded-xl">
-        <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider block mb-2 px-1">
-          Multi-Tenant
-        </label>
-        <div className="relative">
-          <select
-            value={activeTenantId}
-            onChange={(e) => setActiveTenant(e.target.value)}
-            className="w-full bg-white border border-gray-200 text-gray-900 text-sm rounded-lg py-2 pl-3 pr-8 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 cursor-pointer appearance-none font-medium"
-          >
-            {tenants.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.logo} {t.name.split(' ')[2] || t.name}
-              </option>
-            ))}
-          </select>
-          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-gray-500">
-            <Building2 className="w-4 h-4" />
+        {/* Multi-Tenant Premium Selector */}
+        <div className="px-4 mb-4">
+          <button className="w-full flex items-center justify-between p-3 bg-white border border-gray-200 hover:border-green-300 hover:shadow-soft rounded-2xl transition-all group">
+            <div className="flex items-center gap-3 overflow-hidden">
+              <div className="w-10 h-10 bg-gray-50 rounded-xl border border-gray-100 flex items-center justify-center text-lg shadow-sm">
+                {activeTenant?.logo || '🏢'}
+              </div>
+              <div className="text-left flex-1 min-w-0">
+                <p className="text-sm font-bold text-gray-900 truncate leading-none mb-1.5">{activeTenant?.name || 'Sistema'}</p>
+                <div className="flex items-center gap-1.5">
+                  <span className="px-1.5 py-0.5 rounded-md bg-green-100 text-green-700 font-bold text-[9px] uppercase tracking-wider">
+                    {activeTenant?.plan || 'PRO'}
+                  </span>
+                </div>
+              </div>
+            </div>
+            <ChevronDown className="w-4 h-4 text-gray-400 group-hover:text-green-600 transition-colors" />
+          </button>
+        </div>
+
+        {/* Main Navigation */}
+        <nav className="flex-1 overflow-y-auto px-4 pb-6 custom-scrollbar">
+          {menuGroups.map((group, groupIdx) => {
+            const filteredItems = group.items.filter(item => item.roles.includes(currentUserRole));
+            
+            if (filteredItems.length === 0) return null;
+
+            return (
+              <div key={groupIdx} className="mb-6 last:mb-0">
+                <h4 className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider px-3 mb-3">
+                  {group.title}
+                </h4>
+                <div className="space-y-1">
+                  {filteredItems.map((item) => {
+                    const Icon = item.icon;
+                    const isActive = currentView === item.id;
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={() => setView(item.id)}
+                        className={`w-full flex items-center gap-3 px-3 h-12 rounded-xl font-medium text-sm transition-all duration-200 ${
+                          isActive
+                            ? 'bg-green-50 text-green-700 shadow-sm'
+                            : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'
+                        }`}
+                      >
+                        <Icon className={`w-5 h-5 flex-shrink-0 transition-colors ${
+                          isActive ? 'text-green-600' : 'text-gray-400'
+                        }`} />
+                        <span className="truncate">{item.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                {groupIdx < menuGroups.length - 1 && (
+                  <div className="h-px bg-gray-100 mt-6 mx-2" />
+                )}
+              </div>
+            );
+          })}
+        </nav>
+
+        {/* Footer info & Role Switcher */}
+        <div className="mt-auto border-t border-gray-100 p-4 space-y-4 bg-gray-50/50">
+          <div className="bg-white p-3 rounded-xl border border-gray-200 shadow-sm">
+            <label className="text-[10px] font-bold text-gray-500 uppercase flex items-center gap-1.5 mb-2 px-1">
+              <Shield className="w-3 h-3 text-green-600" /> Nível de Acesso (RBAC)
+            </label>
+            <select
+              value={currentUserRole}
+              onChange={(e) => setCurrentUserRole(e.target.value as any)}
+              className="w-full bg-gray-50 border border-gray-200 text-xs font-medium rounded-lg px-2 py-2 text-gray-700 focus:outline-none focus:ring-2 focus:ring-green-600/20 focus:border-green-600 cursor-pointer"
+            >
+              <option value="mega_admin">Mega Admin (Dono)</option>
+              <option value="super_admin">Super Admin (Revenda)</option>
+              <option value="admin">Administrador (Clínica)</option>
+              <option value="auditor">Auditor (Leitura/Alertas)</option>
+              <option value="professional">Profissional (Operação)</option>
+              <option value="patient">Paciente/Familiar</option>
+            </select>
           </div>
         </div>
-        <div className="mt-2 px-1 flex items-center justify-between text-[11px] text-gray-500">
-          <span>CNPJ: {activeTenant.cnpj}</span>
-          <span className="px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-semibold text-[9px] uppercase tracking-wider">
-            {activeTenant.plan}
-          </span>
-        </div>
-      </div>
-
-      {/* Main Navigation */}
-      <nav className="flex-1 px-4 space-y-1 overflow-y-auto mt-4">
-        {menuItems.map((item) => {
-          const Icon = item.icon;
-          const isActive = currentView === item.id;
-          return (
-            <button
-              key={item.id}
-              onClick={() => setView(item.id)}
-              className={`w-full flex items-center gap-3 px-3 py-2 rounded-md font-medium text-sm transition-colors ${
-                isActive
-                  ? 'bg-blue-50 text-blue-700'
-                  : 'text-gray-600 hover:bg-gray-50'
-              }`}
-            >
-              <Icon className={`w-5 h-5 ${
-                isActive ? 'text-blue-600' : 'text-gray-400'
-              }`} />
-              <span>{item.label}</span>
-            </button>
-          );
-        })}
-      </nav>
-
-      {/* Footer info */}
-      <div className="p-4 border-t border-gray-100 text-xs text-gray-500 flex items-center gap-2 mt-auto">
-        <div className="w-2 h-2 rounded-full bg-green-500" />
-        <span>API de WhatsApp Ativa</span>
-      </div>
-    </aside>
+      </aside>
     </>
   );
 }
