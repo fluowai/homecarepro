@@ -549,6 +549,37 @@ app.get("/api/tenant/resolve", globalLimiter, async (req, res) => {
   }
 });
 
+// ── Caddy On-Demand TLS Check ────────────────────────────────────
+app.get("/api/internal/caddy-ask", async (req, res) => {
+  try {
+    const domain = req.query.domain as string;
+    if (!domain) {
+      return res.status(400).send("Missing domain");
+    }
+
+    // Always allow the main domain and api subdomain
+    if (domain === "homecarepro.com.br" || domain === "api.homecarepro.com.br" || domain.includes("localhost")) {
+      return res.status(200).send("OK");
+    }
+
+    // Check if any active tenant has this custom domain
+    const { data: tenant } = await supabaseAdmin
+      .from("tenants")
+      .select("id, status")
+      .eq("custom_domain", domain)
+      .single();
+
+    if (tenant && tenant.status === "active") {
+      return res.status(200).send("OK");
+    }
+
+    return res.status(404).send("Not Found");
+  } catch (error: any) {
+    logEvent("ERROR", "Caddy ask failed", { error: error.message });
+    return res.status(500).send("Internal Server Error");
+  }
+});
+
 // ── Asaas Webhooks ──────────────────────────────────────────────
 app.post("/api/webhooks/asaas", express.json({type: 'application/json'}), async (req, res) => {
   try {
