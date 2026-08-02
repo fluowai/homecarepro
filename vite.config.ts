@@ -12,16 +12,6 @@ export default defineConfig(() => {
       },
     },
     build: {
-      rollupOptions: {
-        output: {
-          manualChunks: {
-            vendor: ['react', 'react-dom'],
-            state: ['zustand'],
-            supabase: ['@supabase/supabase-js'],
-            ui: ['lucide-react', 'motion'],
-          },
-        },
-      },
       chunkSizeWarningLimit: 600,
     },
     server: {
