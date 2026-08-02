@@ -1,4 +1,4 @@
-version: '3.8'
+version: "3.8"
 
 services:
   homecarepro-web:
@@ -8,22 +8,41 @@ services:
     image: homecarepro/web:latest
     container_name: homecarepro-web
     restart: unless-stopped
-    expose:
-      - "3000"
     environment:
       - NODE_ENV=production
       - PORT=3000
-      # As variáveis abaixo devem ser preenchidas no Portainer (Environment Variables)
-      - APP_URL=${APP_URL:-https://homecarepro.com.br}
-      - VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
-      - VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
-      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - ASAAS_API_KEY=${ASAAS_API_KEY}
-      - ASAAS_WEBHOOK_TOKEN=${ASAAS_WEBHOOK_TOKEN}
-      - RESEND_API_KEY=${RESEND_API_KEY}
+      - APP_URL=https://homecare.wootech.com.br
+      - VITE_SUPABASE_URL=https://qczwrubsiuafhwojfzbm.supabase.co
+      - VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFjendydWJzaXVhZmh3b2pmemJtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUxNjQ3ODAsImV4cCI6MjEwMDc0MDc4MH0.ZQHtnHjK7BLzWxr6X2Szno-EKIlz3wg6ErWSq3c5oVo
+      - SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFjendydWJzaXVhZmh3b2pmemJtIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NTE2NDc4MCwiZXhwIjoyMTAwNzQwNzgwfQ.GGXbSrR7246BCMZZ_ROFGUgA8BYcWZqbAilFX_5aHws
+      # As chaves abaixo são opcionais, deixe vazio se não for usar agora
+      - GEMINI_API_KEY=
+      - ASAAS_API_KEY=
+      - ASAAS_WEBHOOK_TOKEN=
+      - RESEND_API_KEY=
     networks:
-      - homecarepro-network
+      - wootech1
+      - homecarepro_swarm_internal
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=wootech1"
+      
+      # 1. Rota principal para o domínio do sistema
+      - "traefik.http.routers.homecarepro_web.rule=Host(`homecare.wootech.com.br`)"
+      - "traefik.http.routers.homecarepro_web.entrypoints=websecure"
+      - "traefik.http.routers.homecarepro_web.tls.certresolver=letsencryptresolver"
+      - "traefik.http.routers.homecarepro_web.priority=10"
+      - "traefik.http.routers.homecarepro_web.service=homecarepro_web"
+      
+      # 2. Rota curinga para os Domínios Personalizados das Revendas (SaaS Whitelabel)
+      - "traefik.http.routers.homecarepro_custom.rule=HostRegexp(`{host:[a-zA-Z0-9-.]+}`)"
+      - "traefik.http.routers.homecarepro_custom.entrypoints=websecure"
+      - "traefik.http.routers.homecarepro_custom.tls.certresolver=letsencryptresolver"
+      - "traefik.http.routers.homecarepro_custom.priority=5"
+      - "traefik.http.routers.homecarepro_custom.service=homecarepro_web"
+      
+      # Porta interna da aplicação
+      - "traefik.http.services.homecarepro_web.loadbalancer.server.port=3000"
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
       interval: 30s
@@ -36,30 +55,8 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  caddy:
-    image: caddy:2-alpine
-    container_name: homecarepro-caddy
-    restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
-    networks:
-      - homecarepro-network
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-
 networks:
-  homecarepro-network:
-    name: homecarepro-network
-    driver: bridge
-
-volumes:
-  caddy_data:
-  caddy_config:
+  wootech1:
+    external: true
+  homecarepro_swarm_internal:
+    driver: overlay
