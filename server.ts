@@ -77,6 +77,10 @@ const startServer = async () => {
       lastModified: true,
     }));
     app.get("*", (req, res) => {
+      if (req.path.startsWith("/assets/")) {
+        return res.status(404).send("Not Found");
+      }
+      
       const indexPath = path.join(distPath, "index.html");
       if (fs.existsSync(indexPath)) {
         let indexHtml = fs.readFileSync(indexPath, "utf8");
@@ -85,6 +89,11 @@ const startServer = async () => {
           VITE_SUPABASE_ANON_KEY: process.env.VITE_SUPABASE_ANON_KEY,
         })}</script>`;
         indexHtml = indexHtml.replace("</head>", `${envScript}</head>`);
+        
+        res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+        res.setHeader("Pragma", "no-cache");
+        res.setHeader("Expires", "0");
+        
         res.send(indexHtml);
       } else {
         res.status(404).send("Not Found");
