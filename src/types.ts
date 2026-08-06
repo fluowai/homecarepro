@@ -267,4 +267,30 @@ export interface TriageResult {
   recommendedActions: string[];
 }
 
+export interface SaaSPlan {
+  id: string;
+  name: string;
+  price: number;
+  maxPatients: number;
+  maxUsers: number;
+  features: string[];
+}
 
+export interface SupportTicket {
+  id: string;
+  tenantId: string;
+  userId: string;
+  subject: string;
+  status: 'open' | 'pending' | 'closed';
+  priority: 'low' | 'normal' | 'high' | 'urgent';
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TicketMessage {
+  id: string;
+  ticketId: string;
+  userId: string;
+  message: string;
+  createdAt: string;
+}

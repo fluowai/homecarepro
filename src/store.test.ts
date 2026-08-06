@@ -37,8 +37,9 @@ describe('HomeCare Pro - Store Helpers', () => {
   });
 
   it('should generate proper IDs', () => {
-    const id1 = `pat-${Date.now()}`;
-    const id2 = `pat-${Date.now()}`;
+    const now = Date.now();
+    const id1 = `pat-${now}`;
+    const id2 = `pat-${now}`;
 
     expect(id1).toMatch(/^pat-\d+$/);
     expect(id1).toBe(id2);

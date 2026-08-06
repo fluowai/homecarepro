@@ -24,9 +24,6 @@ export default function AuthView() {
 
     try {
       if (mode === 'signup') {
-        const hasMegaAdmin = localStorage.getItem('homecare_pro_has_mega_admin');
-        const userRole = hasMegaAdmin ? 'operator' : 'admin';
-
         const { error: authError } = await supabase.auth.signUp({
           email,
           password,
@@ -34,15 +31,11 @@ export default function AuthView() {
             data: {
               full_name: fullName,
               tenant_id: tenantId,
-              role: userRole,
+              role: 'admin',
             },
           },
         });
         if (authError) throw authError;
-        
-        if (!hasMegaAdmin) {
-          localStorage.setItem('homecare_pro_has_mega_admin', 'true');
-        }
       } else {
         const { error: authError } = await supabase.auth.signInWithPassword({
           email,
@@ -147,6 +140,7 @@ export default function AuthView() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
+                  autoComplete="email"
                   className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-600 focus:border-transparent transition"
                   placeholder="seu@email.com"
                 />
@@ -163,6 +157,7 @@ export default function AuthView() {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   minLength={6}
+                  autoComplete="current-password"
                   className="w-full pl-10 pr-10 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-600 focus:border-transparent transition"
                   placeholder="••••••••"
                 />

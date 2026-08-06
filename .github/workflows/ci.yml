@@ -33,11 +33,11 @@ jobs:
           NODE_ENV: production
 
       - name: Run tests
-        run: npm test -- --run
+        run: npx vitest run
 
       - name: Check bundle size
         run: |
-          SIZE=$(stat -c%s dist/assets/index-*.js 2>/dev/null || echo 0)
+          SIZE=$(find dist/assets -maxdepth 1 -name 'index-*.js' -exec stat -c%s {} \; 2>/dev/null | head -1 || echo 0)
           LIMIT=1500000
           if [ "$SIZE" -gt "$LIMIT" ]; then
             echo "Bundle too large: ${SIZE} bytes (limit: ${LIMIT})"
@@ -64,12 +64,20 @@ jobs:
 
       - name: Audit dependencies
         run: npm audit --audit-level=high
-        continue-on-error: true
 
       - name: Check for hardcoded secrets
         run: |
-          if grep -rn "Argo@1507" --include="*.ts" --include="*.tsx" --include="*.js" .; then
-            echo "ERROR: Hardcoded secrets found in source code!"
+          if grep -rInE "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9" . \
+            --include="*.ts" --include="*.tsx" --include="*.js" --include="*.mjs" \
+            --include="*.yml" --include="*.yaml" --include="*.json" \
+            --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=.git; then
+            echo "ERROR: JWT secrets found in tracked files!"
+            exit 1
+          fi
+          if grep -rInE "SUPABASE_SERVICE_ROLE_KEY[=:][[:space:]]*[A-Za-z0-9_-]" . \
+            --include="*.ts" --include="*.tsx" --include="*.js" --include="*.yml" --include="*.yaml" \
+            --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=.git; then
+            echo "ERROR: Supabase service role key found in source!"
             exit 1
           fi
           echo "No hardcoded secrets detected."

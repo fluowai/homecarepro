@@ -308,8 +308,8 @@ interface HomeCareState {
   offlineLogs: string[];
 
   // RBAC
-  currentUserRole: 'mega_admin' | 'super_admin' | 'admin' | 'auditor' | 'professional' | 'patient';
-  setCurrentUserRole: (role: 'mega_admin' | 'super_admin' | 'admin' | 'auditor' | 'professional' | 'patient') => void;
+  currentUserRole: 'mega_admin' | 'super_admin' | 'admin' | 'auditor' | 'professional' | 'patient' | 'system_support';
+  setCurrentUserRole: (role: 'mega_admin' | 'super_admin' | 'admin' | 'auditor' | 'professional' | 'patient' | 'system_support') => void;
 
   // Auth actions
   init: () => Promise<void>;
@@ -317,6 +317,8 @@ interface HomeCareState {
 
   // Actions
   setActiveTenant: (id: string) => void;
+  addTenant: (tenant: Omit<Tenant, 'id'> & { id?: string }) => void;
+  updateTenant: (id: string, updates: Partial<Tenant>) => void;
 
   // Offline/Sync Actions
   setOfflineMode: (offline: boolean) => void;
@@ -404,6 +406,14 @@ const saveToStorage = <T,>(key: string, value: T) => {
   } catch (err) {
     console.error(`Error saving ${key} to storage`, err);
   }
+};
+
+const isDemoModeEnabled = () => {
+  if (isSupabaseConfigured) return false;
+  const windowEnv = (window as any).__ENV__;
+  const rawValue = (windowEnv && windowEnv.VITE_ENABLE_DEMO_MODE) || import.meta.env.VITE_ENABLE_DEMO_MODE;
+  if (rawValue) return rawValue === 'true';
+  return import.meta.env.DEV === true;
 };
 
 // ── Async Supabase helpers (fire-and-forget) ────────────────────
@@ -575,6 +585,23 @@ const DEFAULT_ALERT_CONFIG: AlertConfig = {
   enableSystemNotifications: true,
 };
 
+// ── Auth listener (registered unconditionally so a fresh login transitions to the app) ──
+let authListenerRegistered = false;
+
+function registerAuthListener() {
+  if (authListenerRegistered) return;
+  authListenerRegistered = true;
+  supabase.auth.onAuthStateChange((event, session) => {
+    if (event === 'SIGNED_IN') {
+      void useHomeCareStore.getState().init();
+      return;
+    }
+    if (event === 'SIGNED_OUT' || !session) {
+      useHomeCareStore.setState({ user: null, profile: null, isAuthenticated: false });
+    }
+  });
+}
+
 // ── Store ───────────────────────────────────────────────────────
 
 export const useHomeCareStore = create<HomeCareState>((set, get) => ({
@@ -613,10 +640,20 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
 
   init: async () => {
     if (!isSupabaseConfigured) {
-      // Demo mode: no Supabase, load from localStorage
-      set({ isLoading: false, isAuthenticated: true, user: null, profile: null });
+      if (isDemoModeEnabled()) {
+        // Demo mode: no Supabase, load from localStorage
+        set({ isLoading: false, isAuthenticated: true, user: null, profile: null });
+      } else {
+        set({
+          isLoading: false,
+          isAuthenticated: false,
+          initError: 'Supabase não configurado. Defina VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY.',
+        });
+      }
       return;
     }
+
+    registerAuthListener();
 
     try {
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
@@ -689,6 +726,7 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
       set({
         user,
         profile,
+        currentUserRole: profile.role as any,
         isAuthenticated: true,
         isLoading: false,
         activeTenantId: tenantId,
@@ -703,18 +741,9 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
         alertConfig,
       });
     } catch (err) {
-      console.error('[Store] init failed, falling back to demo mode', err);
-      set({ isLoading: false, isAuthenticated: true, user: null, profile: null, initError: (err as Error).message });
+      console.error('[Store] init failed', err);
+      set({ isLoading: false, isAuthenticated: false, user: null, profile: null, initError: (err as Error).message });
     }
-
-    // Listen for auth state changes
-    supabase.auth.onAuthStateChange((_event, session) => {
-      if (!session) {
-        set({ user: null, profile: null, isAuthenticated: false });
-      } else {
-        set({ user: session.user });
-      }
-    });
   },
 
   signOut: async () => {
@@ -727,6 +756,51 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
   setActiveTenant: (id) => {
     set({ activeTenantId: id });
     saveToStorage('activeTenantId', id);
+  },
+
+  addTenant: (tenant) => {
+    const newTenant: Tenant = {
+      ...tenant,
+      id: tenant.id || `tenant-${Date.now()}`,
+    };
+    const updated = [...get().tenants, newTenant];
+    set({ tenants: updated });
+    saveToStorage('tenants', updated);
+    upsertRow('tenants', {
+      id: newTenant.id,
+      name: newTenant.name,
+      logo: newTenant.logo,
+      cnpj: newTenant.cnpj,
+      plan: newTenant.plan,
+      parent_id: newTenant.parentId || null,
+      status: newTenant.status || 'active',
+      custom_domain: newTenant.customDomain || null,
+      primary_color: newTenant.primaryColor || null,
+      secondary_color: newTenant.secondaryColor || null,
+    });
+  },
+
+  updateTenant: (id, updates) => {
+    const current = get().tenants;
+    const next = current.map(t => t.id === id ? { ...t, ...updates } : t);
+    set({ tenants: next });
+    
+    // update backend
+    const updated = next.find(t => t.id === id);
+    if (updated) {
+      upsertRow('tenants', {
+        id: updated.id,
+        name: updated.name,
+        logo: updated.logo,
+        cnpj: updated.cnpj,
+        plan: updated.plan,
+        parent_id: updated.parentId || null,
+        status: updated.status || 'active',
+        custom_domain: updated.customDomain || null,
+        primary_color: updated.primaryColor || null,
+        secondary_color: updated.secondaryColor || null
+      });
+    }
   },
 
   setOfflineMode: (offline) => {
