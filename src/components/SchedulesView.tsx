@@ -21,6 +21,7 @@ import { VisitStatus } from '../types';
 
 export default function SchedulesView() {
   const { 
+    tenants,
     patients, 
     professionals, 
     visits, 
@@ -28,8 +29,15 @@ export default function SchedulesView() {
     addVisit, 
     updateVisit, 
     deleteVisit,
-    suggestScheduleAi
+    suggestScheduleAi,
+    acceptOpenShift,
+    requestCoverage
   } = useHomeCareStore();
+
+  const activeTenant = tenants.find(t => t.id === activeTenantId);
+  const isCooperativa = activeTenant?.tenantType === 'cooperativa';
+
+  const [activeTab, setActiveTab] = useState<'escalas' | 'plantoes'>('escalas');
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
@@ -56,8 +64,10 @@ export default function SchedulesView() {
   const filteredVisits = tenantVisits.filter(v => {
     const matchesDate = v.date === selectedDate;
     const matchesProf = filterProfessionalId === 'all' ? true : v.professionalId === filterProfessionalId;
-    return matchesDate && matchesProf;
+    return matchesDate && matchesProf && v.status !== 'open_shift';
   });
+
+  const openShifts = tenantVisits.filter(v => v.status === 'open_shift' && v.date === selectedDate);
 
   // Simple day shifting helpers
   const shiftDate = (days: number) => {
@@ -79,8 +89,9 @@ export default function SchedulesView() {
       date: selectedDate,
       timeStart,
       timeEnd,
-      status: 'agendada',
-      value: Number(value)
+      status: (isCooperativa && activeTab === 'plantoes' ? 'open_shift' : 'agendada'),
+      value: Number(value),
+      baseValue: Number(value)
     });
 
     setPatientId('');
@@ -107,8 +118,12 @@ export default function SchedulesView() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-slate-800 tracking-tight">Escalas e Agendamentos Clínicos</h2>
-          <p className="text-slate-500 text-sm mt-1">Planejador diário de visitas domiciliares, rotas de profissionais e conciliação.</p>
+          <h2 className="text-2xl font-bold text-slate-800 tracking-tight">
+            {isCooperativa ? 'Gestão de Escalas e Plantões' : 'Escalas e Agendamentos Clínicos'}
+          </h2>
+          <p className="text-slate-500 text-sm mt-1">
+            {isCooperativa ? 'Mural de vagas, solicitação de coberturas e organização de escalas da cooperativa.' : 'Planejador diário de visitas domiciliares, rotas de profissionais e conciliação.'}
+          </p>
         </div>
         <button
           onClick={() => {
@@ -123,7 +138,7 @@ export default function SchedulesView() {
           className="flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-600 text-white font-semibold text-sm rounded-lg transition-all shadow-md shadow-green-100"
         >
           <Plus className="w-4 h-4" />
-          <span>Agendar Visita</span>
+          <span>{isCooperativa && activeTab === 'plantoes' ? 'Publicar Plantão Aberto' : 'Agendar Visita'}</span>
         </button>
       </div>
 
@@ -184,14 +199,40 @@ export default function SchedulesView() {
             </div>
           </div>
 
-          {/* Visits List */}
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-              <h3 className="font-bold text-slate-800 text-sm">Escalas Ativas no Dia</h3>
-              <span className="text-xs bg-green-50 text-green-600 px-2.5 py-0.5 rounded-full font-bold">
-                {filteredVisits.length} Atendimentos
-              </span>
+          {/* Tabs for Cooperativa */}
+          {isCooperativa && (
+            <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-xl w-fit">
+              <button
+                onClick={() => setActiveTab('escalas')}
+                className={`px-4 py-2 text-sm font-bold rounded-lg transition-all ${
+                  activeTab === 'escalas' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                Escalas Fechadas
+              </button>
+              <button
+                onClick={() => setActiveTab('plantoes')}
+                className={`px-4 py-2 text-sm font-bold rounded-lg transition-all flex items-center gap-2 ${
+                  activeTab === 'plantoes' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                Mural de Plantões (Vagas)
+                {openShifts.length > 0 && (
+                  <span className="bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">{openShifts.length}</span>
+                )}
+              </button>
             </div>
+          )}
+
+          {/* Visits List */}
+          {activeTab === 'escalas' ? (
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+                <h3 className="font-bold text-slate-800 text-sm">Escalas Ativas no Dia</h3>
+                <span className="text-xs bg-green-50 text-green-600 px-2.5 py-0.5 rounded-full font-bold">
+                  {filteredVisits.length} Atendimentos
+                </span>
+              </div>
 
             <div className="divide-y divide-slate-100">
               {filteredVisits.length > 0 ? (
@@ -265,6 +306,20 @@ export default function SchedulesView() {
                           <option value="cancelada">Cancelada</option>
                         </select>
 
+                        {isCooperativa && visit.status === 'agendada' && (
+                          <button
+                            onClick={() => {
+                              if (confirm("Deseja disponibilizar este plantão no mural de vagas para cobertura?")) {
+                                requestCoverage(visit.id);
+                              }
+                            }}
+                            className="text-[10px] bg-amber-50 text-amber-700 hover:bg-amber-100 px-2 py-1.5 rounded-lg font-bold transition-colors whitespace-nowrap"
+                            title="Solicitar Cobertura"
+                          >
+                            Pedir Cobertura
+                          </button>
+                        )}
+
                         <button
                           onClick={() => {
                             if (confirm("Deseja remover este atendimento da escala?")) {
@@ -289,6 +344,101 @@ export default function SchedulesView() {
               )}
             </div>
           </div>
+          ) : (
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-amber-50/50">
+              <h3 className="font-bold text-amber-900 text-sm">Plantões Abertos (Bolsa de Vagas)</h3>
+              <span className="text-xs bg-amber-100 text-amber-700 px-2.5 py-0.5 rounded-full font-bold">
+                {openShifts.length} Vagas
+              </span>
+            </div>
+            
+            <div className="divide-y divide-slate-100">
+              {openShifts.length > 0 ? (
+                openShifts.map((visit) => {
+                  const pat = patients.find(p => p.id === visit.patientId);
+
+                  return (
+                    <div key={visit.id} className="p-6 hover:bg-slate-50/50 transition-colors flex flex-col md:flex-row md:items-center justify-between gap-4">
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center text-amber-600">
+                            <AlertCircle className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <span className="font-bold text-xs text-slate-800 block">Plantão Disponível</span>
+                            <span className="text-[10px] text-slate-500 font-semibold block mt-0.5">Paciente: {pat?.name}</span>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1.5 pl-1">
+                          <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                            <Clock className="w-3.5 h-3.5 text-slate-400" />
+                            <span>Horário: {visit.timeStart} - {visit.timeEnd}</span>
+                          </div>
+                          <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                            <MapPin className="w-3.5 h-3.5 text-slate-400" />
+                            <span className="truncate max-w-[220px]">Local: {pat?.address.city} - {pat?.address.state}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3 border-t md:border-t-0 pt-4 md:pt-0">
+                        <div className="text-right">
+                          <span className="text-[10px] text-slate-400 block font-semibold mb-1">Repasse Base</span>
+                          <span className="text-sm font-bold text-emerald-600 block">R$ {visit.value.toFixed(2)}</span>
+                        </div>
+                        
+                        <div className="flex flex-col gap-2">
+                          <select
+                            id={`accept-${visit.id}`}
+                            className="text-xs bg-slate-50 border border-slate-200 rounded-lg p-2 font-medium focus:outline-none"
+                            defaultValue=""
+                          >
+                            <option value="" disabled>Selecionar Cooperado...</option>
+                            {tenantProfessionals.map(p => (
+                              <option key={p.id} value={p.id}>{p.name}</option>
+                            ))}
+                          </select>
+                          <button
+                            onClick={() => {
+                              const sel = document.getElementById(`accept-${visit.id}`) as HTMLSelectElement;
+                              if (sel.value) {
+                                acceptOpenShift(visit.id, sel.value);
+                              } else {
+                                alert('Selecione o cooperado que aceitou o plantão.');
+                              }
+                            }}
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] px-3 py-1.5 rounded-lg font-bold transition-colors w-full"
+                          >
+                            Atribuir & Confirmar
+                          </button>
+                        </div>
+                        <button
+                          onClick={() => {
+                            if (confirm("Deseja remover esta vaga?")) {
+                              deleteVisit(visit.id);
+                            }
+                          }}
+                          className="p-1.5 text-slate-400 hover:text-red-500 rounded-lg transition-colors border border-transparent hover:border-slate-100"
+                          title="Excluir Vaga"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="py-20 text-center flex flex-col items-center justify-center text-slate-400">
+                  <CheckCircle className="w-12 h-12 text-slate-300 mb-3" />
+                  <h4 className="font-bold text-slate-700 text-sm">Nenhum Plantão Aberto</h4>
+                  <p className="text-xs max-w-xs mt-1">Todos os plantões deste dia já foram atribuídos a cooperados.</p>
+                </div>
+              )}
+            </div>
+          </div>
+          )}
         </div>
 
         {/* Right Side: Smart AI Scale Optimizer */}
@@ -380,19 +530,22 @@ export default function SchedulesView() {
                 </select>
               </div>
 
-              <div>
-                <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Profissional Assistencial *</label>
-                <select
-                  required
-                  value={professionalId}
-                  onChange={(e) => setProfessionalId(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg text-xs py-2 px-3 text-slate-700 focus:outline-none focus:border-green-600"
-                >
-                  {tenantProfessionals.map(p => (
-                    <option key={p.id} value={p.id}>{p.name} ({p.specialty})</option>
-                  ))}
-                </select>
-              </div>
+              {!(isCooperativa && activeTab === 'plantoes') && (
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Profissional Assistencial *</label>
+                  <select
+                    required
+                    value={professionalId}
+                    onChange={(e) => setProfessionalId(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg text-xs py-2 px-3 text-slate-700 focus:outline-none focus:border-green-600"
+                  >
+                    <option value="">Selecione...</option>
+                    {tenantProfessionals.map(p => (
+                      <option key={p.id} value={p.id}>{p.name} ({p.specialty})</option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -441,7 +594,7 @@ export default function SchedulesView() {
                   type="submit"
                   className="px-5 py-2 bg-green-600 hover:bg-green-600 text-white font-bold text-xs rounded-lg shadow-md transition-all"
                 >
-                  Agendar na Escala
+                  {isCooperativa && activeTab === 'plantoes' ? 'Publicar Vaga' : 'Agendar na Escala'}
                 </button>
               </div>
             </form>

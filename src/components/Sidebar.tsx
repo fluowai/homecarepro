@@ -22,7 +22,8 @@ import {
   Plug,
   Lock,
   ChevronDown,
-  Server
+  Server,
+  FileSignature
 } from 'lucide-react';
 import { useHomeCareStore } from '../store';
 
@@ -74,7 +75,8 @@ export default function Sidebar({ currentView, setView, isOpen, onClose }: Sideb
       title: 'COMERCIAL',
       items: [
         { id: 'crm', label: 'CRM', icon: TrendingUp, roles: ['admin'] },
-        { id: 'finance', label: 'Financeiro', icon: DollarSign, roles: ['admin'] },
+        { id: 'contracts', label: 'Contratos', icon: FileSignature, roles: ['admin'] },
+        { id: 'finance', label: 'Financeiro / NF-e', icon: DollarSign, roles: ['admin'] },
         { id: 'reports', label: 'Relatórios', icon: LineChart, roles: ['admin', 'auditor'] },
       ]
     },
@@ -91,6 +93,13 @@ export default function Sidebar({ currentView, setView, isOpen, onClose }: Sideb
         { id: 'system_admin', label: 'Painel Mega Admin', icon: Server, roles: ['mega_admin'] },
         { id: 'reseller', label: 'Painel Super Admin', icon: Building2, roles: ['super_admin'] },
       ]
+    },
+    {
+      title: 'COOPERATIVA',
+      items: activeTenant?.tenantType === 'cooperativa' ? [
+        { id: 'coop_finance', label: 'Repasses e Gamificação', icon: TrendingUp, roles: ['admin', 'professional'] },
+        { id: 'assemblies', label: 'Módulo Societário', icon: Users, roles: ['admin', 'professional'] },
+      ] : []
     },
     {
       title: 'ADMINISTRAÇÃO',

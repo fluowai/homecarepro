@@ -17,6 +17,8 @@ import {
   OfflineSyncItem,
   TriageResult,
   HealthInsurance,
+  Assembly,
+  AssemblyVote
 } from './types';
 
 // ── Auth & Profile ──────────────────────────────────────────────
@@ -140,6 +142,8 @@ function visitToRow(v: Visit) {
     check_out_location: v.checkOutLocation ?? null,
     check_in_coords: v.checkInCoords ? `${v.checkInCoords.lat},${v.checkInCoords.lng}` : null,
     check_out_coords: v.checkOutCoords ? `${v.checkOutCoords.lat},${v.checkOutCoords.lng}` : null,
+    check_in_photo: v.checkInPhoto ?? null,
+    check_out_photo: v.checkOutPhoto ?? null,
     report: v.report ?? '',
     value: v.value,
   };
@@ -161,6 +165,8 @@ function visitFromRow(r: Record<string, unknown>): Visit {
     checkOutLocation: (r.check_out_location as string) ?? undefined,
     checkInCoords: r.check_in_coords ? { lat: Number((r.check_in_coords as string).split(',')[0]), lng: Number((r.check_in_coords as string).split(',')[1]) } : undefined,
     checkOutCoords: r.check_out_coords ? { lat: Number((r.check_out_coords as string).split(',')[0]), lng: Number((r.check_out_coords as string).split(',')[1]) } : undefined,
+    checkInPhoto: (r.check_in_photo as string) ?? undefined,
+    checkOutPhoto: (r.check_out_photo as string) ?? undefined,
     report: (r.report as string) || undefined,
     value: Number(r.value) || 0,
   };
@@ -232,6 +238,8 @@ function medicineToRow(m: Medicine) {
     expiry_date: m.expiryDate,
     quantity: m.quantity,
     min_quantity: m.minQuantity,
+    is_controlled: m.isControlled ?? false,
+    control_class: m.controlClass ?? null,
   };
 }
 
@@ -245,6 +253,8 @@ function medicineFromRow(r: Record<string, unknown>): Medicine {
     expiryDate: r.expiry_date as string,
     quantity: Number(r.quantity) || 0,
     minQuantity: Number(r.min_quantity) || 0,
+    isControlled: Boolean(r.is_controlled),
+    controlClass: (r.control_class as string) || undefined,
   };
 }
 
@@ -306,6 +316,8 @@ interface HomeCareState {
   isOffline: boolean;
   offlineSyncQueue: OfflineSyncItem[];
   offlineLogs: string[];
+  assemblies: Assembly[];
+  assemblyVotes: AssemblyVote[];
 
   // RBAC
   currentUserRole: 'mega_admin' | 'super_admin' | 'admin' | 'auditor' | 'professional' | 'patient' | 'system_support';
@@ -320,7 +332,7 @@ interface HomeCareState {
   addTenant: (tenant: Omit<Tenant, 'id'> & { id?: string }) => void;
   updateTenant: (id: string, updates: Partial<Tenant>) => void;
   refreshTenants: () => Promise<void>;
-  createTenantWithInvite: (input: { name: string; cnpj?: string; plan?: string; logo?: string; customDomain?: string; primaryColor?: string; secondaryColor?: string; adminEmail: string; parentId?: string }) => Promise<{ tenant: Tenant; inviteLink: string }>;
+  createTenantWithInvite: (input: { name: string; cnpj?: string; plan?: string; logo?: string; customDomain?: string; primaryColor?: string; secondaryColor?: string; adminEmail: string; parentId?: string; tenantType?: 'homecare' | 'cooperativa' }) => Promise<{ tenant: Tenant; inviteLink: string }>;
   regenerateInvite: (tenantId: string, adminEmail: string) => Promise<string>;
 
   // Offline/Sync Actions
@@ -350,8 +362,8 @@ interface HomeCareState {
   addVisit: (visit: Omit<Visit, 'id' | 'tenantId'>) => void;
   updateVisit: (id: string, visit: Partial<Visit>) => void;
   deleteVisit: (id: string) => void;
-  checkInVisit: (id: string, location: string, coords?: {lat: number, lng: number}) => void;
-  checkOutVisit: (id: string, location: string, report: string, vitals?: { pa: string; fc: string; temp: string; sat: string }, rawNotes?: string, usedMeds?: { id: string; name: string; qty: number }[], coords?: {lat: number, lng: number}) => void;
+  checkInVisit: (id: string, location: string, coords?: {lat: number, lng: number}, photo?: string) => void;
+  checkOutVisit: (id: string, location: string, report: string, vitals?: { pa: string; fc: string; temp: string; sat: string }, rawNotes?: string, usedMeds?: { id: string; name: string; qty: number }[], coords?: {lat: number, lng: number}, photo?: string) => void;
 
   // CRM Actions
   addLead: (lead: Omit<CRMLead, 'id' | 'tenantId' | 'createdAt'>) => void;
@@ -384,6 +396,13 @@ interface HomeCareState {
   suggestScheduleAi: () => Promise<string>;
   analyzeTriageAi: (description: string, patientAge?: number, mainCondition?: string) => Promise<TriageResult>;
   transcribeAudioAi: (audioData: string, mimeType?: string) => Promise<string>;
+
+  // Cooperativa / Societário
+  addAssembly: (assembly: Omit<Assembly, 'id' | 'tenantId'>) => void;
+  updateAssembly: (id: string, data: Partial<Assembly>) => void;
+  voteAssembly: (assemblyId: string, professionalId: string, vote: 'approve' | 'reject' | 'abstain') => void;
+  acceptOpenShift: (visitId: string, professionalId: string) => void;
+  requestCoverage: (visitId: string) => void;
 }
 
 // ── Helpers ─────────────────────────────────────────────────────
@@ -631,6 +650,8 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
   isOffline: loadFromStorage('isOffline', false),
   offlineSyncQueue: loadFromStorage('offlineSyncQueue', []),
   offlineLogs: loadFromStorage('offlineLogs', ['[SISTEMA]: Sistema online e conectado com o servidor de IA.']),
+  assemblies: loadFromStorage('assemblies', []),
+  assemblyVotes: loadFromStorage('assemblyVotes', []),
 
   // RBAC
   currentUserRole: loadFromStorage('currentUserRole', 'admin'),
@@ -702,6 +723,7 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
         plan: (r.plan as string) || 'Free',
         parentId: (r.parent_id as string) || undefined,
         status: (r.status as Tenant['status']) || 'active',
+        tenantType: (r.tenant_type as Tenant['tenantType']) || 'homecare',
         customDomain: (r.custom_domain as string) || undefined,
         primaryColor: (r.primary_color as string) || undefined,
         secondaryColor: (r.secondary_color as string) || undefined,
@@ -793,6 +815,7 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
       plan: newTenant.plan,
       parent_id: newTenant.parentId || null,
       status: newTenant.status || 'active',
+      tenant_type: newTenant.tenantType || 'homecare',
       custom_domain: newTenant.customDomain || null,
       primary_color: newTenant.primaryColor || null,
       secondary_color: newTenant.secondaryColor || null,
@@ -815,6 +838,7 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
         plan: updated.plan,
         parent_id: updated.parentId || null,
         status: updated.status || 'active',
+        tenant_type: updated.tenantType || 'homecare',
         custom_domain: updated.customDomain || null,
         primary_color: updated.primaryColor || null,
         secondary_color: updated.secondaryColor || null
@@ -835,6 +859,7 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
         plan: (r.plan as string) || 'Free',
         parentId: (r.parent_id as string) || undefined,
         status: (r.status as Tenant['status']) || 'active',
+        tenantType: (r.tenant_type as Tenant['tenantType']) || 'homecare',
         customDomain: (r.custom_domain as string) || undefined,
         primaryColor: (r.primary_color as string) || undefined,
         secondaryColor: (r.secondary_color as string) || undefined,
@@ -869,6 +894,7 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
       plan: result.tenant.plan || 'Free',
       parentId: result.tenant.parentId || undefined,
       status: result.tenant.status || 'active',
+      tenantType: result.tenant.tenantType || 'homecare',
       customDomain: result.tenant.customDomain || undefined,
       primaryColor: result.tenant.primaryColor || undefined,
       secondaryColor: result.tenant.secondaryColor || undefined,
@@ -1098,9 +1124,9 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
     deleteRow('visits', id);
   },
 
-  checkInVisit: (id, location, coords) => {
+  checkInVisit: (id, location, coords, photo) => {
     const timeString = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-    const updated = get().visits.map((v) => (v.id === id ? { ...v, status: 'em_andamento' as VisitStatus, checkInTime: timeString, checkInLocation: location, checkInCoords: coords } : v));
+    const updated = get().visits.map((v) => (v.id === id ? { ...v, status: 'em_andamento' as VisitStatus, checkInTime: timeString, checkInLocation: location, checkInCoords: coords, checkInPhoto: photo } : v));
     set({ visits: updated });
     saveToStorage('visits', updated);
     const row = updated.find((v) => v.id === id);
@@ -1126,9 +1152,9 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
     }
   },
 
-  checkOutVisit: (id, location, report, vitals, rawNotes, usedMeds, coords) => {
+  checkOutVisit: (id, location, report, vitals, rawNotes, usedMeds, coords, photo) => {
     const timeString = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-    const updated = get().visits.map((v) => (v.id === id ? { ...v, status: 'concluida' as VisitStatus, checkOutTime: timeString, checkOutLocation: location, checkOutCoords: coords, report } : v));
+    const updated = get().visits.map((v) => (v.id === id ? { ...v, status: 'concluida' as VisitStatus, checkOutTime: timeString, checkOutLocation: location, checkOutCoords: coords, checkOutPhoto: photo, report } : v));
     set({ visits: updated });
     saveToStorage('visits', updated);
     const row = updated.find((v) => v.id === id);
@@ -1412,4 +1438,56 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
       return 'Ditado gravado: Paciente estável. Sem queixas adicionais.';
     }
   },
+
+  // ── Cooperativas & Assemblies ─────────────────────────────────
+
+  addAssembly: (assembly) => {
+    const newAss: Assembly = { ...assembly, id: `ass-${Date.now()}`, tenantId: get().activeTenantId };
+    const updated = [...get().assemblies, newAss];
+    set({ assemblies: updated });
+    saveToStorage('assemblies', updated);
+  },
+
+  updateAssembly: (id, data) => {
+    const updated = get().assemblies.map(a => a.id === id ? { ...a, ...data } : a);
+    set({ assemblies: updated });
+    saveToStorage('assemblies', updated);
+  },
+
+  voteAssembly: (assemblyId, professionalId, vote) => {
+    // Avoid double voting
+    if (get().assemblyVotes.find(v => v.assemblyId === assemblyId && v.professionalId === professionalId)) {
+      return;
+    }
+    const newVote: AssemblyVote = { id: `v-${Date.now()}`, assemblyId, professionalId, vote, timestamp: new Date().toISOString() };
+    const updated = [...get().assemblyVotes, newVote];
+    set({ assemblyVotes: updated });
+    saveToStorage('assemblyVotes', updated);
+  },
+
+  acceptOpenShift: (visitId, professionalId) => {
+    const updated = get().visits.map(v => {
+      if (v.id === visitId) {
+        return { ...v, status: 'agendada' as VisitStatus, professionalId, isCoverageRequested: false };
+      }
+      return v;
+    });
+    set({ visits: updated });
+    saveToStorage('visits', updated);
+    const row = updated.find((v) => v.id === visitId);
+    if (row) upsertRow('visits', visitToRow(row));
+  },
+
+  requestCoverage: (visitId) => {
+    const updated = get().visits.map(v => {
+      if (v.id === visitId) {
+        return { ...v, status: 'open_shift' as VisitStatus, isCoverageRequested: true };
+      }
+      return v;
+    });
+    set({ visits: updated });
+    saveToStorage('visits', updated);
+    const row = updated.find((v) => v.id === visitId);
+    if (row) upsertRow('visits', visitToRow(row));
+  }
 }));

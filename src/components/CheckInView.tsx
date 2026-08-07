@@ -15,7 +15,10 @@ import {
   Navigation,
   Lock,
   Unlock,
-  User
+  User,
+  Camera,
+  Pill,
+  Trash2
 } from 'lucide-react';
 import { useHomeCareStore } from '../store';
 
@@ -55,9 +58,17 @@ export default function CheckInView() {
   const [medQty, setMedQty] = useState(1);
   const [usedMeds, setUsedMeds] = useState<{ id: string; name: string; qty: number }[]>([]);
   
+  const [showPinModal, setShowPinModal] = useState(false);
+  const [pin, setPin] = useState('');
+  const [pendingMedToAdd, setPendingMedToAdd] = useState<{ id: string; name: string; qty: number; isControlled: boolean; controlClass?: string } | null>(null);
+  
   // AI loader
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
+
+  // Photo states
+  const [inPhotoPreview, setInPhotoPreview] = useState<string | null>(null);
+  const [outPhotoPreview, setOutPhotoPreview] = useState<string | null>(null);
 
   // Filters for today's visits
   const todayStr = new Date().toISOString().split('T')[0];
@@ -79,16 +90,56 @@ export default function CheckInView() {
 
   const closeSimulation = () => {
     setIsSimulationOpen(false);
-    setTimeout(() => setSelectedVisitId(''), 300);
+    setTimeout(() => {
+      setSelectedVisitId('');
+      setInPhotoPreview(null);
+      setOutPhotoPreview(null);
+    }, 300);
   };
 
   const handleCheckIn = () => {
     if (!selectedVisitId) return;
+    if (!inPhotoPreview) {
+      alert("A foto do local (check-in) é obrigatória para validar sua presença.");
+      return;
+    }
     const mockLat = -23.55 + Math.random() * 0.02;
     const mockLng = -46.63 + Math.random() * 0.02;
     const locationStr = `${mockLat.toFixed(4)},${mockLng.toFixed(4)} (Confirmado via GPS Integrado)`;
     
-    checkInVisit(selectedVisitId, locationStr, { lat: mockLat, lng: mockLng });
+    checkInVisit(selectedVisitId, locationStr, { lat: mockLat, lng: mockLng }, inPhotoPreview);
+  };
+
+  const handleAddMed = () => {
+    if (!selectedMedId) return;
+    const med = medicines.find(m => m.id === selectedMedId);
+    if (!med) return;
+
+    const medToAdd = { id: med.id, name: med.name, qty: medQty, isControlled: !!med.isControlled, controlClass: med.controlClass };
+    
+    if (med.isControlled) {
+      setPendingMedToAdd(medToAdd);
+      setShowPinModal(true);
+    } else {
+      setUsedMeds([...usedMeds, medToAdd]);
+      setSelectedMedId('');
+      setMedQty(1);
+    }
+  };
+
+  const handleConfirmPin = () => {
+    if (pin !== '1234') {
+      alert("PIN inválido. Tente '1234'.");
+      return;
+    }
+    if (pendingMedToAdd) {
+      setUsedMeds([...usedMeds, pendingMedToAdd]);
+      setPendingMedToAdd(null);
+    }
+    setShowPinModal(false);
+    setPin('');
+    setSelectedMedId('');
+    setMedQty(1);
   };
 
   const handleGenerateAiReport = async () => {
@@ -142,6 +193,11 @@ ${rawNotes}
       alert("Para profissionais de saúde, é obrigatório o preenchimento de todos os sinais vitais antes do check-out.");
       return;
     }
+    
+    if (!outPhotoPreview) {
+      alert("A foto de check-out é obrigatória para atestar a finalização.");
+      return;
+    }
 
     // Deduct medicines used
     usedMeds.forEach(item => {
@@ -163,7 +219,7 @@ ${rawNotes}
 
     const finalReport = (generatedReport || `Evolução Clínica Simplificada:\nSinais Vitais: PA ${pa} mmHg | FC ${fc} bpm | Temp ${temp}°C | Sat O2 ${sat}%.\nNotas: ${rawNotes}`) + medsReport;
     
-    checkOutVisit(selectedVisitId, locationStr, finalReport, { pa, fc, temp, sat }, rawNotes, usedMeds, { lat: mockLat, lng: mockLng });
+    checkOutVisit(selectedVisitId, locationStr, finalReport, { pa, fc, temp, sat }, rawNotes, usedMeds, { lat: mockLat, lng: mockLng }, outPhotoPreview);
     
     // Clear bedside states
     setRawNotes('');
@@ -188,6 +244,18 @@ ${rawNotes}
       window.removeEventListener('offline', handleOffline);
     };
   }, [setOfflineMode]);
+
+  const handlePhotoCapture = (e: React.ChangeEvent<HTMLInputElement>, type: 'in' | 'out') => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        if (type === 'in') setInPhotoPreview(reader.result as string);
+        else setOutPhotoPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -436,19 +504,36 @@ ${rawNotes}
                     </div>
                   </div>
                   {selectedVisit.status === 'agendada' ? (
-                    <button 
-                      onClick={handleCheckIn} 
-                      className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-bold text-sm rounded-xl shadow-md transition-all active:scale-95 flex items-center gap-2"
-                    >
-                      <MapPin className="w-4 h-4" /> Bater Ponto (GPS)
-                    </button>
-                  ) : (
-                    <div className="flex flex-col items-end">
-                      <div className="flex items-center gap-1.5 text-green-700 font-bold text-sm bg-green-100 px-4 py-2 rounded-xl">
-                        <CheckCircle2 className="w-5 h-5"/> Check-in Realizado
-                      </div>
-                      <span className="text-[10px] text-gray-400 font-medium mt-1">{selectedVisit.checkInTime}</span>
+                    <div className="flex flex-col gap-3">
+                      {!inPhotoPreview ? (
+                        <label className="cursor-pointer px-4 py-2 bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded-xl text-sm font-bold text-gray-700 flex items-center justify-center gap-2 transition-all">
+                          <Camera className="w-4 h-4" /> Tirar Foto (Local)
+                          <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => handlePhotoCapture(e, 'in')} />
+                        </label>
+                      ) : (
+                        <div className="flex flex-col items-center gap-2">
+                          <img src={inPhotoPreview} alt="Check-in" className="w-24 h-24 object-cover rounded-xl border border-gray-300 shadow-sm" />
+                          <button onClick={() => setInPhotoPreview(null)} className="text-[10px] text-red-500 font-bold underline">Refazer Foto</button>
+                        </div>
+                      )}
+                      
+                      <button 
+                        onClick={handleCheckIn} 
+                        className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-bold text-sm rounded-xl shadow-md transition-all active:scale-95 flex items-center gap-2"
+                      >
+                        <MapPin className="w-4 h-4" /> Bater Ponto (GPS)
+                      </button>
                     </div>
+                  ) : (
+                      <div className="flex flex-col items-end gap-2">
+                        <div className="flex items-center gap-1.5 text-green-700 font-bold text-sm bg-green-100 px-4 py-2 rounded-xl">
+                          <CheckCircle2 className="w-5 h-5"/> Check-in Realizado
+                        </div>
+                        {selectedVisit.checkInPhoto && (
+                          <img src={selectedVisit.checkInPhoto} alt="Check-in" className="w-12 h-12 object-cover rounded-lg border border-green-200" />
+                        )}
+                        <span className="text-[10px] text-gray-400 font-medium">{selectedVisit.checkInTime}</span>
+                      </div>
                   )}
                 </div>
               </div>
@@ -514,6 +599,60 @@ ${rawNotes}
                     <textarea required rows={3} placeholder="Descreva os achados clínicos e a conduta..." value={rawNotes} onChange={(e) => setRawNotes(e.target.value)} disabled={selectedVisit.status !== 'em_andamento'} className="w-full bg-white border border-gray-200 rounded-xl text-xs p-3 text-gray-800 outline-none focus:border-green-600 focus:ring-1 focus:ring-green-600" />
                   </div>
 
+                  {/* Administração de Medicamentos */}
+                  <div>
+                    <label className="text-[10px] font-bold text-gray-400 uppercase block mb-1.5 flex items-center gap-1.5">
+                      <Pill className="w-4 h-4 text-blue-500" /> Medicamentos Utilizados
+                    </label>
+                    <div className="flex gap-2">
+                      <select 
+                        value={selectedMedId} 
+                        onChange={(e) => setSelectedMedId(e.target.value)}
+                        disabled={selectedVisit.status !== 'em_andamento'}
+                        className="flex-1 bg-white border border-gray-200 rounded-xl text-xs p-3 text-gray-800 outline-none"
+                      >
+                        <option value="">Selecione um medicamento...</option>
+                        {medicines.filter(m => m.tenantId === activeTenantId && m.quantity > 0).map(m => (
+                          <option key={m.id} value={m.id}>{m.name} ({m.quantity} em estoque) {m.isControlled ? `- CONTROLADO (${m.controlClass})` : ''}</option>
+                        ))}
+                      </select>
+                      <input 
+                        type="number" 
+                        min="1" 
+                        value={medQty} 
+                        onChange={(e) => setMedQty(parseInt(e.target.value) || 1)}
+                        disabled={selectedVisit.status !== 'em_andamento'}
+                        className="w-16 bg-white border border-gray-200 rounded-xl text-xs p-3 text-center text-gray-800 outline-none"
+                      />
+                      <button 
+                        type="button"
+                        onClick={handleAddMed}
+                        disabled={selectedVisit.status !== 'em_andamento' || !selectedMedId}
+                        className="px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-colors disabled:opacity-50"
+                      >
+                        Add
+                      </button>
+                    </div>
+                    {usedMeds.length > 0 && (
+                      <ul className="mt-3 space-y-2">
+                        {usedMeds.map((um, idx) => (
+                          <li key={idx} className="text-xs bg-gray-50 border border-gray-200 p-2 rounded-lg flex justify-between items-center">
+                            <div>
+                              <span className="font-semibold text-gray-700">{um.name}</span>
+                              {um.isControlled && <span className="ml-2 px-1.5 py-0.5 bg-red-100 text-red-700 rounded text-[9px] uppercase font-bold">Autenticado</span>}
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <span className="text-gray-500">{um.qty} un</span>
+                              {selectedVisit.status === 'em_andamento' && (
+                                <button onClick={() => setUsedMeds(usedMeds.filter((_, i) => i !== idx))} className="text-red-500 hover:text-red-700"><Trash2 className="w-4 h-4" /></button>
+                              )}
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+
                   {/* AI generation button & Output */}
                   {selectedVisit.status === 'em_andamento' && (
                     <div className="border-t border-gray-100 pt-4 space-y-4">
@@ -572,23 +711,80 @@ ${rawNotes}
                   </div>
                   
                   {selectedVisit.status === 'em_andamento' ? (
-                    <button 
-                      onClick={handleCheckOut} 
-                      className="px-6 py-3 bg-gray-900 hover:bg-black text-white font-bold text-sm rounded-xl shadow-md transition-all active:scale-95 flex items-center gap-2"
-                    >
-                      Assinar e Sair <ArrowRight className="w-4 h-4" />
-                    </button>
+                    <div className="flex flex-col gap-3">
+                      {!outPhotoPreview ? (
+                        <label className="cursor-pointer px-4 py-2 bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded-xl text-sm font-bold text-gray-700 flex items-center justify-center gap-2 transition-all">
+                          <Camera className="w-4 h-4" /> Tirar Foto (Saída)
+                          <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => handlePhotoCapture(e, 'out')} />
+                        </label>
+                      ) : (
+                        <div className="flex flex-col items-center gap-2">
+                          <img src={outPhotoPreview} alt="Check-out" className="w-24 h-24 object-cover rounded-xl border border-gray-300 shadow-sm" />
+                          <button onClick={() => setOutPhotoPreview(null)} className="text-[10px] text-red-500 font-bold underline">Refazer Foto</button>
+                        </div>
+                      )}
+                      
+                      <button 
+                        onClick={handleCheckOut} 
+                        className="px-6 py-3 bg-gray-900 hover:bg-black text-white font-bold text-sm rounded-xl shadow-md transition-all active:scale-95 flex items-center gap-2"
+                      >
+                        Assinar e Sair <ArrowRight className="w-4 h-4" />
+                      </button>
+                    </div>
                   ) : selectedVisit.status === 'concluida' ? (
-                    <div className="text-right">
+                    <div className="text-right flex flex-col items-end gap-2">
                       <div className="flex items-center gap-1.5 text-gray-600 font-bold text-sm bg-gray-200 px-4 py-2 rounded-xl">
                         <CheckCircle2 className="w-5 h-5"/> Check-out Salvo
                       </div>
-                      <span className="text-[10px] text-gray-400 font-medium mt-1 block">{selectedVisit.checkOutTime}</span>
+                      {selectedVisit.checkOutPhoto && (
+                        <img src={selectedVisit.checkOutPhoto} alt="Check-out" className="w-12 h-12 object-cover rounded-lg border border-gray-300" />
+                      )}
+                      <span className="text-[10px] text-gray-400 font-medium">{selectedVisit.checkOutTime}</span>
                     </div>
                   ) : null}
                 </div>
               </div>
 
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PIN Modal */}
+      {showPinModal && (
+        <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-sm shadow-xl overflow-hidden">
+            <div className="p-6 text-center border-b border-gray-100 bg-red-50">
+              <Lock className="w-12 h-12 text-red-500 mx-auto mb-2" />
+              <h3 className="text-lg font-bold text-red-800">Medicamento Controlado</h3>
+              <p className="text-xs text-red-600 mt-1">Este medicamento exige autenticação dupla (Portaria 344/98).</p>
+            </div>
+            <div className="p-6">
+              <p className="text-sm text-gray-600 font-semibold mb-4 text-center">
+                Autentique-se para administrar:<br/>
+                <span className="text-gray-900 font-bold">{pendingMedToAdd?.name}</span> ({pendingMedToAdd?.qty} un)
+              </p>
+              <input
+                type="password"
+                placeholder="Insira seu PIN numérico"
+                value={pin}
+                onChange={(e) => setPin(e.target.value)}
+                className="w-full text-center tracking-[0.5em] font-mono text-xl bg-gray-50 border border-gray-200 rounded-xl p-3 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 mb-4"
+              />
+              <div className="flex gap-3">
+                <button 
+                  onClick={() => { setShowPinModal(false); setPendingMedToAdd(null); setPin(''); }} 
+                  className="flex-1 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-sm rounded-xl transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  onClick={handleConfirmPin} 
+                  className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-bold text-sm rounded-xl transition-colors"
+                >
+                  Assinar
+                </button>
+              </div>
             </div>
           </div>
         </div>

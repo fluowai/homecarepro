@@ -8,9 +8,10 @@ import {
   CreditCard, 
   Download, 
   ArrowUpRight,
-  ShieldCheck,
   Building2,
-  PieChart
+  PieChart,
+  FileDigit,
+  Send
 } from 'lucide-react';
 import { useHomeCareStore } from '../store';
 
@@ -213,13 +214,31 @@ export default function FinanceView() {
                         <span className="text-xs font-bold text-slate-900 block">R$ {inv.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                       </div>
 
-                      <span className={`text-[10px] px-2.5 py-1 rounded-md font-bold uppercase tracking-wide shrink-0 ${
-                        inv.status === 'pago' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' :
-                        inv.status === 'pendente' ? 'bg-amber-50 text-amber-700 border border-amber-100' :
-                        'bg-rose-50 text-rose-700 border border-rose-100'
-                      }`}>
-                        {inv.status === 'pago' ? 'Fechado' : inv.status}
-                      </span>
+                      <div className="flex flex-col gap-2 border-l border-slate-100 pl-4 ml-2">
+                        {inv.status === 'pago' ? (
+                          <>
+                            <span className={`text-[10px] px-2.5 py-1 rounded-md font-bold uppercase tracking-wide text-center bg-emerald-50 text-emerald-700 border border-emerald-100`}>
+                              Fechado
+                            </span>
+                            <button className="flex items-center gap-1.5 px-2 py-1 text-[10px] text-slate-600 hover:text-indigo-600 hover:bg-indigo-50 border border-slate-200 rounded transition-colors font-bold">
+                              <Download className="w-3 h-3" /> NF-e
+                            </button>
+                          </>
+                        ) : inv.status === 'pendente' ? (
+                          <>
+                            <span className={`text-[10px] px-2.5 py-1 rounded-md font-bold uppercase tracking-wide text-center bg-amber-50 text-amber-700 border border-amber-100`}>
+                              Pendente
+                            </span>
+                            <button onClick={() => alert("Simulação: Emitindo Nota Fiscal e enviando fatura para " + inv.patientName)} className="flex items-center justify-center gap-1.5 px-2 py-1 text-[10px] bg-indigo-600 hover:bg-indigo-700 text-white rounded transition-colors font-bold">
+                              <Send className="w-3 h-3" /> Cobrar
+                            </button>
+                          </>
+                        ) : (
+                          <span className={`text-[10px] px-2.5 py-1 rounded-md font-bold uppercase tracking-wide text-center bg-rose-50 text-rose-700 border border-rose-100`}>
+                            {inv.status}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))

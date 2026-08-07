@@ -1,6 +1,6 @@
 export type PatientStatus = 'active' | 'inactive';
 export type ProfessionalStatus = 'active' | 'busy' | 'offline';
-export type VisitStatus = 'agendada' | 'em_andamento' | 'concluida' | 'cancelada';
+export type VisitStatus = 'agendada' | 'em_andamento' | 'concluida' | 'cancelada' | 'open_shift';
 export type LeadStatus = 'lead' | 'avaliacao' | 'proposta' | 'fechado';
 
 export interface Tenant {
@@ -11,6 +11,7 @@ export interface Tenant {
   plan: string;
   parentId?: string;
   status?: 'active' | 'inactive' | 'blocked';
+  tenantType?: 'homecare' | 'cooperativa';
   customDomain?: string;
   primaryColor?: string;
   secondaryColor?: string;
@@ -144,6 +145,9 @@ export interface Professional {
     status?: 'valid' | 'expired' | 'pending';
   }[];
   stampSignatureUrl?: string;
+  score?: number;
+  tier?: 'Bronze' | 'Prata' | 'Ouro' | 'Diamante';
+  balance?: number;
 }
 
 export interface Visit {
@@ -161,8 +165,12 @@ export interface Visit {
   checkOutLocation?: string;
   checkInCoords?: { lat: number; lng: number };
   checkOutCoords?: { lat: number; lng: number };
+  checkInPhoto?: string;
+  checkOutPhoto?: string;
   report?: string;
   value: number;
+  baseValue?: number;
+  isCoverageRequested?: boolean;
 }
 
 export interface CRMLead {
@@ -198,6 +206,22 @@ export interface Medicine {
   expiryDate: string; // YYYY-MM-DD
   quantity: number;
   minQuantity: number;
+  isControlled?: boolean;
+  controlClass?: string;
+}
+
+export interface MedicationAdministration {
+  id: string;
+  tenantId: string;
+  patientId: string;
+  medicineId: string;
+  visitId?: string;
+  professionalId: string;
+  quantity: number;
+  administeredAt: string;
+  notes: string;
+  verifiedByPin: boolean;
+  createdAt: string;
 }
 
 export interface SurveyResponse {
@@ -293,4 +317,64 @@ export interface TicketMessage {
   userId: string;
   message: string;
   createdAt: string;
+}
+
+export interface Proposal {
+  id: string;
+  tenantId: string;
+  leadId: string;
+  title: string;
+  value: number;
+  status: 'draft' | 'sent' | 'accepted' | 'rejected';
+  pdfUrl?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Contract {
+  id: string;
+  tenantId: string;
+  patientId: string;
+  title: string;
+  status: 'draft' | 'pending_signature' | 'active' | 'terminated';
+  pdfUrl?: string;
+  signatureId?: string;
+  startDate?: string;
+  endDate?: string;
+  value?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Invoice {
+  id: string;
+  tenantId: string;
+  patientId: string;
+  visitId?: string;
+  issueDate: string;
+  dueDate: string;
+  value: number;
+  status: 'pending' | 'paid' | 'canceled' | 'failed';
+  nfeUrl?: string;
+  nfeId?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Assembly {
+  id: string;
+  tenantId: string;
+  title: string;
+  description: string;
+  status: 'draft' | 'active' | 'completed';
+  date: string;
+  documentUrl?: string;
+}
+
+export interface AssemblyVote {
+  id: string;
+  assemblyId: string;
+  professionalId: string;
+  vote: 'approve' | 'reject' | 'abstain';
+  timestamp: string;
 }

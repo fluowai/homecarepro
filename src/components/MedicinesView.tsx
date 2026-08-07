@@ -38,6 +38,8 @@ export default function MedicinesView() {
   const [expiryDate, setExpiryDate] = useState('');
   const [quantity, setQuantity] = useState<number>(30);
   const [minQuantity, setMinQuantity] = useState<number>(5);
+  const [isControlled, setIsControlled] = useState(false);
+  const [controlClass, setControlClass] = useState('N/A');
 
   // Quick consumption states
   const [consumingId, setConsumingId] = useState<string | null>(null);
@@ -102,7 +104,9 @@ export default function MedicinesView() {
       manufacturer,
       expiryDate,
       quantity,
-      minQuantity
+      minQuantity,
+      isControlled,
+      controlClass: isControlled ? controlClass : undefined
     });
 
     // Reset Form
@@ -112,6 +116,8 @@ export default function MedicinesView() {
     setExpiryDate('');
     setQuantity(30);
     setMinQuantity(5);
+    setIsControlled(false);
+    setControlClass('N/A');
     setShowAddModal(false);
   };
 
@@ -281,7 +287,10 @@ export default function MedicinesView() {
                             <Pill className="w-5 h-5" />
                           </div>
                           <div>
-                            <span className="font-bold text-slate-800 block text-sm">{m.name}</span>
+                            <span className="font-bold text-slate-800 block text-sm">
+                              {m.name} 
+                              {m.isControlled && <span className="ml-2 px-1.5 py-0.5 bg-red-100 text-red-700 rounded text-[9px] uppercase font-bold" title={`Controlado: ${m.controlClass}`}>Tarja Preta</span>}
+                            </span>
                             <span className="text-[10px] text-slate-400 block mt-0.5">Dosagem: {m.dosage}</span>
                           </div>
                         </div>
@@ -514,6 +523,35 @@ export default function MedicinesView() {
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl text-xs px-3.5 py-2.5 text-slate-700 focus:outline-none"
                   />
                   <span className="text-[10px] text-slate-400 mt-1 block">O sistema gerará um alerta inteligente caso o saldo caia para este valor ou menos.</span>
+                </div>
+
+                <div className="col-span-2 bg-slate-50 p-4 rounded-xl border border-slate-200 mt-2">
+                  <div className="flex items-center justify-between mb-3">
+                    <label className="text-[11px] font-bold text-slate-700 uppercase">Medicamento Controlado (Portaria 344/98)?</label>
+                    <input 
+                      type="checkbox" 
+                      checked={isControlled} 
+                      onChange={(e) => setIsControlled(e.target.checked)}
+                      className="w-4 h-4 text-green-600 rounded"
+                    />
+                  </div>
+                  {isControlled && (
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Classe de Controle</label>
+                      <select 
+                        value={controlClass}
+                        onChange={(e) => setControlClass(e.target.value)}
+                        className="w-full bg-white border border-slate-200 rounded-xl text-xs px-3.5 py-2.5 text-slate-700 focus:outline-none"
+                      >
+                        <option value="A1">A1 (Entorpecentes)</option>
+                        <option value="A2">A2 (Entorpecentes)</option>
+                        <option value="A3">A3 (Psicotrópicos)</option>
+                        <option value="B1">B1 (Psicotrópicos)</option>
+                        <option value="B2">B2 (Psicotrópicos Anorexígenos)</option>
+                        <option value="C1">C1 (Outras Substâncias Sujeitas a Controle Especial)</option>
+                      </select>
+                    </div>
+                  )}
                 </div>
               </div>
 

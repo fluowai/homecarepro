@@ -25,8 +25,12 @@ const CrmView = lazy(() => import('./components/CrmView'));
 const MedicinesView = lazy(() => import('./components/MedicinesView'));
 const SatisfactionView = lazy(() => import('./components/SatisfactionView'));
 const AlertsView = lazy(() => import('./components/AlertsView'));
+const ContractsView = lazy(() => import('./components/ContractsView'));
 const SystemAdminView = lazy(() => import('./components/SystemAdminView'));
 const ResellerView = lazy(() => import('./components/ResellerView'));
+const FamilyDashboardView = lazy(() => import('./components/FamilyDashboardView'));
+const CoopFinanceView = lazy(() => import('./components/CoopFinanceView'));
+const AssembliesView = lazy(() => import('./components/AssembliesView'));
 
 function LoadingScreen() {
   return (
@@ -64,6 +68,7 @@ export default function App() {
   const isAuthenticated = useHomeCareStore((s) => s.isAuthenticated);
   const tenants = useHomeCareStore((s) => s.tenants);
   const activeTenantId = useHomeCareStore((s) => s.activeTenantId);
+  const currentUserRole = useHomeCareStore((s) => s.currentUserRole);
 
   useEffect(() => {
     init();
@@ -92,6 +97,9 @@ export default function App() {
   const renderActiveView = () => {
     switch (currentView) {
       case 'dashboard':
+        if (currentUserRole === 'patient' || currentUserRole === 'viewer') {
+          return <FamilyDashboardView />;
+        }
         return <DashboardView setView={handleSetView} searchQuery={searchQuery} />;
       case 'patients':
         return <PatientsView searchQuery={searchQuery} />;
@@ -115,6 +123,12 @@ export default function App() {
         return <FinanceView />;
       case 'crm':
         return <CrmView />;
+      case 'contracts':
+        return <ContractsView />;
+      case 'coop_finance':
+        return <CoopFinanceView />;
+      case 'assemblies':
+        return <AssembliesView />;
       default:
         return <DashboardView setView={handleSetView} searchQuery={searchQuery} />;
     }
