@@ -1,6 +1,7 @@
 import express from "express";
 import helmet from "helmet";
 import cors from "cors";
+import crypto from "crypto";
 import rateLimit from "express-rate-limit";
 import { GoogleGenAI } from "@google/genai";
 import { SupabaseClient } from "@supabase/supabase-js";
@@ -585,6 +586,235 @@ Apenas o objeto JSON valido, sem formatacao Markdown adicional nem blocos de cod
     } catch (error: any) {
       logEvent("ERROR", "Tenant resolution failed", { error: error.message });
       res.status(500).json({ error: "Failed to resolve tenant" });
+    }
+  });
+
+  // ── Tenant Invitations (Reseller & Clinic onboarding) ─────────────
+  const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+
+  function newInviteToken() {
+    return crypto.randomBytes(32).toString("hex");
+  }
+
+  async function getProfile(userId: string) {
+    const { data } = await supabaseAdmin
+      .from("user_profiles")
+      .select("role, tenant_id")
+      .eq("id", userId)
+      .single();
+    return data as { role: string; tenant_id: string } | null;
+  }
+
+  // Create a tenant (reseller for mega_admin, clinic for super_admin) and emit an invite link
+  app.post("/api/admin/tenants", requireAuth, globalLimiter, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const profile = await getProfile(userId);
+      if (!profile || (profile.role !== "mega_admin" && profile.role !== "super_admin")) {
+        return res.status(403).json({ error: "Acesso negado." });
+      }
+
+      const { name, cnpj, plan, logo, customDomain, primaryColor, secondaryColor, adminEmail, adminName, parentId } = req.body;
+      if (!name || !adminEmail) {
+        return res.status(400).json({ error: "Nome da instância e e-mail do administrador são obrigatórios." });
+      }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(adminEmail)) {
+        return res.status(400).json({ error: "E-mail do administrador inválido." });
+      }
+
+      let targetParent: string | null = null;
+      if (profile.role === "super_admin") {
+        // Super admin can only create clinics under its own reseller tenant
+        targetParent = profile.tenant_id;
+      } else if (parentId) {
+        targetParent = parentId;
+      }
+      const inviteRole = targetParent ? "admin" : "super_admin";
+
+      const tenantId = `tenant-${Date.now().toString(36)}-${crypto.randomBytes(3).toString("hex")}`;
+      const { error: insertError } = await supabaseAdmin.from("tenants").insert({
+        id: tenantId,
+        name,
+        cnpj: cnpj || "",
+        plan: plan || "Free",
+        logo: logo || "",
+        status: "active",
+        parent_id: targetParent,
+        custom_domain: customDomain || null,
+        primary_color: primaryColor || null,
+        secondary_color: secondaryColor || null,
+      });
+      if (insertError) throw insertError;
+
+      const token = newInviteToken();
+      const { error: inviteError } = await supabaseAdmin.from("tenant_invitations").insert({
+        tenant_id: tenantId,
+        email: adminEmail,
+        role: inviteRole,
+        token,
+        status: "pending",
+        expires_at: new Date(Date.now() + INVITE_TTL_MS).toISOString(),
+        created_by: userId,
+      });
+      if (inviteError) throw inviteError;
+
+      logEvent("INFO", "Tenant created with invitation", { tenantId, role: inviteRole, createdBy: userId, adminName: adminName || "" });
+      res.status(201).json({
+        tenant: {
+          id: tenantId,
+          name,
+          cnpj: cnpj || "",
+          plan: plan || "Free",
+          logo: logo || "",
+          parentId: targetParent,
+          status: "active",
+          customDomain: customDomain || undefined,
+          primaryColor: primaryColor || undefined,
+          secondaryColor: secondaryColor || undefined,
+        },
+        inviteLink: `${appUrl}/?invite=${token}`,
+      });
+    } catch (error: any) {
+      logEvent("ERROR", "Tenant creation failed", { error: error.message });
+      res.status(500).json({ error: "Falha ao criar instância." });
+    }
+  });
+
+  // Regenerate an invite link for an existing tenant
+  app.post("/api/admin/tenants/:id/invite", requireAuth, globalLimiter, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const profile = await getProfile(userId);
+      if (!profile || (profile.role !== "mega_admin" && profile.role !== "super_admin")) {
+        return res.status(403).json({ error: "Acesso negado." });
+      }
+
+      const tenantId = (req.params as any).id;
+      const { adminEmail, adminName } = req.body;
+      if (!adminEmail) {
+        return res.status(400).json({ error: "E-mail do administrador é obrigatório." });
+      }
+
+      const { data: tenant, error: tenantError } = await supabaseAdmin
+        .from("tenants")
+        .select("id, parent_id")
+        .eq("id", tenantId)
+        .single();
+      if (tenantError || !tenant) {
+        return res.status(404).json({ error: "Instância não encontrada." });
+      }
+
+      // Super admin can only invite admins for its own child clinics
+      if (profile.role === "super_admin" && tenant.parent_id !== profile.tenant_id) {
+        return res.status(403).json({ error: "Acesso negado." });
+      }
+
+      const inviteRole = tenant.parent_id ? "admin" : "super_admin";
+      const token = newInviteToken();
+      const { error: inviteError } = await supabaseAdmin.from("tenant_invitations").insert({
+        tenant_id: tenantId,
+        email: adminEmail,
+        role: inviteRole,
+        token,
+        status: "pending",
+        expires_at: new Date(Date.now() + INVITE_TTL_MS).toISOString(),
+        created_by: userId,
+      });
+      if (inviteError) throw inviteError;
+
+      logEvent("INFO", "Invite regenerated", { tenantId, role: inviteRole, adminName: adminName || "" });
+      res.status(201).json({ inviteLink: `${appUrl}/?invite=${token}` });
+    } catch (error: any) {
+      logEvent("ERROR", "Invite regeneration failed", { error: error.message });
+      res.status(500).json({ error: "Falha ao gerar novo convite." });
+    }
+  });
+
+  // Public: validate an invite token (used by the accept page)
+  app.get("/api/invites/:token", globalLimiter, async (req, res) => {
+    try {
+      const token = (req.params as any).token;
+      const { data: invite, error } = await supabaseAdmin
+        .from("tenant_invitations")
+        .select("id, tenant_id, email, role, status, expires_at")
+        .eq("token", token)
+        .maybeSingle();
+      if (error) throw error;
+      if (!invite || invite.status !== "pending") {
+        return res.status(404).json({ error: "Convite inválido ou já utilizado." });
+      }
+      if (new Date(invite.expires_at).getTime() < Date.now()) {
+        return res.status(410).json({ error: "Convite expirado. Solicite um novo." });
+      }
+
+      const { data: tenant } = await supabaseAdmin
+        .from("tenants")
+        .select("id, name, logo, primary_color, secondary_color")
+        .eq("id", invite.tenant_id)
+        .single();
+
+      res.json({
+        id: invite.id,
+        email: invite.email,
+        role: invite.role,
+        tenant: tenant
+          ? { id: tenant.id, name: tenant.name, logo: tenant.logo, primaryColor: tenant.primary_color, secondaryColor: tenant.secondary_color }
+          : { id: invite.tenant_id, name: "Instância", logo: "" },
+      });
+    } catch (error: any) {
+      logEvent("ERROR", "Invite validation failed", { error: error.message });
+      res.status(500).json({ error: "Falha ao validar convite." });
+    }
+  });
+
+  // Public: accept an invite by creating the account (email + password)
+  app.post("/api/invites/accept", authLimiter, async (req, res) => {
+    try {
+      const { token, fullName, password } = req.body;
+      if (!token || !fullName || !password) {
+        return res.status(400).json({ error: "Preencha nome completo e senha." });
+      }
+      if (password.length < 6) {
+        return res.status(400).json({ error: "A senha deve ter pelo menos 6 caracteres." });
+      }
+
+      const { data: invite, error } = await supabaseAdmin
+        .from("tenant_invitations")
+        .select("id, tenant_id, email, role, status, expires_at")
+        .eq("token", token)
+        .maybeSingle();
+      if (error) throw error;
+      if (!invite || invite.status !== "pending") {
+        return res.status(404).json({ error: "Convite inválido ou já utilizado." });
+      }
+      if (new Date(invite.expires_at).getTime() < Date.now()) {
+        return res.status(410).json({ error: "Convite expirado. Solicite um novo." });
+      }
+
+      const { data: created, error: createError } = await supabaseAdmin.auth.admin.createUser({
+        email: invite.email,
+        password,
+        email_confirm: true,
+        user_metadata: {
+          full_name: fullName,
+          tenant_id: invite.tenant_id,
+          role: invite.role,
+        },
+      });
+      if (createError) {
+        if (String(createError.message || "").toLowerCase().includes("already")) {
+          return res.status(409).json({ error: "Já existe uma conta com este e-mail. Entre em contato com o suporte." });
+        }
+        throw createError;
+      }
+
+      await supabaseAdmin.from("tenant_invitations").update({ status: "accepted", accepted_at: new Date().toISOString() }).eq("id", invite.id);
+
+      logEvent("INFO", "Invite accepted, account created", { userId: created?.user?.id, tenantId: invite.tenant_id, role: invite.role });
+      res.status(201).json({ success: true, email: invite.email, role: invite.role });
+    } catch (error: any) {
+      logEvent("ERROR", "Invite accept failed", { error: error.message });
+      res.status(500).json({ error: "Falha ao criar a conta." });
     }
   });
 

@@ -9,6 +9,8 @@ import Sidebar from './components/Sidebar';
 import Topbar from './components/Topbar';
 import MobileNav from './components/MobileNav';
 import AuthView from './components/AuthView';
+import InviteAcceptView from './components/InviteAcceptView';
+import { supabase } from './lib/supabase';
 import { useHomeCareStore } from './store';
 
 const DashboardView = lazy(() => import('./components/DashboardView'));
@@ -66,6 +68,12 @@ export default function App() {
   useEffect(() => {
     init();
   }, [init]);
+
+  const inviteToken = new URLSearchParams(window.location.search).get('invite');
+
+  if (inviteToken) {
+    return <InviteAcceptView token={inviteToken} />;
+  }
 
   if (isLoading) {
     return <LoadingScreen />;

@@ -6,6 +6,7 @@ Mapa da documentação operacional. Leia na ordem abaixo.
 - `HANDOFF.md` — estado atual e próximo contexto
 - `CONTEXT.md` — estado do projeto / decisões ativas
 - `SPECS/ACTIVE.md` — contrato da tarefa em andamento
+- `VERIFY.md` — evidência de verificação da última entrega
 
 ## Detalhe
 - `PRODUCTION_READINESS.md` — análise completa de prontidão para produção (2026-08-04)

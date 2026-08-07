@@ -1,5 +1,12 @@
 # Worklog
 
+## 2026-08-07 (convites de revenda e painel Super Admin)
+- Nova migration `20260807000000_add_tenant_invitations.sql` (tabela `tenant_invitations` + RLS + `generate_invite_token()`), aplicada no banco (10 aplicadas / 0 pendentes; colunas verificadas).
+- `src/server/app.ts`: endpoints `POST /api/admin/tenants`, `POST /api/admin/tenants/:id/invite`, `GET /api/invites/:token`, `POST /api/invites/accept` (criação de conta via `auth.admin.createUser` com `email_confirm` e auto-login no front).
+- `src/store.ts`: novas ações `refreshTenants`, `createTenantWithInvite`, `regenerateInvite`; `init()` agora carrega tenants do Supabase.
+- UI: `InviteAcceptView` (aceite público), `InviteLinkModal` (link copiável), `TenantEditorModal` (criação com email do admin + modal de link), `SystemAdminView` (reenvio de convite por revenda), `ResellerView` redesenhado como painel exclusivo do Super Admin (visão geral + gestão de clínicas + whitelabel), `App.tsx` captura `?invite=` e renderiza o aceite.
+- Testes: 50 no `server.test.ts` (15 novos p/ convites), todos verdes. Typecheck e build verdes.
+
 ## 2026-08-04 (runner de migrations)
 - `run-sql.js` reescrito com controle de versão: tabela `public.schema_migrations`, executa somente migrations pendentes, em transação (rollback em falha), modo `--baseline` para adotar em banco já migrado e carrega `.env` via dotenv.
 - Baseline aplicado: 9 migrations registradas como aplicadas (não re-executadas).

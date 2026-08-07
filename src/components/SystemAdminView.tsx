@@ -1,18 +1,24 @@
 import React, { useState } from 'react';
-import { Building2, Users, CreditCard, Activity, Search, Filter, Plus, Shield, Settings, Server, Package, LifeBuoy } from 'lucide-react';
+import { Building2, Users, CreditCard, Activity, Search, Filter, Plus, Shield, Settings, Server, Package, LifeBuoy, Link2 } from 'lucide-react';
 import { useHomeCareStore } from '../store';
 import { PlanManager } from './PlanManager';
 import { SupportDesk } from './SupportDesk';
 import { GlobalUserManager } from './GlobalUserManager';
 import { InternalTeamManager } from './InternalTeamManager';
 import { TenantEditorModal } from './TenantEditorModal';
+import { InviteLinkModal } from './InviteLinkModal';
 import { Tenant } from '../types';
 
 export default function SystemAdminView() {
-  const { tenants, addTenant } = useHomeCareStore();
+  const { tenants, regenerateInvite } = useHomeCareStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<'network' | 'plans' | 'support' | 'users' | 'team'>('network');
   const [editingTenant, setEditingTenant] = useState<Tenant | null>(null);
+  const [reinviteTenant, setReinviteTenant] = useState<Tenant | null>(null);
+  const [reinviteEmail, setReinviteEmail] = useState('');
+  const [reinviteLink, setReinviteLink] = useState<string | null>(null);
+  const [reinviteLoading, setReinviteLoading] = useState(false);
+  const [reinviteError, setReinviteError] = useState('');
 
   const filteredTenants = tenants.filter(
     (t) => t.id !== 'system' && t.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -173,15 +179,31 @@ export default function SystemAdminView() {
                            )}
                          </div>
                        </td>
-                       <td className="p-4 text-right pr-6">
-                         <button
-                           onClick={() => setEditingTenant(tenant)}
-                           className="text-gray-400 hover:text-indigo-600 p-1.5 rounded-lg hover:bg-indigo-50 transition-colors"
-                           title="Editar Tenant"
-                         >
-                           <Settings className="w-4 h-4" />
-                         </button>
-                       </td>
+                        <td className="p-4 text-right pr-6">
+                          <div className="flex items-center justify-end gap-1">
+                            {!tenant.parentId && (
+                              <button
+                                onClick={() => {
+                                  setReinviteTenant(tenant);
+                                  setReinviteEmail('');
+                                  setReinviteLink(null);
+                                  setReinviteError('');
+                                }}
+                                className="text-gray-400 hover:text-emerald-600 p-1.5 rounded-lg hover:bg-emerald-50 transition-colors"
+                                title="Gerar link de convite da revenda"
+                              >
+                                <Link2 className="w-4 h-4" />
+                              </button>
+                            )}
+                            <button
+                              onClick={() => setEditingTenant(tenant)}
+                              className="text-gray-400 hover:text-indigo-600 p-1.5 rounded-lg hover:bg-indigo-50 transition-colors"
+                              title="Editar Tenant"
+                            >
+                              <Settings className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
                      </tr>
                    ))}
                    {filteredTenants.length === 0 && (
@@ -228,6 +250,82 @@ export default function SystemAdminView() {
           tenant={editingTenant}
           isCreating={editingTenant.id === ''}
           onClose={() => setEditingTenant(null)}
+        />
+      )}
+
+      {reinviteTenant && !reinviteLink && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50">
+              <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                <Link2 className="w-5 h-5 text-emerald-600" />
+                Novo Convite — {reinviteTenant.name}
+              </h3>
+              <p className="text-sm text-gray-500">Gere um novo link de acesso para a revenda criar a conta.</p>
+            </div>
+            <div className="p-6 space-y-4">
+              {reinviteError && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{reinviteError}</div>
+              )}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">E-mail do Administrador</label>
+                <input
+                  type="email"
+                  value={reinviteEmail}
+                  onChange={(e) => setReinviteEmail(e.target.value)}
+                  placeholder="admin@revenda.com.br"
+                  className="w-full px-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-colors"
+                />
+              </div>
+            </div>
+            <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 flex items-center justify-end gap-3">
+              <button
+                onClick={() => setReinviteTenant(null)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200 rounded-lg transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={async () => {
+                  if (!reinviteEmail.trim()) {
+                    setReinviteError('Informe o e-mail do administrador.');
+                    return;
+                  }
+                  setReinviteLoading(true);
+                  setReinviteError('');
+                  try {
+                    const link = await regenerateInvite(reinviteTenant.id, reinviteEmail.trim());
+                    setReinviteLink(link);
+                  } catch (err: any) {
+                    setReinviteError(err.message || 'Falha ao gerar convite.');
+                  } finally {
+                    setReinviteLoading(false);
+                  }
+                }}
+                disabled={reinviteLoading}
+                className="px-4 py-2 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors flex items-center gap-2 shadow-sm disabled:opacity-50"
+              >
+                {reinviteLoading ? 'Gerando...' : (
+                  <>
+                    <Link2 className="w-4 h-4" />
+                    Gerar Link
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {reinviteLink && (
+        <InviteLinkModal
+          inviteLink={reinviteLink}
+          title="Novo Link de Convite Gerado"
+          description={`Convite para ${reinviteTenant?.name} criar a conta de Super Admin.`}
+          onClose={() => {
+            setReinviteLink(null);
+            setReinviteTenant(null);
+          }}
         />
       )}
     </div>

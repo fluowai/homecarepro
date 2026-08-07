@@ -319,6 +319,9 @@ interface HomeCareState {
   setActiveTenant: (id: string) => void;
   addTenant: (tenant: Omit<Tenant, 'id'> & { id?: string }) => void;
   updateTenant: (id: string, updates: Partial<Tenant>) => void;
+  refreshTenants: () => Promise<void>;
+  createTenantWithInvite: (input: { name: string; cnpj?: string; plan?: string; logo?: string; customDomain?: string; primaryColor?: string; secondaryColor?: string; adminEmail: string; parentId?: string }) => Promise<{ tenant: Tenant; inviteLink: string }>;
+  regenerateInvite: (tenantId: string, adminEmail: string) => Promise<string>;
 
   // Offline/Sync Actions
   setOfflineMode: (offline: boolean) => void;
@@ -678,7 +681,8 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
       const tenantId = profile.tenant_id;
 
       // Load all tenant data from Supabase
-      const [patientsRes, profsRes, visitsRes, leadsRes, msgsRes, medsRes, surveysRes, surveyCfgRes, alertCfgRes] = await Promise.all([
+      const [tenantsRes, patientsRes, profsRes, visitsRes, leadsRes, msgsRes, medsRes, surveysRes, surveyCfgRes, alertCfgRes] = await Promise.all([
+        supabase.from('tenants').select('*'),
         supabase.from('patients').select('*'),
         supabase.from('professionals').select('*'),
         supabase.from('visits').select('*'),
@@ -689,6 +693,20 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
         supabase.from('survey_config').select('*').eq('tenant_id', tenantId).maybeSingle(),
         supabase.from('alert_config').select('*').eq('tenant_id', tenantId).maybeSingle(),
       ]);
+
+      const tenants: Tenant[] = (tenantsRes.data ?? []).map((r) => ({
+        id: r.id as string,
+        name: r.name as string,
+        logo: (r.logo as string) || '',
+        cnpj: (r.cnpj as string) || '',
+        plan: (r.plan as string) || 'Free',
+        parentId: (r.parent_id as string) || undefined,
+        status: (r.status as Tenant['status']) || 'active',
+        customDomain: (r.custom_domain as string) || undefined,
+        primaryColor: (r.primary_color as string) || undefined,
+        secondaryColor: (r.secondary_color as string) || undefined,
+      }));
+      saveToStorage('tenants', tenants);
 
       const patients = (patientsRes.data ?? []).map(patientFromRow);
       const professionals = (profsRes.data ?? []).map(professionalFromRow);
@@ -730,6 +748,7 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
         isAuthenticated: true,
         isLoading: false,
         activeTenantId: tenantId,
+        tenants,
         patients,
         professionals,
         visits,
@@ -801,6 +820,81 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
         secondary_color: updated.secondaryColor || null
       });
     }
+  },
+
+  refreshTenants: async () => {
+    if (!isSupabaseConfigured) return;
+    try {
+      const { data, error } = await supabase.from('tenants').select('*');
+      if (error) throw error;
+      const tenants: Tenant[] = (data ?? []).map((r) => ({
+        id: r.id as string,
+        name: r.name as string,
+        logo: (r.logo as string) || '',
+        cnpj: (r.cnpj as string) || '',
+        plan: (r.plan as string) || 'Free',
+        parentId: (r.parent_id as string) || undefined,
+        status: (r.status as Tenant['status']) || 'active',
+        customDomain: (r.custom_domain as string) || undefined,
+        primaryColor: (r.primary_color as string) || undefined,
+        secondaryColor: (r.secondary_color as string) || undefined,
+      }));
+      set({ tenants });
+      saveToStorage('tenants', tenants);
+    } catch (err) {
+      console.error('[Store] refreshTenants failed', err);
+    }
+  },
+
+  createTenantWithInvite: async (input) => {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData?.session?.access_token;
+    const res = await fetch('/api/admin/tenants', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(input),
+    });
+    const result = await res.json();
+    if (!res.ok) {
+      throw new Error(result.error || 'Falha ao criar instância.');
+    }
+    const tenant: Tenant = {
+      id: result.tenant.id,
+      name: result.tenant.name,
+      logo: result.tenant.logo || '',
+      cnpj: result.tenant.cnpj || '',
+      plan: result.tenant.plan || 'Free',
+      parentId: result.tenant.parentId || undefined,
+      status: result.tenant.status || 'active',
+      customDomain: result.tenant.customDomain || undefined,
+      primaryColor: result.tenant.primaryColor || undefined,
+      secondaryColor: result.tenant.secondaryColor || undefined,
+    };
+    const updated = [...get().tenants, tenant];
+    set({ tenants: updated });
+    saveToStorage('tenants', updated);
+    return { tenant, inviteLink: result.inviteLink as string };
+  },
+
+  regenerateInvite: async (tenantId, adminEmail) => {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData?.session?.access_token;
+    const res = await fetch(`/api/admin/tenants/${tenantId}/invite`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({ adminEmail }),
+    });
+    const result = await res.json();
+    if (!res.ok) {
+      throw new Error(result.error || 'Falha ao gerar convite.');
+    }
+    return result.inviteLink as string;
   },
 
   setOfflineMode: (offline) => {

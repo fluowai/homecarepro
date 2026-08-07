@@ -16,6 +16,7 @@ interface MockOptions {
   getUser?: (token: string) => { data: { user?: unknown } | null; error?: unknown };
   tableResult?: TableResult;
   adminDeleteUser?: () => { error?: unknown };
+  adminCreateUser?: () => { data?: unknown; error?: unknown };
 }
 
 function createMockSupabase(opts: MockOptions) {
@@ -33,6 +34,7 @@ function createMockSupabase(opts: MockOptions) {
     }),
     admin: {
       deleteUser: vi.fn(async () => opts.adminDeleteUser?.() ?? { error: null }),
+      createUser: vi.fn(async () => opts.adminCreateUser?.() ?? { data: { user: { id: "u-new" } }, error: null }),
     },
   };
 
@@ -442,6 +444,166 @@ describe("GET /api/internal/caddy-ask", () => {
     const { app } = makeApp();
     const res = await request(app).get("/api/internal/caddy-ask").query({ domain: "estranho.com.br" });
     expect(res.status).toBe(404);
+  });
+});
+
+describe("POST /api/admin/tenants", () => {
+  const profile = (role: string, tenantId = "sp") => ({
+    tableResult: (table: string) =>
+      table === "user_profiles" ? { data: { role, tenant_id: tenantId }, error: null } : { data: null, error: null },
+  });
+
+  it("retorna 401 sem token", async () => {
+    const { app } = makeApp();
+    const res = await request(app).post("/api/admin/tenants").send({ name: "X", adminEmail: "a@b.com" });
+    expect(res.status).toBe(401);
+  });
+
+  it("retorna 403 para operador", async () => {
+    const { app } = makeApp(profile("operator"));
+    const res = await request(app).post("/api/admin/tenants").set(AUTH).send({ name: "X", adminEmail: "a@b.com" });
+    expect(res.status).toBe(403);
+  });
+
+  it("retorna 400 sem adminEmail ou email inválido", async () => {
+    const { app } = makeApp(profile("mega_admin"));
+    const noEmail = await request(app).post("/api/admin/tenants").set(AUTH).send({ name: "X" });
+    expect(noEmail.status).toBe(400);
+    const badEmail = await request(app).post("/api/admin/tenants").set(AUTH).send({ name: "X", adminEmail: "invalido" });
+    expect(badEmail.status).toBe(400);
+  });
+
+  it("mega_admin cria revenda (sem parentId) com convite de super_admin", async () => {
+    const { app } = makeApp(profile("mega_admin"));
+    const res = await request(app).post("/api/admin/tenants").set(AUTH).send({ name: "Revenda SP", adminEmail: "revenda@sp.com" });
+    expect(res.status).toBe(201);
+    expect(res.body.tenant.parentId).toBeNull();
+    expect(res.body.inviteLink).toContain("/?invite=");
+  });
+
+  it("super_admin cria clínica filha com parentId próprio", async () => {
+    const { app } = makeApp(profile("super_admin", "rev-1"));
+    const res = await request(app).post("/api/admin/tenants").set(AUTH).send({ name: "Clínica Filha", adminEmail: "cli@filha.com" });
+    expect(res.status).toBe(201);
+    expect(res.body.tenant.parentId).toBe("rev-1");
+    expect(res.body.inviteLink).toContain("/?invite=");
+  });
+});
+
+describe("POST /api/admin/tenants/:id/invite", () => {
+  const profile = (role: string, tenantId = "sp") => ({
+    tableResult: (table: string, method: string) => {
+      if (table === "user_profiles") return { data: { role, tenant_id: tenantId }, error: null };
+      if (table === "tenants" && method === "single") return { data: { id: "t-1", parent_id: null }, error: null };
+      return { data: null, error: null };
+    },
+  });
+
+  it("retorna 403 para super_admin que não é dono da clínica", async () => {
+    const { app } = makeApp({
+      tableResult: (table, method) => {
+        if (table === "user_profiles") return { data: { role: "super_admin", tenant_id: "rev-1" }, error: null };
+        if (table === "tenants" && method === "single") return { data: { id: "t-1", parent_id: "rev-2" }, error: null };
+        return { data: null, error: null };
+      },
+    });
+    const res = await request(app).post("/api/admin/tenants/t-1/invite").set(AUTH).send({ adminEmail: "a@b.com" });
+    expect(res.status).toBe(403);
+  });
+
+  it("gera novo convite para tenant existente", async () => {
+    const { app } = makeApp(profile("mega_admin"));
+    const res = await request(app).post("/api/admin/tenants/t-1/invite").set(AUTH).send({ adminEmail: "a@b.com" });
+    expect(res.status).toBe(201);
+    expect(res.body.inviteLink).toContain("/?invite=");
+  });
+
+  it("retorna 400 sem adminEmail", async () => {
+    const { app } = makeApp(profile("mega_admin"));
+    const res = await request(app).post("/api/admin/tenants/t-1/invite").set(AUTH).send({});
+    expect(res.status).toBe(400);
+  });
+});
+
+describe("GET /api/invites/:token", () => {
+  it("retorna 404 para token inexistente", async () => {
+    const { app } = makeApp();
+    const res = await request(app).get("/api/invites/unknown-token");
+    expect(res.status).toBe(404);
+  });
+
+  it("retorna dados do convite pendente com tenant", async () => {
+    const { app } = makeApp({
+      tableResult: (table, method) => {
+        if (table === "tenant_invitations") return { data: { id: "inv-1", tenant_id: "t-1", email: "a@b.com", role: "admin", status: "pending", expires_at: new Date(Date.now() + 60000).toISOString() }, error: null };
+        if (table === "tenants" && method === "single") return { data: { id: "t-1", name: "Clínica X", logo: "", primary_color: null, secondary_color: null }, error: null };
+        return { data: null, error: null };
+      },
+    });
+    const res = await request(app).get("/api/invites/valid-token");
+    expect(res.status).toBe(200);
+    expect(res.body.email).toBe("a@b.com");
+    expect(res.body.role).toBe("admin");
+    expect(res.body.tenant.name).toBe("Clínica X");
+  });
+
+  it("retorna 410 para convite expirado", async () => {
+    const { app } = makeApp({
+      tableResult: (table) =>
+        table === "tenant_invitations"
+          ? { data: { id: "inv-1", tenant_id: "t-1", email: "a@b.com", role: "admin", status: "pending", expires_at: new Date(Date.now() - 60000).toISOString() }, error: null }
+          : { data: null, error: null },
+    });
+    const res = await request(app).get("/api/invites/expired-token");
+    expect(res.status).toBe(410);
+  });
+});
+
+describe("POST /api/invites/accept", () => {
+  const pendingInvite = {
+    id: "inv-1",
+    tenant_id: "t-1",
+    email: "a@b.com",
+    role: "admin",
+    status: "pending",
+    expires_at: new Date(Date.now() + 60000).toISOString(),
+  };
+
+  it("retorna 400 sem campos obrigatórios", async () => {
+    const { app } = makeApp();
+    const res = await request(app).post("/api/invites/accept").send({});
+    expect(res.status).toBe(400);
+  });
+
+  it("retorna 400 com senha curta", async () => {
+    const { app } = makeApp();
+    const res = await request(app).post("/api/invites/accept").send({ token: "x", fullName: "Ana", password: "123" });
+    expect(res.status).toBe(400);
+  });
+
+  it("cria conta e marca convite como aceito", async () => {
+    const { app, calls } = makeApp({
+      tableResult: (table, method) => {
+        if (table === "tenant_invitations" && method === "maybeSingle") return { data: pendingInvite, error: null };
+        if (table === "tenant_invitations" && method === "update") return { data: null, error: null };
+        return { data: null, error: null };
+      },
+    });
+    const res = await request(app).post("/api/invites/accept").send({ token: "t", fullName: "Ana", password: "123456" });
+    expect(res.status).toBe(201);
+    expect(res.body.success).toBe(true);
+    const accepted = calls.updates.find((c) => c.table === "tenant_invitations");
+    expect(accepted).toBeTruthy();
+  });
+
+  it("retorna 409 se e-mail já cadastrado", async () => {
+    const { app } = makeApp({
+      tableResult: (table, method) =>
+        table === "tenant_invitations" && method === "maybeSingle" ? { data: pendingInvite, error: null } : { data: null, error: null },
+      adminCreateUser: () => ({ data: null, error: { message: "A user with this email address already exists" } }),
+    });
+    const res = await request(app).post("/api/invites/accept").send({ token: "t", fullName: "Ana", password: "123456" });
+    expect(res.status).toBe(409);
   });
 });
 

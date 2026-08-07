@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { X, Globe, Palette, Save, AlertTriangle, CheckCircle, ShieldAlert, Edit3, Sparkles } from 'lucide-react';
+import { X, Globe, Palette, Save, AlertTriangle, CheckCircle, ShieldAlert, Edit3, Sparkles, Mail } from 'lucide-react';
 import { useHomeCareStore } from '../store';
 import { Tenant } from '../types';
+import { InviteLinkModal } from './InviteLinkModal';
 
 interface TenantEditorModalProps {
   tenant: Tenant;
@@ -10,9 +11,10 @@ interface TenantEditorModalProps {
 }
 
 export function TenantEditorModal({ tenant, isCreating = false, onClose }: TenantEditorModalProps) {
-  const { addTenant, updateTenant } = useHomeCareStore();
+  const { updateTenant, createTenantWithInvite } = useHomeCareStore();
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [inviteLink, setInviteLink] = useState<string | null>(null);
 
   const [name, setName] = useState(tenant.name || '');
   const [logo, setLogo] = useState(tenant.logo || '\u{1F3EC}');
@@ -21,6 +23,7 @@ export function TenantEditorModal({ tenant, isCreating = false, onClose }: Tenan
   const [primaryColor, setPrimaryColor] = useState(tenant.primaryColor || '#16a34a');
   const [status, setStatus] = useState(tenant.status || 'active');
   const [plan, setPlan] = useState(tenant.plan || 'Free');
+  const [adminEmail, setAdminEmail] = useState('');
 
   useEffect(() => {
     setName(tenant.name || '');
@@ -30,6 +33,7 @@ export function TenantEditorModal({ tenant, isCreating = false, onClose }: Tenan
     setPrimaryColor(tenant.primaryColor || '#16a34a');
     setStatus(tenant.status || 'active');
     setPlan(tenant.plan || 'Free');
+    setAdminEmail('');
   }, [tenant]);
 
   const handleSave = async () => {
@@ -37,39 +41,45 @@ export function TenantEditorModal({ tenant, isCreating = false, onClose }: Tenan
       alert('Nome da inst\u00e2ncia \u00e9 obrigat\u00f3rio.');
       return;
     }
+    if (isCreating && !adminEmail.trim()) {
+      alert('Informe o e-mail do administrador para gerar o link de convite.');
+      return;
+    }
     setLoading(true);
     try {
       await new Promise(r => setTimeout(r, 400));
 
       if (isCreating) {
-        addTenant({
-          id: '',
+        const { inviteLink } = await createTenantWithInvite({
           name,
           logo,
           cnpj,
           plan,
-          status,
           customDomain: customDomain || undefined,
           primaryColor,
+          adminEmail,
         });
-      } else {
-        updateTenant(tenant.id, {
-          name,
-          logo,
-          cnpj,
-          customDomain: customDomain || undefined,
-          primaryColor,
-          status,
-          plan,
-        });
+        setInviteLink(inviteLink);
+        setSuccess(true);
+        return;
       }
+      updateTenant(tenant.id, {
+        name,
+        logo,
+        cnpj,
+        customDomain: customDomain || undefined,
+        primaryColor,
+        status,
+        plan,
+      });
 
       setSuccess(true);
       setTimeout(() => {
         onClose();
       }, 1500);
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
+      alert(error.message || 'Erro ao salvar.');
     } finally {
       setLoading(false);
     }
@@ -94,7 +104,7 @@ export function TenantEditorModal({ tenant, isCreating = false, onClose }: Tenan
         </div>
 
         <div className="p-6 overflow-y-auto flex-1 space-y-6">
-          {success && (
+          {success && !inviteLink && (
             <div className="p-4 bg-emerald-50 text-emerald-700 rounded-xl flex items-center gap-3 border border-emerald-100 animate-slide-up">
               <CheckCircle className="w-5 h-5 text-emerald-500" />
               <p className="text-sm font-medium">
@@ -118,6 +128,24 @@ export function TenantEditorModal({ tenant, isCreating = false, onClose }: Tenan
                 className="w-full px-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors"
               />
             </div>
+            {isCreating && (
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">E-mail do Administrador (Revenda)</label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input
+                    type="email"
+                    placeholder="admin@revenda.com.br"
+                    value={adminEmail}
+                    onChange={(e) => setAdminEmail(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors"
+                  />
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  O sistema gerará um link de convite. A revenda criará a conta com e-mail e senha.
+                </p>
+              </div>
+            )}
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">CNPJ</label>
               <input
@@ -232,20 +260,31 @@ export function TenantEditorModal({ tenant, isCreating = false, onClose }: Tenan
           >
             Cancelar
           </button>
-          <button
-            onClick={handleSave}
-            disabled={loading || success}
-            className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors flex items-center gap-2 shadow-sm disabled:opacity-50"
-          >
-            {loading ? 'Salvando...' : (
-              <>
-                <Save className="w-4 h-4" />
-                {isCreating ? 'Criar Revenda' : 'Salvar Alterações'}
-              </>
-            )}
-          </button>
+          {!inviteLink && (
+            <button
+              onClick={handleSave}
+              disabled={loading || success}
+              className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors flex items-center gap-2 shadow-sm disabled:opacity-50"
+            >
+              {loading ? 'Salvando...' : (
+                <>
+                  <Save className="w-4 h-4" />
+                  {isCreating ? 'Criar Revenda' : 'Salvar Alterações'}
+                </>
+              )}
+            </button>
+          )}
         </div>
       </div>
+
+      {inviteLink && (
+        <InviteLinkModal
+          inviteLink={inviteLink}
+          title="Link de Convite da Revenda"
+          description="A revenda usará este link para criar a conta com e-mail e senha."
+          onClose={onClose}
+        />
+      )}
     </div>
   );
 }
