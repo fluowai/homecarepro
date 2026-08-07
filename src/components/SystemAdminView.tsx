@@ -1,18 +1,49 @@
 import React, { useState } from 'react';
-import { Building2, Users, CreditCard, Activity, Search, Filter, Plus, Shield, Settings, Server, Package, LifeBuoy, Link2 } from 'lucide-react';
+import { Building2, Users, CreditCard, Activity, Search, Filter, Plus, Shield, Server, Package, LifeBuoy, Link2, LayoutDashboard, Globe, UserCog, Wrench, Settings } from 'lucide-react';
 import { useHomeCareStore } from '../store';
+import { AdminLayout } from './AdminLayout';
 import { PlanManager } from './PlanManager';
 import { SupportDesk } from './SupportDesk';
 import { GlobalUserManager } from './GlobalUserManager';
 import { InternalTeamManager } from './InternalTeamManager';
 import { TenantEditorModal } from './TenantEditorModal';
 import { InviteLinkModal } from './InviteLinkModal';
+import { DomainValidator } from './DomainValidator';
 import { Tenant } from '../types';
 
-export default function SystemAdminView() {
+interface SystemAdminViewProps {
+  onExit: (view: string) => void;
+}
+
+const MENU_GROUPS = [
+  {
+    title: 'Geral',
+    items: [
+      { id: 'overview', label: 'Visão Geral', icon: LayoutDashboard },
+    ],
+  },
+  {
+    title: 'Gestão',
+    items: [
+      { id: 'network', label: 'Cadastro & Rede', icon: Server },
+      { id: 'plans', label: 'Planos', icon: Package },
+      { id: 'domains', label: 'Validação de Domínios', icon: Globe },
+    ],
+  },
+  {
+    title: 'Operação',
+    items: [
+      { id: 'support', label: 'Suporte', icon: LifeBuoy },
+      { id: 'users', label: 'Usuários Globais', icon: UserCog },
+      { id: 'team', label: 'Time Interno', icon: Wrench },
+    ],
+  },
+];
+
+export default function SystemAdminView({ onExit }: SystemAdminViewProps) {
   const { tenants, regenerateInvite } = useHomeCareStore();
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeTab, setActiveTab] = useState<'network' | 'plans' | 'support' | 'users' | 'team'>('network');
+  const [activeSection, setActiveSection] = useState('overview');
   const [editingTenant, setEditingTenant] = useState<Tenant | null>(null);
   const [reinviteTenant, setReinviteTenant] = useState<Tenant | null>(null);
   const [reinviteEmail, setReinviteEmail] = useState('');
@@ -34,27 +65,8 @@ export default function SystemAdminView() {
     { label: 'Status do Sistema', value: '100% Online', icon: Activity, color: 'bg-blue-500', bgColor: 'bg-blue-50' },
   ];
 
-  return (
-    <div className="space-y-8 animate-fade-in">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
-            <Shield className="w-6 h-6 text-indigo-600" />
-            Mega Admin - Gestão do Sistema
-          </h2>
-          <p className="text-gray-500 text-sm mt-1">Visão global de revendas, clientes whitelabel, planos e suporte.</p>
-        </div>
-        {activeTab === 'network' && (
-          <button
-            onClick={() => setEditingTenant({ id: '', name: '', logo: '', cnpj: '', plan: 'Free', status: 'active' } as Tenant)}
-            className="flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm rounded-xl transition-all shadow-sm"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Nova Revenda</span>
-          </button>
-        )}
-      </div>
-
+  const renderOverview = () => (
+    <div className="space-y-6 animate-fade-in">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {stats.map((stat, idx) => (
           <div key={idx} className="bg-white p-6 rounded-2xl shadow-soft border border-gray-100 flex items-center gap-4">
@@ -69,182 +81,219 @@ export default function SystemAdminView() {
         ))}
       </div>
 
-      <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
-        <div className="border-b border-gray-100 flex flex-wrap items-center">
-          <button 
-            className={`px-6 py-4 text-sm font-semibold border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'network' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-            onClick={() => setActiveTab('network')}
-          >
-            <Server className="w-4 h-4" />
-            Rede e Revendas
-          </button>
-          <button 
-            className={`px-6 py-4 text-sm font-semibold border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'plans' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-            onClick={() => setActiveTab('plans')}
-          >
-            <Package className="w-4 h-4" />
-            Planos de Assinatura
-          </button>
-          <button 
-            className={`px-6 py-4 text-sm font-semibold border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'support' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-            onClick={() => setActiveTab('support')}
-          >
-            <LifeBuoy className="w-4 h-4" />
-            Suporte Helpdesk
-          </button>
-          <button 
-            className={`px-6 py-4 text-sm font-semibold border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'users' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-            onClick={() => setActiveTab('users')}
-          >
-            <Users className="w-4 h-4" />
-            Usuários Globais
-          </button>
-          <button 
-            className={`px-6 py-4 text-sm font-semibold border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'team' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-            onClick={() => setActiveTab('team')}
-          >
-            <Shield className="w-4 h-4" />
-            Time Interno
-          </button>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 bg-white border border-gray-100 rounded-2xl shadow-sm p-6">
+          <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
+            <Server className="w-5 h-5 text-indigo-600" />
+            Rede em resumo
+          </h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {filteredTenants.slice(0, 6).map((t) => (
+              <div key={t.id} className="flex items-center gap-3 p-3 border border-gray-100 rounded-xl">
+                <div className="w-9 h-9 rounded-lg bg-gray-100 flex items-center justify-center text-lg">
+                  {t.logo || '🏢'}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="font-semibold text-gray-900 text-sm truncate">{t.name}</p>
+                  <div className="flex items-center gap-2">
+                    <span className={`w-2 h-2 rounded-full ${t.status === 'blocked' ? 'bg-red-500' : 'bg-emerald-500'}`} />
+                    <span className="text-xs text-gray-500 capitalize">{t.status || 'ativo'}</span>
+                    <span className="text-xs text-gray-400">• {t.plan}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
 
-        {activeTab === 'network' && (
-          <div>
-            <div className="p-4 flex flex-col sm:flex-row sm:items-center justify-end gap-4 border-b border-gray-100">
-              <div className="flex items-center gap-2">
-                <div className="relative">
-                  <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                  <input 
-                    type="text" 
-                    placeholder="Buscar tenant..." 
-                    className="pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 w-64"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                  />
-                </div>
-                 <button
-                    onClick={() => alert('Filtro de tenants - em breve mais opções')}
-                    className="p-2 border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600"
-                  >
-                    <Filter className="w-4 h-4" />
-                  </button>
-              </div>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-gray-50/50 border-b border-gray-100 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                    <th className="p-4 pl-6">ID / Nome da Instância</th>
-                    <th className="p-4">Tipo</th>
-                    <th className="p-4">Plano</th>
-                    <th className="p-4">Status</th>
-                    <th className="p-4">Domínio / Cor Primária</th>
-                    <th className="p-4 text-right pr-6">Ações</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                   {filteredTenants.map((tenant) => (
-                     <tr key={tenant.id} className="hover:bg-gray-50/50 transition-colors">
-                       <td className="p-4 pl-6">
-                         <div className="flex items-center gap-3">
-                           <div className="w-8 h-8 rounded bg-gray-100 flex items-center justify-center text-lg shadow-sm border border-gray-200">
-                             {tenant.logo || '🏢'}
-                           </div>
-                           <div>
-                             <div className="font-semibold text-gray-900 text-sm">{tenant.name}</div>
-                             <div className="text-xs text-gray-500">ID: {tenant.id} • CNPJ: {tenant.cnpj}</div>
-                           </div>
-                         </div>
-                       </td>
-                       <td className="p-4">
-                         <span className={`inline-flex px-2 py-1 text-[10px] font-bold rounded-full ${!tenant.parentId ? 'bg-indigo-50 text-indigo-700' : 'bg-green-50 text-green-700'}`}>
-                           {!tenant.parentId ? 'Revenda' : 'Clínica Cliente'}
-                         </span>
-                       </td>
-                       <td className="p-4">
-                         <span className="text-sm font-medium text-gray-700">{tenant.plan}</span>
-                       </td>
-                       <td className="p-4">
-                         <div className="flex items-center gap-1.5">
-                           <span className={`w-2 h-2 rounded-full ${tenant.status === 'blocked' ? 'bg-red-500' : 'bg-emerald-500'}`} />
-                           <span className="text-sm text-gray-600 capitalize">{tenant.status || 'ativo'}</span>
-                         </div>
-                       </td>
-                       <td className="p-4">
-                         <div className="text-xs text-gray-500 flex items-center gap-2">
-                           {tenant.customDomain || 'Padrão'}
-                           {tenant.primaryColor && (
-                             <span className="w-3 h-3 rounded-full border border-gray-200" style={{ backgroundColor: tenant.primaryColor }} title={tenant.primaryColor} />
-                           )}
-                         </div>
-                       </td>
-                        <td className="p-4 text-right pr-6">
-                          <div className="flex items-center justify-end gap-1">
-                            {!tenant.parentId && (
-                              <button
-                                onClick={() => {
-                                  setReinviteTenant(tenant);
-                                  setReinviteEmail('');
-                                  setReinviteLink(null);
-                                  setReinviteError('');
-                                }}
-                                className="text-gray-400 hover:text-emerald-600 p-1.5 rounded-lg hover:bg-emerald-50 transition-colors"
-                                title="Gerar link de convite da revenda"
-                              >
-                                <Link2 className="w-4 h-4" />
-                              </button>
-                            )}
-                            <button
-                              onClick={() => setEditingTenant(tenant)}
-                              className="text-gray-400 hover:text-indigo-600 p-1.5 rounded-lg hover:bg-indigo-50 transition-colors"
-                              title="Editar Tenant"
-                            >
-                              <Settings className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </td>
-                     </tr>
-                   ))}
-                   {filteredTenants.length === 0 && (
-                     <tr>
-                       <td colSpan={6} className="p-8 text-center text-gray-500">
-                         Nenhuma instância localizada.
-                       </td>
-                     </tr>
-                   )}
-                </tbody>
-              </table>
-            </div>
+        <div className="bg-white border border-gray-100 rounded-2xl shadow-sm p-6">
+          <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
+            <Shield className="w-5 h-5 text-indigo-600" />
+            Acesso
+          </h3>
+          <p className="text-sm text-gray-500 mb-4">
+            Painel exclusivo de gestão do sistema. Cadastre revendas, gerencie planos, suporte, usuários globais e valide os domínios whitelabel.
+          </p>
+          <div className="flex flex-col gap-2">
+            <button
+              onClick={() => setActiveSection('network')}
+              className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm rounded-xl transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              Nova Revenda
+            </button>
+            <button
+              onClick={() => setActiveSection('domains')}
+              className="flex items-center gap-2 px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold text-sm rounded-xl transition-colors"
+            >
+              <Globe className="w-4 h-4" />
+              Validar Domínios
+            </button>
           </div>
-        )}
-
-        {activeTab === 'plans' && (
-          <div className="p-6 bg-gray-50/30">
-            <PlanManager />
-          </div>
-        )}
-
-        {activeTab === 'support' && (
-          <div className="p-6 bg-gray-50/30">
-            <SupportDesk />
-          </div>
-        )}
-
-        {activeTab === 'users' && (
-          <div className="p-6 bg-gray-50/30">
-            <GlobalUserManager />
-          </div>
-        )}
-
-        {activeTab === 'team' && (
-          <div className="p-6 bg-gray-50/30">
-            <InternalTeamManager />
-          </div>
-        )}
-
+        </div>
       </div>
-      
+    </div>
+  );
+
+  const renderNetwork = () => (
+    <div className="space-y-4 animate-fade-in">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-end gap-4">
+        <div className="flex items-center gap-2">
+          <div className="relative">
+            <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Buscar tenant..."
+              className="pl-9 pr-4 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 w-64"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+          <button
+            onClick={() => alert('Filtro de tenants - em breve mais opções')}
+            className="p-2 border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600"
+          >
+            <Filter className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+
+      <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-gray-50/50 border-b border-gray-100 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                <th className="p-4 pl-6">ID / Nome da Instância</th>
+                <th className="p-4">Tipo</th>
+                <th className="p-4">Plano</th>
+                <th className="p-4">Status</th>
+                <th className="p-4">Domínio / Cor Primária</th>
+                <th className="p-4 text-right pr-6">Ações</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {filteredTenants.map((tenant) => (
+                <tr key={tenant.id} className="hover:bg-gray-50/50 transition-colors">
+                  <td className="p-4 pl-6">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded bg-gray-100 flex items-center justify-center text-lg shadow-sm border border-gray-200">
+                        {tenant.logo || '🏢'}
+                      </div>
+                      <div>
+                        <div className="font-semibold text-gray-900 text-sm">{tenant.name}</div>
+                        <div className="text-xs text-gray-500">ID: {tenant.id} • CNPJ: {tenant.cnpj}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="p-4">
+                    <span className={`inline-flex px-2 py-1 text-[10px] font-bold rounded-full ${!tenant.parentId ? 'bg-indigo-50 text-indigo-700' : 'bg-green-50 text-green-700'}`}>
+                      {!tenant.parentId ? 'Revenda' : 'Clínica Cliente'}
+                    </span>
+                  </td>
+                  <td className="p-4">
+                    <span className="text-sm font-medium text-gray-700">{tenant.plan}</span>
+                  </td>
+                  <td className="p-4">
+                    <div className="flex items-center gap-1.5">
+                      <span className={`w-2 h-2 rounded-full ${tenant.status === 'blocked' ? 'bg-red-500' : 'bg-emerald-500'}`} />
+                      <span className="text-sm text-gray-600 capitalize">{tenant.status || 'ativo'}</span>
+                    </div>
+                  </td>
+                  <td className="p-4">
+                    <div className="text-xs text-gray-500 flex items-center gap-2">
+                      {tenant.customDomain || 'Padrão'}
+                      {tenant.primaryColor && (
+                        <span className="w-3 h-3 rounded-full border border-gray-200" style={{ backgroundColor: tenant.primaryColor }} title={tenant.primaryColor} />
+                      )}
+                    </div>
+                  </td>
+                  <td className="p-4 text-right pr-6">
+                    <div className="flex items-center justify-end gap-1">
+                      {!tenant.parentId && (
+                        <button
+                          onClick={() => {
+                            setReinviteTenant(tenant);
+                            setReinviteEmail('');
+                            setReinviteLink(null);
+                            setReinviteError('');
+                          }}
+                          className="text-gray-400 hover:text-emerald-600 p-1.5 rounded-lg hover:bg-emerald-50 transition-colors"
+                          title="Gerar link de convite da revenda"
+                        >
+                          <Link2 className="w-4 h-4" />
+                        </button>
+                      )}
+                      <button
+                        onClick={() => setEditingTenant(tenant)}
+                        className="text-gray-400 hover:text-indigo-600 p-1.5 rounded-lg hover:bg-indigo-50 transition-colors"
+                        title="Editar Tenant"
+                      >
+                        <Settings className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {filteredTenants.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="p-8 text-center text-gray-500">
+                    Nenhuma instância localizada.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderSection = () => {
+    switch (activeSection) {
+      case 'overview':
+        return renderOverview();
+      case 'network':
+        return renderNetwork();
+      case 'plans':
+        return <div className="p-6 bg-gray-50/30"><PlanManager /></div>;
+      case 'support':
+        return <div className="p-6 bg-gray-50/30"><SupportDesk /></div>;
+      case 'users':
+        return <div className="p-6 bg-gray-50/30"><GlobalUserManager /></div>;
+      case 'team':
+        return <div className="p-6 bg-gray-50/30"><InternalTeamManager /></div>;
+      case 'domains':
+        return <DomainValidator scope="all" />;
+      default:
+        return renderOverview();
+    }
+  };
+
+  return (
+    <AdminLayout
+      brand="Mega Admin"
+      brandSubtitle="Gestão do Sistema"
+      accent="indigo"
+      title={MENU_GROUPS.flatMap((g) => g.items).find((i) => i.id === activeSection)?.label || 'Visão Geral'}
+      subtitle="Visão global de revendas, clientes whitelabel, planos e suporte."
+      menuGroups={MENU_GROUPS}
+      active={activeSection}
+      onSelect={setActiveSection}
+      onExit={() => onExit('dashboard')}
+      actions={
+        activeSection === 'network' ? (
+          <button
+            onClick={() => setEditingTenant({ id: '', name: '', logo: '', cnpj: '', plan: 'Free', status: 'active' } as Tenant)}
+            className="flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm rounded-xl transition-all shadow-sm"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Nova Revenda</span>
+          </button>
+        ) : undefined
+      }
+    >
+      {renderSection()}
+
       {editingTenant && (
         <TenantEditorModal
           tenant={editingTenant}
@@ -328,6 +377,7 @@ export default function SystemAdminView() {
           }}
         />
       )}
-    </div>
+    </AdminLayout>
   );
 }
+

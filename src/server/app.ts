@@ -5,10 +5,16 @@ import crypto from "crypto";
 import rateLimit from "express-rate-limit";
 import { GoogleGenAI } from "@google/genai";
 import { SupabaseClient } from "@supabase/supabase-js";
+import { promises as dnsImpl } from "node:dns";
 
 // ── App Factory (testable) ───────────────────────────────────────
 // server.ts bootstraps the real environment and calls createApp().
 // Tests call createApp() with a mocked/injected Supabase client.
+
+export interface DnsClient {
+  resolveCname: (hostname: string) => Promise<string[]>;
+  resolve4: (hostname: string) => Promise<string[]>;
+}
 
 export interface CreateAppOptions {
   supabaseAdmin: SupabaseClient;
@@ -17,6 +23,7 @@ export interface CreateAppOptions {
   asaasWebhookToken?: string;
   appUrl?: string;
   enableRateLimit?: boolean;
+  dns?: DnsClient;
 }
 
 export function createApp(options: CreateAppOptions) {
@@ -27,7 +34,10 @@ export function createApp(options: CreateAppOptions) {
     asaasWebhookToken,
     appUrl = "http://localhost:3000",
     enableRateLimit = true,
+    dns: dnsClient,
   } = options;
+
+  const dns = dnsClient ?? dnsImpl;
 
   const SUPABASE_URL = process.env.VITE_SUPABASE_URL || "";
 
@@ -727,6 +737,85 @@ Apenas o objeto JSON valido, sem formatacao Markdown adicional nem blocos de cod
     } catch (error: any) {
       logEvent("ERROR", "Invite regeneration failed", { error: error.message });
       res.status(500).json({ error: "Falha ao gerar novo convite." });
+    }
+  });
+
+  // ── Domain Validation (Mega Admin & Super Admin) ────────────────
+  async function checkDomain(domain: string, expectedTarget: string) {
+    const host = String(domain || "").toLowerCase().trim().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+    const result: { domain: string; cname: string | null; a: string | null; status: "valid" | "warning" | "invalid"; message: string } = {
+      domain: host,
+      cname: null,
+      a: null,
+      status: "invalid",
+      message: "",
+    };
+
+    if (!host) {
+      result.message = "Domínio vazio.";
+      return result;
+    }
+
+    try {
+      const cname = await dns.resolveCname(host);
+      result.cname = cname[0] || null;
+    } catch {
+      // no CNAME record
+    }
+
+    try {
+      const a = await dns.resolve4(host);
+      result.a = a[0] || null;
+    } catch {
+      // no A record
+    }
+
+    if (result.cname && expectedTarget && result.cname.toLowerCase() === expectedTarget.toLowerCase()) {
+      result.status = "valid";
+      result.message = "CNAME apontando corretamente para o sistema.";
+    } else if (result.a) {
+      result.status = "valid";
+      result.message = "Registro A presente — DNS resolvendo para o IP.";
+    } else if (result.cname) {
+      result.status = "warning";
+      result.message = `CNAME encontrado${expectedTarget ? ` (esperado: ${expectedTarget})` : ""}.`;
+    } else {
+      result.status = "invalid";
+      result.message = "Nenhum registro DNS encontrado. Configure um apontamento CNAME/A.";
+    }
+
+    return result;
+  }
+
+  app.post("/api/admin/domains/check", requireAuth, globalLimiter, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const profile = await getProfile(userId);
+      if (!profile || (profile.role !== "mega_admin" && profile.role !== "super_admin")) {
+        return res.status(403).json({ error: "Acesso negado." });
+      }
+
+      const { domains, expectedTarget } = req.body;
+      if (!Array.isArray(domains) || domains.length === 0 || domains.length > 50) {
+        return res.status(400).json({ error: "Informe uma lista de domínios (máx. 50)." });
+      }
+      if (domains.some((d: unknown) => typeof d !== "string")) {
+        return res.status(400).json({ error: "Domínios inválidos." });
+      }
+
+      const target = typeof expectedTarget === "string" && expectedTarget.trim()
+        ? expectedTarget.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "")
+        : "";
+
+      const results = await Promise.all(
+        domains.map((d: string) => checkDomain(d, target))
+      );
+
+      logEvent("INFO", "Domain check completed", { userId, count: results.length });
+      res.json({ results, expectedTarget: target });
+    } catch (error: any) {
+      logEvent("ERROR", "Domain check failed", { error: error.message });
+      res.status(500).json({ error: "Falha ao validar domínios." });
     }
   });
 

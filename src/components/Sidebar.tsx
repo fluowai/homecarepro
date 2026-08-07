@@ -88,8 +88,8 @@ export default function Sidebar({ currentView, setView, isOpen, onClose }: Sideb
     {
       title: 'SAAS MULTI-NÍVEL',
       items: [
-        { id: 'system_admin', label: 'Mega Admin (Sistema)', icon: Server, roles: ['mega_admin'] },
-        { id: 'reseller', label: 'Painel da Revenda', icon: Building2, roles: ['super_admin'] },
+        { id: 'system_admin', label: 'Painel Mega Admin', icon: Server, roles: ['mega_admin'] },
+        { id: 'reseller', label: 'Painel Super Admin', icon: Building2, roles: ['super_admin'] },
       ]
     },
     {

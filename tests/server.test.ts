@@ -17,6 +17,7 @@ interface MockOptions {
   tableResult?: TableResult;
   adminDeleteUser?: () => { error?: unknown };
   adminCreateUser?: () => { data?: unknown; error?: unknown };
+  dns?: { resolveCname: (h: string) => Promise<string[]>; resolve4: (h: string) => Promise<string[]> };
 }
 
 function createMockSupabase(opts: MockOptions) {
@@ -94,6 +95,7 @@ function makeApp(opts: MockOptions = {}) {
     ai: null,
     isProduction: false,
     enableRateLimit: false,
+    dns: opts.dns,
   });
   return { app, calls, supabase };
 }
@@ -604,6 +606,64 @@ describe("POST /api/invites/accept", () => {
     });
     const res = await request(app).post("/api/invites/accept").send({ token: "t", fullName: "Ana", password: "123456" });
     expect(res.status).toBe(409);
+  });
+});
+
+describe("POST /api/admin/domains/check", () => {
+  const profile = (role: string, tenantId = "sp") => ({
+    tableResult: (table: string) =>
+      table === "user_profiles" ? { data: { role, tenant_id: tenantId }, error: null } : { data: null, error: null },
+  });
+
+  const mockDns = (overrides: Partial<{ resolveCname: () => Promise<string[]>; resolve4: () => Promise<string[]> }> = {}) => {
+    return {
+      resolveCname: overrides.resolveCname ?? (() => Promise.reject(new Error("ENOTFOUND"))),
+      resolve4: overrides.resolve4 ?? (() => Promise.reject(new Error("ENOTFOUND"))),
+    };
+  };
+
+  it("retorna 401 sem token", async () => {
+    const { app } = makeApp({ dns: mockDns() });
+    const res = await request(app)
+      .post("/api/admin/domains/check")
+      .send({ domains: ["app.exemplo.com.br"], expectedTarget: "app.homecarepro.com.br" });
+    expect(res.status).toBe(401);
+  });
+
+  it("retorna 403 para operador", async () => {
+    const { app } = makeApp({ ...profile("operator"), dns: mockDns() });
+    const res = await request(app).post("/api/admin/domains/check").set(AUTH).send({ domains: ["app.exemplo.com.br"] });
+    expect(res.status).toBe(403);
+  });
+
+  it("retorna 400 sem lista de domínios", async () => {
+    const { app } = makeApp({ ...profile("mega_admin"), dns: mockDns() });
+    const res = await request(app).post("/api/admin/domains/check").set(AUTH).send({});
+    expect(res.status).toBe(400);
+  });
+
+  it("valida CNAME correto como válido", async () => {
+    const { app } = makeApp({
+      ...profile("mega_admin"),
+      dns: mockDns({ resolveCname: () => Promise.resolve(["app.homecarepro.com.br"]) }),
+    });
+    const res = await request(app)
+      .post("/api/admin/domains/check")
+      .set(AUTH)
+      .send({ domains: ["app.exemplo.com.br"], expectedTarget: "app.homecarepro.com.br" });
+    expect(res.status).toBe(200);
+    expect(res.body.results[0].status).toBe("valid");
+    expect(res.body.results[0].cname).toBe("app.homecarepro.com.br");
+  });
+
+  it("marca como inválido quando não há registro DNS", async () => {
+    const { app } = makeApp({ ...profile("super_admin", "rev-1"), dns: mockDns() });
+    const res = await request(app)
+      .post("/api/admin/domains/check")
+      .set(AUTH)
+      .send({ domains: ["app.exemplo.com.br"], expectedTarget: "app.homecarepro.com.br" });
+    expect(res.status).toBe(200);
+    expect(res.body.results[0].status).toBe("invalid");
   });
 });
 

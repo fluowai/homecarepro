@@ -115,10 +115,6 @@ export default function App() {
         return <FinanceView />;
       case 'crm':
         return <CrmView />;
-      case 'system_admin':
-        return <SystemAdminView />;
-      case 'reseller':
-        return <ResellerView />;
       default:
         return <DashboardView setView={handleSetView} searchQuery={searchQuery} />;
     }
@@ -128,6 +124,18 @@ export default function App() {
   const whitelabelTenant = activeTenant?.parentId ? tenants.find(t => t.id === activeTenant.parentId) : activeTenant;
   const primaryColor = whitelabelTenant?.primaryColor;
   const secondaryColor = whitelabelTenant?.secondaryColor;
+
+  // Telas exclusivas de gestão (Mega Admin / Super Admin): layout próprio,
+  // separado do usuário final, com menu lateral de gestão à esquerda.
+  if (currentView === 'system_admin' || currentView === 'reseller') {
+    return (
+      <Suspense fallback={<LoadingScreen />}>
+        {currentView === 'system_admin'
+          ? <SystemAdminView onExit={handleSetView} />
+          : <ResellerView onExit={handleSetView} />}
+      </Suspense>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 flex font-sans antialiased text-gray-900">
