@@ -43,7 +43,7 @@ export default function CheckInView() {
   } = useHomeCareStore();
 
   const [selectedVisitId, setSelectedVisitId] = useState<string>('');
-  const [isSimulationOpen, setIsSimulationOpen] = useState(false);
+  const [isJourneyOpen, setIsJourneyOpen] = useState(false);
   
   // Bedside input states
   const [pa, setPa] = useState('');
@@ -56,7 +56,7 @@ export default function CheckInView() {
   // Medication tracking states
   const [selectedMedId, setSelectedMedId] = useState('');
   const [medQty, setMedQty] = useState(1);
-  const [usedMeds, setUsedMeds] = useState<{ id: string; name: string; qty: number }[]>([]);
+  const [usedMeds, setUsedMeds] = useState<{ id: string; name: string; qty: number; isControlled: boolean; controlClass?: string }[]>([]);
   
   const [showPinModal, setShowPinModal] = useState(false);
   const [pin, setPin] = useState('');
@@ -81,15 +81,15 @@ export default function CheckInView() {
   const patient = selectedVisit ? patients.find(p => p.id === selectedVisit.patientId) : null;
   const professional = selectedVisit ? professionals.find(p => p.id === selectedVisit.professionalId) : null;
 
-  const openSimulation = (visitId: string) => {
+  const openJourney = (visitId: string) => {
     setSelectedVisitId(visitId);
     setRawNotes('');
     setGeneratedReport('');
-    setIsSimulationOpen(true);
+    setIsJourneyOpen(true);
   };
 
-  const closeSimulation = () => {
-    setIsSimulationOpen(false);
+  const closeJourney = () => {
+    setIsJourneyOpen(false);
     setTimeout(() => {
       setSelectedVisitId('');
       setInPhotoPreview(null);
@@ -97,17 +97,34 @@ export default function CheckInView() {
     }, 300);
   };
 
-  const handleCheckIn = () => {
+  const getCurrentPosition = (): Promise<{ lat: number; lng: number } | null> => {
+    return new Promise((resolve) => {
+      if (!('geolocation' in navigator)) {
+        resolve(null);
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+        () => resolve(null),
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
+      );
+    });
+  };
+
+  const handleCheckIn = async () => {
     if (!selectedVisitId) return;
     if (!inPhotoPreview) {
       alert("A foto do local (check-in) é obrigatória para validar sua presença.");
       return;
     }
-    const mockLat = -23.55 + Math.random() * 0.02;
-    const mockLng = -46.63 + Math.random() * 0.02;
-    const locationStr = `${mockLat.toFixed(4)},${mockLng.toFixed(4)} (Confirmado via GPS Integrado)`;
+    const coords = await getCurrentPosition();
+    if (!coords) {
+      alert("Não foi possível obter a localização GPS. Verifique as permissões de localização do navegador.");
+      return;
+    }
+    const locationStr = `${coords.lat.toFixed(4)},${coords.lng.toFixed(4)} (Confirmado via GPS)`;
     
-    checkInVisit(selectedVisitId, locationStr, { lat: mockLat, lng: mockLng }, inPhotoPreview);
+    checkInVisit(selectedVisitId, locationStr, coords, inPhotoPreview);
   };
 
   const handleAddMed = () => {
@@ -186,7 +203,7 @@ ${rawNotes}
     }
   };
 
-  const handleCheckOut = () => {
+  const handleCheckOut = async () => {
     if (!selectedVisitId) return;
 
     if (!pa || !fc || !temp || !sat) {
@@ -208,9 +225,12 @@ ${rawNotes}
       }
     });
 
-    const mockLat = -23.55 + Math.random() * 0.02;
-    const mockLng = -46.63 + Math.random() * 0.02;
-    const locationStr = `${mockLat.toFixed(4)},${mockLng.toFixed(4)} (Confirmado via GPS Integrado)`;
+    const coords = await getCurrentPosition();
+    if (!coords) {
+      alert("Não foi possível obter a localização GPS no check-out. Verifique as permissões de localização do navegador.");
+      return;
+    }
+    const locationStr = `${coords.lat.toFixed(4)},${coords.lng.toFixed(4)} (Confirmado via GPS)`;
     
     let medsReport = "";
     if (usedMeds.length > 0) {
@@ -219,7 +239,7 @@ ${rawNotes}
 
     const finalReport = (generatedReport || `Evolução Clínica Simplificada:\nSinais Vitais: PA ${pa} mmHg | FC ${fc} bpm | Temp ${temp}°C | Sat O2 ${sat}%.\nNotas: ${rawNotes}`) + medsReport;
     
-    checkOutVisit(selectedVisitId, locationStr, finalReport, { pa, fc, temp, sat }, rawNotes, usedMeds, { lat: mockLat, lng: mockLng }, outPhotoPreview);
+    checkOutVisit(selectedVisitId, locationStr, finalReport, { pa, fc, temp, sat }, rawNotes, usedMeds, coords, outPhotoPreview);
     
     // Clear bedside states
     setRawNotes('');
@@ -227,9 +247,9 @@ ${rawNotes}
     setUsedMeds([]);
     setSelectedMedId('');
     
-    // Automatically close simulation modal after a short delay
+    // Automatically close journey modal after a short delay
     setTimeout(() => {
-      closeSimulation();
+      closeJourney();
     }, 1500);
   };
 
@@ -286,7 +306,7 @@ ${rawNotes}
                 </span>
               </div>
               <p className="text-[11px] text-gray-500 mt-1 line-clamp-2 sm:line-clamp-none">
-                {isOffline ? 'Os profissionais estão simulando áreas sem área. Registros aguardam fila.' : 'Sincronização em tempo real de prontuários ativos.'}
+                {isOffline ? 'Sem conexão. Os registros ficam na fila local e serão sincronizados automaticamente.' : 'Sincronização em tempo real de prontuários ativos.'}
               </p>
               {offlineSyncQueue.length > 0 && (
                 <div className="mt-2 flex items-center gap-1.5 text-[10px] text-amber-800 font-bold bg-amber-100/50 border border-amber-200/60 px-2 py-0.5 rounded-lg w-fit">
@@ -331,7 +351,7 @@ ${rawNotes}
         </div>
       </div>
 
-      {/* MAPA SIMULADO */}
+      {/* MAPA DE MONITORAMENTO */}
       <div className="bg-white rounded-2xl border border-gray-200 shadow-soft overflow-hidden relative">
         <div className="absolute top-4 left-4 z-10 bg-white/95 backdrop-blur px-3 py-2 rounded-xl border border-gray-200 shadow-sm text-xs font-bold text-gray-700 flex items-center gap-2">
           <Navigation className="w-4 h-4 text-green-600" /> Monitoramento GPS em Tempo Real
@@ -355,7 +375,7 @@ ${rawNotes}
                 key={v.id} 
                 className="absolute flex flex-col items-center cursor-pointer transition-transform hover:scale-110 group z-20" 
                 style={{ top, left }} 
-                onClick={() => openSimulation(v.id)}
+                onClick={() => openJourney(v.id)}
               >
                 <div className="relative">
                   <div className={`p-1.5 rounded-full shadow-md text-white ${isPending ? 'bg-amber-400' : isDone ? 'bg-gray-400' : 'bg-green-600'} border-2 border-white relative z-10`}>
@@ -394,7 +414,7 @@ ${rawNotes}
                 return (
                   <div 
                     key={v.id} 
-                    onClick={() => openSimulation(v.id)}
+                    onClick={() => openJourney(v.id)}
                     className="flex items-center justify-between p-3.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl cursor-pointer transition-all active:scale-[0.98] group"
                   >
                     <div className="flex items-center gap-3">
@@ -435,7 +455,7 @@ ${rawNotes}
                 return (
                   <div 
                     key={v.id} 
-                    onClick={() => openSimulation(v.id)}
+                    onClick={() => openJourney(v.id)}
                     className="flex items-center justify-between p-3.5 bg-white hover:bg-gray-50 border border-gray-200 shadow-sm rounded-xl cursor-pointer transition-all active:scale-[0.98] group relative overflow-hidden"
                   >
                     {isOngoing && <div className="absolute left-0 top-0 bottom-0 w-1 bg-green-500" />}
@@ -467,12 +487,12 @@ ${rawNotes}
       </div>
 
       {/* SIMULATION MODAL (Jornada Guiada) */}
-      {isSimulationOpen && selectedVisit && (
+      {isJourneyOpen && selectedVisit && (
         <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 sm:p-6 animate-fade-in">
           <div className="bg-white rounded-[2rem] w-full max-w-3xl max-h-[95vh] overflow-y-auto shadow-2xl relative flex flex-col">
             
             <button 
-              onClick={closeSimulation} 
+              onClick={closeJourney} 
               className="absolute top-6 right-6 p-2 bg-gray-100 hover:bg-gray-200 rounded-full transition-colors z-10"
             >
               <X className="w-5 h-5 text-gray-600" />
@@ -480,7 +500,7 @@ ${rawNotes}
             
             <div className="p-8 pb-4 border-b border-gray-100">
               <h2 className="text-2xl font-bold text-gray-900">Jornada do Profissional</h2>
-              <p className="text-gray-500 text-sm mt-1">Simule o aplicativo de campo preenchendo as etapas exigidas.</p>
+              <p className="text-gray-500 text-sm mt-1">Preencha as etapas exigidas para registrar o atendimento no prontuário.</p>
             </div>
 
             <div className="p-8 pt-6 flex-1 space-y-8">

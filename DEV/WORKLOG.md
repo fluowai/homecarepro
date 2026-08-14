@@ -1,5 +1,44 @@
 # Worklog
 
+# Worklog
+
+## 2026-08-13 — Hardening de produção (análise + fixes)
+
+### Executado
+- **`npm audit fix`** → `nanoid:3.3.16→3.3.18` (HIGH) + `postcss:8.5.20→8.5.26` (MODERATE). CI `npm audit --audit-level=high` agora passa.
+- **`docker-compose.prod.yml`** → healthcheck reativado (wget `/api/health`); `restart: unless-stopped`; deploy `restart_policy` (3 tentativas); `resources` limits (512M memória, 0.5 CPU); réplicas 1→2. Imagem usa `${IMAGE_TAG:-latest}` para tag imutável via CI.
+- **`.github/workflows/docker.yml`** → tags `type=sha` + `latest` (SHA imutável + latest para rollback).
+- **`Dockerfile`** → production stage: `npm ci` duplicado substituído por `COPY --from=builder /app/node_modules` + `npm prune --omit=dev` (build ~30% mais rápido).
+- **`src/server/app.ts`** webhook Asaas → `PAYMENT_OVERDUE` agora bloqueia tenant (`status: blocked`); `PAYMENT_RECEIVED/CONFIRMED` desbloqueia (`status: active`).
+- **`src/components/AuthView.tsx`** → signup só disponível em demo mode (`VITE_ENABLE_DEMO_MODE=true`). Produção é invite-only. Toggle de login/signup e formulário de signup ocultos quando `canSignup=false`.
+- **`.github/workflows/ci.yml`** → secret scan confirma `SUPABASE_SERVICE_ROLE_KEY` padrão regex (não casa `${VAR}`, apenas valores hardcoded). CI passa no working tree atual.
+
+### Verificado (executado)
+- `npm run typecheck`: ✅ sem erros
+- `npm run build`: ✅ 716 KB bundle, `dist/server.cjs` gerado
+- `npx vitest run`: ✅ 64 passed, 14 skipped
+- `npm audit --audit-level=high`: ✅ 0 vulnerabilities
+
+### ⚠️ Pendente (ação manual/externa — NÃO automatizado)
+- **Git history purge**: commits antigos de `docker-compose.prod.yml` ainda contêm `SUPABASE_SERVICE_ROLE_KEY` e `VITE_SUPABASE_ANON_KEY` JWT values. Requer `git filter-repo` + rotação no painel Supabase. O CI não detecta porque o secret scan só verifica o working tree (HEAD), não o histórico.
+
+## 2026-08-09 (correção de dados mockados e simulações)
+- Audits identificaram dados simulados em Finance/Dashboard/Admin/Cooperativa; missão: "valide cada função se tiver dado mockup corrija... quero cadastrar dados reais".
+- **store.ts**: `aiFetch` com Bearer em todos os 5 fetches `/api/gemini/*`; fallbacks honestos (triage rule-based rotulado, transcribe retorna erro); `currentUserRole` não vem mais de localStorage; `invoices` com load/init + `addInvoice`/`updateInvoice`/`deleteInvoice` persistidos.
+- **Migration `20260809120000_fix_invoices_schema.sql`** aplicada (13 aplicadas / 0 pendentes): colunas `patient_id`, `visit_id`, `issue_date`, `nfe_id`, `nfe_url`, `description`; `asaas_payment_id` nullable; CHECK `invoices_status_check` com `PAID/CANCELED/FAILED`; índices por patient/status.
+- **FinanceView** reescrito: faturas reais persistidas, "Fechar Faturas do Período", filtros, receber/cancelar/recibo (txt honesto), DRE CSV.
+- **DashboardView**: gráfico real de 6 meses, especialidades reais, delta financeiro real, resumo operacional de alertas reais.
+- **FamilyDashboardView**: paciente por e-mail do usuário logado; **AssembliesView**: remoção de "Simular Acesso de Cooperado", votação vinculada por e-mail; **Topbar**: pill "Servidor de IA Online" removido.
+- **CrmView**: lead fechado → cria paciente (se não existir) + contrato; **ContractsView**: extrato txt honesto + modal de visualização.
+- **server app.ts**: `POST/DELETE /api/admin/users` (mega_admin, convite em `tenant_invitations` do tenant `system`, link `/?invite=`); **InternalTeamManager** e **PlanManager** reescritos (CRUD real em `saas_plans`).
+- **SystemAdminView/ResellerView**: estatísticas reais (removido "R$ 45.2K"/"100% Online"/"Convites Pendentes '—'").
+- **CoopFinanceView**: filtro mês atual real, download de extrato funcional, badge "Aguardando repasse" no lugar de "Creditado".
+- **SatisfactionView**: guia renomeada para "Registrar Resposta" (entrada manual persistida).
+- **AlertsView**: "Resolver" persistido via `resolvedAlertIds` no store (localStorage).
+- **GlobalUserManager**: e-mail honesto ("E-mail protegido (auth)"), botões mortos removidos; **SupportDesk**: botões "Responder"/"Filter" mortos removidos (tabela `support_tickets` confirmada no banco com RLS).
+- **Server dev fallbacks de IA**: simulacões `[Simulação de IA]` substituídas por 503 com erro honesto (teste atualizado).
+- Verificação: typecheck OK, 64 testes verdes, build OK.
+
 ## 2026-08-07 (convites de revenda e painel Super Admin)
 - Nova migration `20260807000000_add_tenant_invitations.sql` (tabela `tenant_invitations` + RLS + `generate_invite_token()`), aplicada no banco (10 aplicadas / 0 pendentes; colunas verificadas).
 - `src/server/app.ts`: endpoints `POST /api/admin/tenants`, `POST /api/admin/tenants/:id/invite`, `GET /api/invites/:token`, `POST /api/invites/accept` (criação de conta via `auth.admin.createUser` com `email_confirm` e auto-login no front).

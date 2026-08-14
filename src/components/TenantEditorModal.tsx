@@ -49,8 +49,6 @@ export function TenantEditorModal({ tenant, isCreating = false, onClose }: Tenan
     }
     setLoading(true);
     try {
-      await new Promise(r => setTimeout(r, 400));
-
       if (isCreating) {
         const { inviteLink } = await createTenantWithInvite({
           name,

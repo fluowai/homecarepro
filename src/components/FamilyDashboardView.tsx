@@ -3,17 +3,25 @@ import { Calendar, Activity, Pill, MessageCircle, Clock, CheckCircle2, ChevronRi
 import { useHomeCareStore } from '../store';
 
 export default function FamilyDashboardView() {
-  const { patients, visits, activeTenantId, currentUserRole } = useHomeCareStore();
+  const { patients, visits, activeTenantId, user } = useHomeCareStore();
   const todayStr = new Date().toISOString().split('T')[0];
-  
-  // In a real scenario, the backend would filter by the logged-in patient's ID.
-  // For demo, we just pick the first patient.
-  const myPatient = patients.find(p => p.tenantId === activeTenantId) || patients[0];
+
+  // The patient is linked to the logged-in account by e-mail.
+  const myPatient = patients.find(p =>
+    p.tenantId === activeTenantId &&
+    p.email?.trim().toLowerCase() === user?.email?.trim().toLowerCase()
+  );
   const myVisits = visits.filter(v => v.patientId === myPatient?.id && v.tenantId === activeTenantId);
   const todayVisit = myVisits.find(v => v.date === todayStr);
 
   if (!myPatient) {
-    return <div className="p-8 text-center text-gray-500">Nenhum dado encontrado para sua conta.</div>;
+    return (
+      <div className="p-8 text-center text-gray-500 max-w-md mx-auto space-y-3">
+        <Activity className="w-12 h-12 text-gray-300 mx-auto" />
+        <p className="font-semibold text-gray-700">Nenhum paciente vinculado à sua conta.</p>
+        <p className="text-sm">Para visualizar os dados de um paciente, o cadastro dele precisa conter o mesmo e-mail da sua conta de acesso.</p>
+      </div>
+    );
   }
 
   return (

@@ -2,12 +2,12 @@ version: "3.8"
 
 services:
   homecarepro-web:
-    image: ghcr.io/fluowai/homecarepro:${IMAGE_TAG:-latest}
+    image: ghcr.io/fluowai/homecarepro:latest
     restart: unless-stopped
     environment:
       - NODE_ENV=production
       - PORT=3000
-      - APP_URL=https://homecare.wootech.com.br
+      - APP_URL=${APP_URL:-https://homecare.wootech.com.br}
       - VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
       - VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
       - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
@@ -17,7 +17,7 @@ services:
       - RESEND_API_KEY=${RESEND_API_KEY}
     networks:
       - wootech1
-      - homecarepro_swarm_internal
+      - homecarepro_internal
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=wootech1"
@@ -26,21 +26,6 @@ services:
       - "traefik.http.routers.homecarepro_web.tls.certresolver=letsencryptresolver"
       - "traefik.http.routers.homecarepro_web.service=homecarepro_web"
       - "traefik.http.services.homecarepro_web.loadbalancer.server.port=3000"
-    deploy:
-      mode: replicated
-      replicas: 2
-      restart_policy:
-        condition: on-failure
-        delay: 5s
-        max_attempts: 3
-        window: 60s
-      resources:
-        limits:
-          memory: 512M
-          cpus: "0.5"
-        reservations:
-          memory: 256M
-          cpus: "0.25"
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
       interval: 30s
@@ -56,5 +41,5 @@ services:
 networks:
   wootech1:
     external: true
-  homecarepro_swarm_internal:
-    driver: overlay
+  homecarepro_internal:
+    driver: bridge

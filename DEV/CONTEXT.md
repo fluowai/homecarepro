@@ -1,21 +1,27 @@
 # Contexto do Projeto
 
-## Estado atual (2026-08-07)
-SaaS multi-tenant de gestão de Home Care em fase pré-produção. Existe deploy Docker Swarm via Traefik apontando para `homecare.wootech.com.br`, mas o sistema NÃO está pronto para produção. Runner de migrations operacional (10 aplicadas / 0 pendentes). Onboarding de revendas e clínicas via convite por link (e-mail + senha) implementado e com testes.
+## Estado atual (2026-08-13)
+SaaS multi-tenant de gestão de Home Care em fase **pré-produção com hardening aplicado**. Deploy Docker Swarm via Traefik em `homecare.wootech.com.br`. Runner de migrations: 13 aplicadas / 0 pendentes. Onboarding por convite implementado e testado. Dados mockados corrigidos. Hardening de segurança, CI, Docker e deploy aplicado (2026-08-13).
 
 ## Decisões ativas
 - Auth: Supabase Auth (email/senha), sem fluxo de recuperação de senha.
-- Billing: Asaas (PIX/boleto), somente webhook básico, sem idempotência completa.
-- IA: Gemini 2.5 Flash com fallback rule-based.
+- Billing: Asaas (PIX/boleto), webhook com idempotência + tenant blocking.
+- IA: Gemini 2.5 Flash com 503 honesto sem `GEMINI_API_KEY`.
 - Whitelabel: por domínio custom via Caddy On-Demand TLS + `/api/tenant/resolve`.
 - Convites: revenda/clínica criados por Mega Admin/Super Admin; link copiável (`/?invite=token`), conta por e-mail + senha, expira em 7 dias.
-- Dados: cache em `localStorage` (risco LGPD), modo demo sempre disponível.
+- Cadastro: **invite-only em produção** (signup form só aparece em demo mode).
+- Dados: cache em `localStorage` (risco LGPD a mitigar).
 
-## Pendências bloqueantes (resumo)
-1. **Rotacionar service role key no Supabase** (a antiga foi commitada) + purgar histórico git.
-2. **Decisão de cadastro** em produção (invite-only?) + confirmação de e-mail.
-3. Features simuladas (arquivos, WhatsApp, GPS) ainda não são reais.
-4. `npm audit`: 1 vulnerabilidade moderada (postcss) — não bloqueia.
+## Pendências bloqueantes
+1. **🔴 Rotacionar service role key no Supabase + purgar histórico git** (chave antiga foi commitada em `docker-compose.prod.yml` history). Ação manual/externa.
+2. CSP nonce (unsafe-inline para `window.__ENV__`).
+3. localStorage de dados clínicos (migrar para sessionStorage com expiração).
+4. Features incompletas: upload de arquivos, Evolution API WhatsApp, GPS check-in.
+5. Testes: RLS (opt-in), E2E, componentes, zod validation em endpoints de IA.
+6. Supabase email confirmation + password reset flow.
+
+## Corrigido em 2026-08-09
+- Dados mockados/simulados corrigidos: faturas persistidas no banco (migration `20260809120000_fix_invoices_schema.sql` aplicada), Dashboard/Finance/Admin/Cooperativa com métricas reais, IA sem conteúdo clínico simulado (503 honesto sem `GEMINI_API_KEY`), "Resolver" de alertas persistido, convites/planos/usuários internos reais. Typecheck, 64 testes e build verdes.
 
 ## Corrigido em 2026-08-07
 - Onboarding por convite (revenda/clínica): migration `tenant_invitations`, 4 endpoints, store, UI de aceite e link, painel exclusivo do Super Admin. Typecheck, 58 testes e build verdes.

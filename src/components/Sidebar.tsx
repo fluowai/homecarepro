@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   Activity, 
   Users, 
@@ -22,6 +22,7 @@ import {
   Plug,
   Lock,
   ChevronDown,
+  ChevronRight,
   Server,
   FileSignature
 } from 'lucide-react';
@@ -37,6 +38,15 @@ interface SidebarProps {
 export default function Sidebar({ currentView, setView, isOpen, onClose }: SidebarProps) {
   const { tenants, activeTenantId, setActiveTenant, currentUserRole } = useHomeCareStore();
   const activeTenant = tenants.find(t => t.id === activeTenantId) || tenants[0];
+  
+  const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({
+    'system_admin': true,
+    'reseller': true
+  });
+
+  const toggleMenu = (id: string) => {
+    setExpandedMenus(prev => ({ ...prev, [id]: !prev[id] }));
+  };
 
   const roleLabels: Record<string, string> = {
     mega_admin: 'Mega Admin (Dono)',
@@ -50,7 +60,15 @@ export default function Sidebar({ currentView, setView, isOpen, onClose }: Sideb
     operator: 'Operador',
   };
 
-  const menuGroups = [
+  interface MenuItem {
+    id: string;
+    label: string;
+    icon: typeof Activity;
+    roles: string[];
+    subItems?: { id: string; label: string }[];
+  }
+
+  const menuGroups: { title: string; items: MenuItem[] }[] = [
     {
       title: 'OPERAÇÃO',
       items: [
@@ -90,8 +108,35 @@ export default function Sidebar({ currentView, setView, isOpen, onClose }: Sideb
     {
       title: 'SAAS MULTI-NÍVEL',
       items: [
-        { id: 'system_admin', label: 'Painel Mega Admin', icon: Server, roles: ['mega_admin'] },
-        { id: 'reseller', label: 'Painel Super Admin', icon: Building2, roles: ['super_admin'] },
+        { 
+          id: 'system_admin', 
+          label: 'Painel Mega Admin', 
+          icon: Server, 
+          roles: ['mega_admin'],
+          subItems: [
+            { id: 'mega_overview', label: 'Visão Geral' },
+            { id: 'mega_network', label: 'Cadastro & Rede' },
+            { id: 'mega_plans', label: 'Planos' },
+            { id: 'mega_domains', label: 'Validação de Domínios' },
+            { id: 'mega_support', label: 'Suporte' },
+            { id: 'mega_users', label: 'Usuários Globais' },
+            { id: 'mega_team', label: 'Time Interno' }
+          ]
+        },
+        { 
+          id: 'reseller', 
+          label: 'Painel Super Admin', 
+          icon: Building2, 
+          roles: ['super_admin'],
+          subItems: [
+            { id: 'super_overview', label: 'Visão Geral' },
+            { id: 'super_clinics', label: 'Cadastro & Clínicas' },
+            { id: 'super_plans', label: 'Planos' },
+            { id: 'super_domains', label: 'Validação de Domínios' },
+            { id: 'super_whitelabel', label: 'Configuração Whitelabel' },
+            { id: 'super_support', label: 'Suporte' }
+          ]
+        },
       ]
     },
     {
@@ -179,6 +224,51 @@ export default function Sidebar({ currentView, setView, isOpen, onClose }: Sideb
                 <div className="space-y-1">
                   {filteredItems.map((item) => {
                     const Icon = item.icon;
+                    const hasSubItems = item.subItems && item.subItems.length > 0;
+                    const isExpanded = expandedMenus[item.id];
+                    const isParentActive = currentView === item.id || (hasSubItems && item.subItems.some(sub => sub.id === currentView));
+                    
+                    if (hasSubItems) {
+                      return (
+                        <div key={item.id} className="space-y-1">
+                          <button
+                            onClick={() => toggleMenu(item.id)}
+                            className={`w-full flex items-center justify-between px-3 h-12 rounded-xl font-medium text-sm transition-all duration-200 ${
+                              isParentActive
+                                ? 'bg-green-50/50 text-green-800 shadow-sm'
+                                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                            }`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <Icon className={`w-5 h-5 flex-shrink-0 transition-colors ${
+                                isParentActive ? 'text-green-600' : 'text-gray-400'
+                              }`} />
+                              <span className="truncate">{item.label}</span>
+                            </div>
+                            <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                          </button>
+                          
+                          {isExpanded && (
+                            <div className="pl-11 pr-2 py-1 space-y-1">
+                              {item.subItems.map((subItem: any) => (
+                                <button
+                                  key={subItem.id}
+                                  onClick={() => setView(subItem.id)}
+                                  className={`w-full flex items-center gap-3 px-3 h-10 rounded-lg font-medium text-[13px] transition-all duration-200 ${
+                                    currentView === subItem.id
+                                      ? 'bg-green-50 text-green-700 font-bold shadow-sm'
+                                      : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
+                                  }`}
+                                >
+                                  <span className="truncate">{subItem.label}</span>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    }
+
                     const isActive = currentView === item.id;
                     return (
                       <button

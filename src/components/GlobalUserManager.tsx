@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, UserX, Shield, Mail, Building2, UserCog, AlertCircle, Loader2, Users } from 'lucide-react';
+import { Search, Shield, Mail, Building2, AlertCircle, Loader2, Users } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useHomeCareStore } from '../store';
 
@@ -8,7 +8,7 @@ interface GlobalUser {
   tenant_id: string;
   full_name: string;
   role: string;
-  email: string; // Since we can't easily query auth.users without admin key, we might have to rely on user_profiles or a view. For now we will mock the email or use full_name.
+  email: string | null; // user_profiles não possui coluna de email; o email real fica em auth.users (protegido)
 }
 
 export function GlobalUserManager() {
@@ -96,7 +96,7 @@ export function GlobalUserManager() {
                   <th className="p-4 pl-6">Usuário</th>
                   <th className="p-4">Instância (Tenant)</th>
                   <th className="p-4">Nível de Acesso</th>
-                  <th className="p-4 text-right pr-6">Ações</th>
+                  <th className="p-4 text-right pr-6">Notas</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -111,7 +111,7 @@ export function GlobalUserManager() {
                           <div className="font-semibold text-gray-900 text-sm">{user.full_name}</div>
                           <div className="text-xs text-gray-500 flex items-center gap-1">
                             <Mail className="w-3 h-3" />
-                            {user.email || 'email@oculto.com'}
+                            {user.email || 'E-mail protegido (auth)'}
                           </div>
                         </div>
                       </div>
@@ -126,14 +126,7 @@ export function GlobalUserManager() {
                       {getRoleBadge(user.role)}
                     </td>
                     <td className="p-4 text-right pr-6">
-                      <div className="flex justify-end gap-2">
-                        <button className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors" title="Editar Perfil">
-                          <UserCog className="w-4 h-4" />
-                        </button>
-                        <button className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Bloquear Usuário">
-                          <UserX className="w-4 h-4" />
-                        </button>
-                      </div>
+                      <span className="text-xs text-gray-400 font-medium">Gestão via Admin {">"} Usuários</span>
                     </td>
                   </tr>
                 ))}

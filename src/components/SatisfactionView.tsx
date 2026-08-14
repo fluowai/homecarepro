@@ -118,7 +118,7 @@ export default function SatisfactionView() {
             }`}
           >
             <span className="w-1.5 h-1.5 bg-green-600 rounded-full animate-ping"></span>
-            <span>Simulador de Resposta</span>
+            <span>Registrar Resposta</span>
           </button>
         </div>
       </div>
@@ -371,8 +371,8 @@ export default function SatisfactionView() {
           {/* Simulator Form */}
           <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-6">
             <div className="border-b border-slate-100 pb-3">
-              <h3 className="font-bold text-slate-800 text-sm uppercase tracking-wide">Preencher Pesquisa (Simulador do Paciente)</h3>
-              <p className="text-slate-500 text-xs mt-1">Insira uma resposta na escala de satisfação fingindo ser um paciente que acabou de receber o atendimento domiciliar.</p>
+              <h3 className="font-bold text-slate-800 text-sm uppercase tracking-wide">Registrar Resposta (Entrada Manual)</h3>
+              <p className="text-slate-500 text-xs mt-1">Registre a resposta de satisfação de um atendimento ainda aguardando retorno do paciente.</p>
             </div>
 
             {pendingSurveys.length > 0 ? (
@@ -444,7 +444,7 @@ export default function SatisfactionView() {
                     type="submit"
                     className="px-5 py-2.5 bg-green-600 hover:bg-green-600 text-white rounded-xl text-xs font-bold shadow-md shadow-green-100 flex items-center gap-1.5"
                   >
-                    <span>Enviar Resposta Simulada</span>
+                    <span>Enviar Resposta</span>
                     <Check className="w-4 h-4" />
                   </button>
                 </div>
@@ -467,8 +467,8 @@ export default function SatisfactionView() {
               <li>O profissional realiza o check-out na residência do paciente.</li>
               <li>O sistema detecta que o atendimento foi concluído com sucesso.</li>
               <li>Caso o envio esteja ativado, o sistema gera um identificador único de pesquisa e insere no histórico.</li>
-              <li>Uma mensagem de WhatsApp ou SMS é simulada na guia de <strong>Comunicação</strong> e disparada para o paciente com o link.</li>
-              <li>Você pode preencher a avaliação do paciente usando este simulador interativo!</li>
+              <li>Uma mensagem de WhatsApp ou SMS é encaminhada ao paciente com o link da pesquisa.</li>
+              <li>Você pode registrar a avaliação do paciente manualmente nesta guia, se necessário.</li>
             </ol>
           </div>
         </div>
@@ -480,7 +480,7 @@ export default function SatisfactionView() {
           <div className="p-4 bg-emerald-50 border border-emerald-100 text-emerald-700 rounded-xl shadow-lg flex items-center gap-2.5">
             <CheckCircle className="w-5 h-5 text-emerald-500" />
             <span className="text-xs font-bold">
-              {saveSuccess ? 'Configurações atualizadas com sucesso!' : 'Avaliação simulada enviada com sucesso!'}
+              {saveSuccess ? 'Configurações atualizadas com sucesso!' : 'Resposta registrada com sucesso!'}
             </span>
           </div>
         </div>

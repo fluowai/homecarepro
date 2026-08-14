@@ -17,10 +17,11 @@ import { useHomeCareStore } from '../store';
 export default function CommunicationView() {
   const { 
     patients, 
+    visits,
+    professionals,
     activeTenantId, 
     messages, 
     sendMessage, 
-    receiveMessage, 
     markMessagesRead 
   } = useHomeCareStore();
 
@@ -70,38 +71,28 @@ export default function CommunicationView() {
 
     sendMessage(activePatientId, inputText, 'operator');
     setInputText('');
-
-    // Simulated patient reply after 2 seconds
-    const userPrompt = inputText;
-    setTimeout(() => {
-      let patientReply = "Obrigada pelo retorno. Vou avisar o cuidador aqui em casa.";
-      
-      if (userPrompt.toLowerCase().includes('confirm') || userPrompt.toLowerCase().includes('escala')) {
-        patientReply = "Perfeito, já recebemos o horário aqui e a equipe de cuidadores está a postos para receber a enfermeira.";
-      } else if (userPrompt.toLowerCase().includes('remédio') || userPrompt.toLowerCase().includes('prescrição')) {
-        patientReply = "Ok, os remédios estão comprados e organizados na bandeja do quarto. Obrigada!";
-      } else if (userPrompt.toLowerCase().includes('dor') || userPrompt.toLowerCase().includes('sintoma')) {
-        patientReply = "O paciente está dormindo melhor agora, mas vamos monitorar a febre conforme orientado.";
-      }
-      
-      receiveMessage(activePatientId, patientReply);
-    }, 2000);
   };
 
   // Automated notification templates
   const triggerVisitReminder = () => {
     if (!activePatientId) return;
-    const reminderText = `[HomeCare Pro Lembrete] Olá, gostaríamos de confirmar que a visita da Dra. Mariana Costa (Enfermagem) está agendada para amanhã às 09:00 na residência. Caso precise remarcar, favor nos avisar por aqui.`;
+    const nextVisit = visits
+      .filter(v => v.tenantId === activeTenantId && v.patientId === activePatientId && (v.status === 'agendada' || v.status === 'open_shift'))
+      .sort((a, b) => (a.date + a.timeStart).localeCompare(b.date + b.timeStart))[0];
+    if (!nextVisit) {
+      alert('Este paciente não possui visitas futuras agendadas para gerar o lembrete.');
+      return;
+    }
+    const prof = professionals.find(p => p.id === nextVisit.professionalId);
+    const profName = prof ? `${prof.name} (${prof.specialty})` : 'profissional da equipe';
+    const reminderText = `[HomeCare Pro Lembrete] Olá, gostaríamos de confirmar que a visita de ${profName} está agendada para ${nextVisit.date} às ${nextVisit.timeStart} na residência. Caso precise remarcar, favor nos avisar por aqui.`;
     sendMessage(activePatientId, reminderText, 'system');
-
-    setTimeout(() => {
-      receiveMessage(activePatientId, "Lembrete confirmado! Estaremos aguardando o profissional no horário marcado.");
-    }, 1500);
   };
 
   const triggerVisitConfirmation = () => {
     if (!activePatientId) return;
-    const confirmationText = `[HomeCare Pro Confirmação] Olá, informamos que o atendimento assistencial de hoje com Dona Francisca foi concluído com sucesso às 10:05. A evolução técnica e os sinais vitais já estão atualizados no prontuário digital.`;
+    const patientName = activePatient.name || 'paciente';
+    const confirmationText = `[HomeCare Pro Confirmação] Olá, informamos que o atendimento assistencial de hoje com ${patientName} foi concluído com sucesso. A evolução técnica e os sinais vitais já estão atualizados no prontuário digital.`;
     sendMessage(activePatientId, confirmationText, 'system');
   };
 

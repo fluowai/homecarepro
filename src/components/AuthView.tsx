@@ -17,6 +17,15 @@ export default function AuthView() {
 
   const tenants = useHomeCareStore((s) => s.tenants);
 
+  const isDemoMode = () => {
+    if (typeof window !== 'undefined' && (window as any).__ENV__) {
+      return (window as any).__ENV__.VITE_ENABLE_DEMO_MODE === 'true';
+    }
+    return import.meta.env.VITE_ENABLE_DEMO_MODE === 'true';
+  };
+
+  const canSignup = isDemoMode();
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -93,8 +102,21 @@ export default function AuthView() {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {mode === 'signup' && (
+          {!canSignup && mode === 'signup' ? (
+            <div className="text-center py-8">
+              <p className="text-sm text-slate-500 mb-4">
+                O cadastro direto está desativado. Contas são criadas por convite.
+              </p>
+              <button
+                onClick={() => setMode('login')}
+                className="text-sm text-green-600 hover:text-green-700 font-medium"
+              >
+                Ir para login
+              </button>
+            </div>
+          ) : (
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {mode === 'signup' && canSignup && (
               <>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Nome completo</label>
@@ -186,14 +208,17 @@ export default function AuthView() {
               ) : (
                 'Criar conta'
               )}
-            </button>
-          </form>
+             </button>
+            </form>
+          )}
 
-          <div className="mt-6 text-center">
-            <button onClick={toggleMode} className="text-sm text-green-600 hover:text-green-700 font-medium transition">
-              {mode === 'login' ? 'Não tem conta? Cadastre-se' : 'Já tem conta? Entrar'}
-            </button>
-          </div>
+          {canSignup && (
+            <div className="mt-6 text-center">
+              <button onClick={toggleMode} className="text-sm text-green-600 hover:text-green-700 font-medium transition">
+                {mode === 'login' ? 'Não tem conta? Cadastre-se' : 'Já tem conta? Entrar'}
+              </button>
+            </div>
+          )}
         </div>
 
         <p className="text-center text-xs text-slate-400 mt-6">

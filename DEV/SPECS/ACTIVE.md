@@ -1,4 +1,26 @@
-# Spec Ativa — Convites de Revenda e Painel Super Admin (Whitelabel)
+# Spec Ativa — Correção de dados mockados/simulados (cadastro real)
+
+## Objetivo
+"Valide cada função se tiver dado mockup corrija... quero cadastrar dados reais": eliminar elementos simulados e fazer as telas operarem com dados reais persistidos no banco (financeiro, dashboard, administração, cooperativa, alertas, convites, IA).
+
+## Escopo
+1. `store.ts`: auth em todos os fetches de IA (`aiFetch`), fallbacks honestos, RBAC sem localStorage, estado/actions de `invoices` persistidos, `resolvedAlertIds` persistido.
+2. Migration `20260809120000_fix_invoices_schema.sql` (reconciliação da tabela `invoices` com schema do app) — aplicada.
+3. Views reescritas para dados reais: FinanceView, DashboardView, FamilyDashboardView, AssembliesView, Topbar, CrmView (lead→paciente+contrato), ContractsView, InternalTeamManager, PlanManager, SystemAdminView, ResellerView, CoopFinanceView, SatisfactionView, AlertsView, GlobalUserManager, SupportDesk.
+4. `server/app.ts`: endpoints `POST/DELETE /api/admin/users` (mega_admin, convite em tenant `system`); fallbacks de IA em dev retornam 503 honesto.
+
+## Status
+**Concluído** (2026-08-09) — code, migration aplicada, testes (64), typecheck e build verdes.
+
+## Aceite
+1. `npm run typecheck`: verde.
+2. `npx vitest run`: 64 testes verdes (14 skipped RLS).
+3. `npm run build`: verde.
+4. Migration `20260809120000_fix_invoices_schema.sql` aplicada (13 aplicadas / 0 pendentes); `invoices`, `support_tickets` e `ticket_messages` verificados no banco.
+5. Fallback de IA em dev: 503 honesto sem `GEMINI_API_KEY` (teste atualizado).
+
+---
+## Spec anterior — Convites de Revenda e Painel Super Admin (Whitelabel, concluído 2026-08-07)
 
 ## Objetivo
 Permitir que o Mega Admin crie revendas (whitelabel) e que o Super Admin gerencie clínicas clientes, com criação de conta via link de convite (e-mail + senha) e painel exclusivo para o Super Admin.

@@ -84,7 +84,8 @@ const startServer = async () => {
       const indexPath = path.join(distPath, "index.html");
       if (fs.existsSync(indexPath)) {
         let indexHtml = fs.readFileSync(indexPath, "utf8");
-        const envScript = `<script>window.__ENV__ = ${JSON.stringify({
+        const nonce = res.locals.cspNonce;
+        const envScript = `<script nonce="${nonce}">window.__ENV__ = ${JSON.stringify({
           VITE_SUPABASE_URL: process.env.VITE_SUPABASE_URL,
           VITE_SUPABASE_ANON_KEY: process.env.VITE_SUPABASE_ANON_KEY,
         })}</script>`;

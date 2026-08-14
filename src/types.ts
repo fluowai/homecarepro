@@ -49,6 +49,7 @@ export interface PatientFile {
   size: string;
   uploadedAt: string;
   type: string;
+  url?: string;
 }
 
 export interface TimelineEvent {
@@ -354,9 +355,10 @@ export interface Invoice {
   issueDate: string;
   dueDate: string;
   value: number;
-  status: 'pending' | 'paid' | 'canceled' | 'failed';
+  status: 'PENDING' | 'PAID' | 'CANCELED' | 'FAILED';
   nfeUrl?: string;
   nfeId?: string;
+  description?: string;
   createdAt: string;
   updatedAt: string;
 }

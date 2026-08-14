@@ -78,8 +78,8 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
   const [eventDesc, setEventDesc] = useState('');
   const [eventVitals, setEventVitals] = useState({ pa: '', fc: '', temp: '', sat: '', pain: '' });
 
-  // File uploading simulator
-  const [fileNameInput, setFileNameInput] = useState('');
+  // File uploading
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
 
   // Filter patients
   const tenantPatients = patients.filter(p => p.tenantId === activeTenantId);
@@ -166,20 +166,12 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
   const handleAddTimeline = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedPatientId || !eventTitle || !eventDesc) return;
-    
-    let photos: string[] | undefined = undefined;
-    let finalDesc = eventDesc;
-    if (eventDesc.includes("[FOTO_ANEXADA]")) {
-      photos = ["https://images.unsplash.com/photo-1581595220892-b0739db3ba8c?auto=format&fit=crop&q=80&w=300"];
-      finalDesc = eventDesc.replace(" [FOTO_ANEXADA]", "");
-    }
 
     addTimelineEvent(selectedPatientId, {
       title: eventTitle,
-      description: finalDesc,
+      description: eventDesc,
       type: eventType,
-      author: 'Admin Demo',
-      photos,
+      author: 'Admin',
       vitals: eventType === 'clinical' && (eventVitals.pa || eventVitals.fc || eventVitals.temp || eventVitals.sat || eventVitals.pain) ? {
         pa: eventVitals.pa || undefined,
         fc: eventVitals.fc || undefined,
@@ -194,18 +186,23 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
     setEventVitals({ pa: '', fc: '', temp: '', sat: '', pain: '' });
   };
 
-  const handleSimulateFileUpload = (e: React.FormEvent) => {
+  const handleFileUpload = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedPatientId || !fileNameInput) return;
-    
-    const extension = fileNameInput.includes('.') ? fileNameInput.split('.').pop() : 'pdf';
-    addPatientFile(
-      selectedPatientId, 
-      fileNameInput, 
-      '1.4 MB', 
-      extension === 'pdf' ? 'application/pdf' : 'image/jpeg'
-    );
-    setFileNameInput('');
+    if (!selectedPatientId || !pendingFile) return;
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const url = reader.result as string;
+      addPatientFile(
+        selectedPatientId,
+        pendingFile.name,
+        `${(pendingFile.size / (1024 * 1024)).toFixed(1)} MB`,
+        pendingFile.type || 'application/octet-stream',
+        url
+      );
+    };
+    reader.readAsDataURL(pendingFile);
+    setPendingFile(null);
   };
 
   return (
@@ -456,19 +453,21 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
                   <span className="text-xs text-slate-400">Laudos, receitas e exames</span>
                 </div>
 
-                {/* Upload Form Simulator */}
-                <form onSubmit={handleSimulateFileUpload} className="flex gap-2.5 p-4 bg-slate-50 border border-slate-200/60 rounded-xl max-w-lg">
-                  <input
-                    type="text"
-                    required
-                    placeholder="Nome do arquivo (ex: Receita_Agosto.pdf)"
-                    value={fileNameInput}
-                    onChange={(e) => setFileNameInput(e.target.value)}
-                    className="flex-1 bg-white border border-slate-200 rounded-lg text-xs px-3 py-2 text-slate-700 focus:outline-none focus:border-green-600"
-                  />
+                {/* Upload Form */}
+                <form onSubmit={handleFileUpload} className="flex gap-2.5 p-4 bg-slate-50 border border-slate-200/60 rounded-xl max-w-lg">
+                  <label className="flex-1 flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-500 cursor-pointer hover:border-green-400 transition-colors overflow-hidden">
+                    <Paperclip className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                    <span className="truncate">{pendingFile ? pendingFile.name : 'Selecione um arquivo (laudo, receita, exame)...'}</span>
+                    <input
+                      type="file"
+                      className="hidden"
+                      onChange={(e) => setPendingFile(e.target.files?.[0] ?? null)}
+                    />
+                  </label>
                   <button
                     type="submit"
-                    className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white font-semibold text-xs rounded-lg transition-colors flex items-center gap-1.5"
+                    disabled={!pendingFile}
+                    className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white font-semibold text-xs rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
                   >
                     <Plus className="w-3.5 h-3.5" />
                     <span>Anexar</span>
@@ -480,19 +479,21 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
                   {selectedPatient.files.length > 0 ? (
                     selectedPatient.files.map((file) => (
                       <div key={file.id} className="p-3 border border-slate-100 rounded-xl hover:bg-slate-50 transition-colors flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <FileText className="w-8 h-8 text-green-600 bg-green-50 p-1.5 rounded-lg" />
-                          <div>
-                            <span className="font-semibold text-xs text-slate-800 block">{file.name}</span>
+                        <div className="flex items-center gap-3 min-w-0">
+                          <FileText className="w-8 h-8 text-green-600 bg-green-50 p-1.5 rounded-lg shrink-0" />
+                          <div className="min-w-0">
+                            <span className="font-semibold text-xs text-slate-800 block truncate">{file.name}</span>
                             <span className="text-[10px] text-slate-400 block mt-0.5">{file.uploadedAt} • {file.size}</span>
                           </div>
                         </div>
-                        <button 
-                          onClick={() => alert(`Simulação de Download: Baixando arquivo ${file.name}`)}
-                          className="text-xs text-green-600 hover:underline font-semibold"
+                        <a
+                          href={file.url || '#'}
+                          download={file.name}
+                          onClick={(e) => { if (!file.url) e.preventDefault(); }}
+                          className={`text-xs font-semibold ${file.url ? 'text-green-600 hover:underline' : 'text-slate-300 cursor-not-allowed'}`}
                         >
-                          Baixar
-                        </button>
+                          {file.url ? 'Baixar' : 'Sem arquivo'}
+                        </a>
                       </div>
                     ))
                   ) : (
@@ -598,20 +599,6 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
                           placeholder="Escreva as observações técnicas..."
                           className="w-full bg-white border border-slate-200 text-xs rounded-lg px-3 py-2 text-slate-700 focus:outline-none"
                         />
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <label className="text-[10px] font-bold text-slate-500 flex items-center gap-1 cursor-pointer hover:text-green-600 transition-colors">
-                          <Paperclip className="w-3 h-3" />
-                          <span>Anexar Foto (Simulação)</span>
-                          <input 
-                            type="checkbox" 
-                            className="ml-1 rounded text-green-600" 
-                            onChange={(e) => {
-                               if (e.target.checked) setEventDesc(prev => prev + " [FOTO_ANEXADA]");
-                               else setEventDesc(prev => prev.replace(" [FOTO_ANEXADA]", ""));
-                            }}
-                          />
-                        </label>
                       </div>
                       <button
                         type="submit"

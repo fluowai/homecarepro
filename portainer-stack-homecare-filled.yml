@@ -1,0 +1,57 @@
+version: "3.8"
+
+services:
+  homecarepro-web:
+    image: ghcr.io/fluowai/homecarepro:latest
+    restart: unless-stopped
+    environment:
+      NODE_ENV: "production"
+      PORT: "3000"
+      APP_URL: "https://homecare.wootech.com.br"
+      VITE_SUPABASE_URL: "https://qczwrubsiuafhwojfzbm.supabase.co"
+      VITE_SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFjendydWJzaXVhZmh3b2pmemJtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUxNjQ3ODAsImV4cCI6MjEwMDc0MDc4MH0.ZQHtnHjK7BLzWxr6X2Szno-EKIlz3wg6ErWSq3c5oVo"
+      SUPABASE_SERVICE_ROLE_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFjendydWJzaXVhZmh3b2pmemJtIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NTE2NDc4MCwiZXhwIjoyMTAwNzQwNzgwfQ.GGXbSrR7246BCMZZ_ROFGUgA8BYcWZqbAilFX_5aHws"
+      SUPABASE_DB_URL: "postgresql://postgres:JgSgyqhBg81wFPoM@db.qczwrubsiuafhwojfzbm.supabase.co:5432/postgres"
+      GEMINI_API_KEY: "YOUR_GEMINI_API_KEY"
+      ASAAS_API_KEY: "YOUR_ASAAS_API_KEY"
+      ASAAS_WEBHOOK_TOKEN: "YOUR_ASAAS_WEBHOOK_TOKEN"
+      RESEND_API_KEY: "YOUR_RESEND_API_KEY"
+    networks:
+      - wootech1
+      - homecarepro_internal
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=wootech1"
+      - "traefik.http.routers.hcpro_web.rule=Host(`homecare.wootech.com.br`)"
+      - "traefik.http.routers.hcpro_web.entrypoints=websecure"
+      - "traefik.http.routers.hcpro_web.tls.certresolver=letsencryptresolver"
+      - "traefik.http.routers.hcpro_web.service=hcpro_web_svc"
+      - "traefik.http.services.hcpro_web_svc.loadbalancer.server.port=3000"
+    deploy:
+      mode: replicated
+      replicas: 1
+      labels:
+        - "traefik.enable=true"
+        - "traefik.docker.network=wootech1"
+        - "traefik.http.routers.hcpro_web.rule=Host(`homecare.wootech.com.br`)"
+        - "traefik.http.routers.hcpro_web.entrypoints=websecure"
+        - "traefik.http.routers.hcpro_web.tls.certresolver=letsencryptresolver"
+        - "traefik.http.routers.hcpro_web.service=hcpro_web_svc"
+        - "traefik.http.services.hcpro_web_svc.loadbalancer.server.port=3000"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  wootech1:
+    external: true
+  homecarepro_internal:
+    driver: overlay

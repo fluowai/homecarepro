@@ -19,7 +19,8 @@ RUN addgroup -g 1001 -S appgroup && \
     adduser -S appuser -u 1001 -G appgroup
 
 COPY package.json package-lock.json* ./
-RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
+COPY --from=builder /app/node_modules ./node_modules
+RUN npm prune --omit=dev --ignore-scripts
 
 COPY --from=builder /app/dist ./dist
 

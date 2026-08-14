@@ -74,6 +74,14 @@ export default function App() {
     init();
   }, [init]);
 
+  useEffect(() => {
+    if (currentUserRole === 'mega_admin' && currentView === 'dashboard') {
+      setView('mega_overview');
+    } else if (currentUserRole === 'super_admin' && currentView === 'dashboard') {
+      setView('super_overview');
+    }
+  }, [currentUserRole, currentView]);
+
   const inviteToken = new URLSearchParams(window.location.search).get('invite');
 
   if (inviteToken) {
@@ -97,7 +105,7 @@ export default function App() {
   const renderActiveView = () => {
     switch (currentView) {
       case 'dashboard':
-        if (currentUserRole === 'patient' || currentUserRole === 'viewer') {
+        if (currentUserRole === 'patient') {
           return <FamilyDashboardView />;
         }
         return <DashboardView setView={handleSetView} searchQuery={searchQuery} />;
@@ -129,6 +137,21 @@ export default function App() {
         return <CoopFinanceView />;
       case 'assemblies':
         return <AssembliesView />;
+      case 'mega_overview':
+      case 'mega_network':
+      case 'mega_plans':
+      case 'mega_domains':
+      case 'mega_support':
+      case 'mega_users':
+      case 'mega_team':
+        return <SystemAdminView activeSection={currentView.replace('mega_', '')} onExit={handleSetView} />;
+      case 'super_overview':
+      case 'super_clinics':
+      case 'super_plans':
+      case 'super_domains':
+      case 'super_whitelabel':
+      case 'super_support':
+        return <ResellerView activeSection={currentView.replace('super_', '')} onExit={handleSetView} />;
       default:
         return <DashboardView setView={handleSetView} searchQuery={searchQuery} />;
     }
@@ -138,18 +161,6 @@ export default function App() {
   const whitelabelTenant = activeTenant?.parentId ? tenants.find(t => t.id === activeTenant.parentId) : activeTenant;
   const primaryColor = whitelabelTenant?.primaryColor;
   const secondaryColor = whitelabelTenant?.secondaryColor;
-
-  // Telas exclusivas de gestão (Mega Admin / Super Admin): layout próprio,
-  // separado do usuário final, com menu lateral de gestão à esquerda.
-  if (currentView === 'system_admin' || currentView === 'reseller') {
-    return (
-      <Suspense fallback={<LoadingScreen />}>
-        {currentView === 'system_admin'
-          ? <SystemAdminView onExit={handleSetView} />
-          : <ResellerView onExit={handleSetView} />}
-      </Suspense>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-gray-50 flex font-sans antialiased text-gray-900">

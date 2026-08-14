@@ -4,7 +4,6 @@ import {
   Calendar, 
   UserCheck, 
   ShieldAlert, 
-  ArrowUpRight, 
   Clock, 
   Activity, 
   ClipboardCheck, 
@@ -36,13 +35,12 @@ export default function DashboardView({ setView, searchQuery }: DashboardViewPro
   const todayVisits = tenantVisits.filter(v => v.date === todayStr);
   const completedVisitsTodayCount = todayVisits.filter(v => v.status === 'concluida').length;
   const inProgressVisitsCount = todayVisits.filter(v => v.status === 'em_andamento').length;
-  
+
   const activeProfessionalsCount = tenantProfessionals.filter(p => p.status === 'active' || p.status === 'busy').length;
 
-  // Smart clinical risk alerts (simulated or direct analytical checks)
+  // Clinical risk alerts calculated from real data
   const riskAlerts: { id: string; patient: string; severity: string; reason: string }[] = [];
-  
-  // 1. Check patients with no visits in current data
+
   tenantPatients.forEach(p => {
     const patVisits = tenantVisits.filter(v => v.patientId === p.id);
     if (patVisits.length === 0) {
@@ -55,23 +53,21 @@ export default function DashboardView({ setView, searchQuery }: DashboardViewPro
     }
   });
 
-  // 2. Traqueostomizados com alergias críticas
   tenantPatients.forEach(p => {
     if (p.diagnostic.toLowerCase().includes('traqueosto') && p.allergies.includes('Látex')) {
       riskAlerts.push({
         id: `alert-2-${p.id}`,
         patient: p.name,
         severity: 'moderado',
-        reason: 'Paciente traqueostomizado(a) com alergia gravíssima a LÁTEX. Verificar materiais de proteção utilizados.'
+        reason: 'Paciente traqueostomizado(a) com alergia a LÁTEX. Verificar materiais de proteção utilizados.'
       });
     }
   });
 
-  // 3. Profissionais com documentos vencidos ou pendentes
   tenantProfessionals.forEach(p => {
     const expiredDocs = p.documents?.filter(d => d.status === 'expired') || [];
     const pendingDocs = p.documents?.filter(d => d.status === 'pending') || [];
-    
+
     if (expiredDocs.length > 0) {
       riskAlerts.push({
         id: `alert-doc-exp-${p.id}`,
@@ -90,7 +86,6 @@ export default function DashboardView({ setView, searchQuery }: DashboardViewPro
     }
   });
 
-  // 3. Append dynamic calculated alerts (Low stock, missing visits, expired drugs)
   if (getCalculatedAlerts) {
     const calculatedAlerts = getCalculatedAlerts();
     calculatedAlerts.forEach(a => {
@@ -103,7 +98,67 @@ export default function DashboardView({ setView, searchQuery }: DashboardViewPro
     });
   }
 
-  // Render stats data cards
+  // Monthly evolution of concluded visits (last 6 months) - real data
+  const months = (() => {
+    const now = new Date();
+    const list: { label: string; count: number }[] = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const count = tenantVisits.filter(v => {
+        if (v.status !== 'concluida') return false;
+        const vd = new Date(v.date);
+        return vd.getMonth() === d.getMonth() && vd.getFullYear() === d.getFullYear();
+      }).length;
+      list.push({ label: d.toLocaleDateString('pt-BR', { month: 'short' }), count });
+    }
+    return list;
+  })();
+  const maxMonthly = Math.max(1, ...months.map(m => m.count));
+  const chartW = 500;
+  const chartH = 190;
+  const barW = 52;
+  const gap = (chartW - barW * months.length) / (months.length + 1);
+
+  // Specialty distribution - real counts
+  const specialtyGroups: { name: string; filter: (s: string) => boolean; color: string }[] = [
+    { name: 'Enfermagem', filter: (s) => ['Enfermeiro', 'Técnico de Enfermagem', 'Tecnico de Enfermagem'].includes(s), color: 'bg-green-600' },
+    { name: 'Fisioterapia', filter: (s) => s === 'Fisioterapeuta', color: 'bg-emerald-500' },
+    { name: 'Medicina', filter: (s) => ['Médico', 'Medico'].includes(s), color: 'bg-indigo-600' },
+    { name: 'Outros', filter: (s) => !['Enfermeiro', 'Técnico de Enfermagem', 'Tecnico de Enfermagem', 'Fisioterapeuta', 'Médico', 'Medico'].includes(s), color: 'bg-purple-500' },
+  ];
+  const specialtyStats = specialtyGroups.map(g => {
+    const count = tenantProfessionals.filter(p => g.filter(p.specialty)).length;
+    const pct = tenantProfessionals.length > 0 ? Math.round((count / tenantProfessionals.length) * 100) : 0;
+    return { name: g.name, count, pct, color: g.color };
+  });
+
+  // Financial comparison (this month vs previous month) - real data
+  const now = new Date();
+  const thisMonthValue = tenantVisits.filter(v => {
+    if (v.status !== 'concluida') return false;
+    const vd = new Date(v.date);
+    return vd.getMonth() === now.getMonth() && vd.getFullYear() === now.getFullYear();
+  }).reduce((s, v) => s + v.value, 0);
+  const prevMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const prevMonthValue = tenantVisits.filter(v => {
+    if (v.status !== 'concluida') return false;
+    const vd = new Date(v.date);
+    return vd.getMonth() === prevMonthDate.getMonth() && vd.getFullYear() === prevMonthDate.getFullYear();
+  }).reduce((s, v) => s + v.value, 0);
+  const monthlyDelta = prevMonthValue > 0 ? ((thisMonthValue - prevMonthValue) / prevMonthValue) * 100 : null;
+
+  // Operational insight computed from real data
+  const insight = (() => {
+    if (riskAlerts.length > 0) {
+      const top = riskAlerts[0];
+      return `${riskAlerts.length} alerta(s) clínico(s) ativo(s) no momento. O mais relevante: ${top.reason}`;
+    }
+    if (todayVisits.length === 0) {
+      return 'Nenhuma visita programada para hoje. Considere revisar a escala de profissionais.';
+    }
+    return `Operação com ${todayVisits.length} visita(s) hoje e ${activeProfessionalsCount} profissional(is) em campo. Nenhum alerta clínico crítico ativo.`;
+  })();
+
   const stats = [
     { 
       label: 'Pacientes Ativos', 
@@ -132,7 +187,7 @@ export default function DashboardView({ setView, searchQuery }: DashboardViewPro
     { 
       label: 'Alertas Inteligentes', 
       value: riskAlerts.length, 
-      desc: 'Detectados automaticamente pela IA', 
+      desc: 'Calculados a partir dos dados do sistema', 
       icon: ShieldAlert, 
       color: 'bg-rose-500 text-rose-500', 
       bgColor: 'bg-rose-50' 
@@ -176,7 +231,6 @@ export default function DashboardView({ setView, searchQuery }: DashboardViewPro
             </div>
             <div className="flex items-baseline gap-3">
               <span className="text-4xl font-bold text-gray-900 tracking-tight">{stat.value.toString().padStart(2, '0')}</span>
-              {idx === 0 && <span className="text-sm font-bold text-green-600">+12%</span>}
             </div>
             <span className="text-xs font-medium text-gray-400 mt-auto pt-4">{stat.desc}</span>
           </div>
@@ -190,94 +244,39 @@ export default function DashboardView({ setView, searchQuery }: DashboardViewPro
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Left Side: Operations & Specialty Graphs */}
         <div className="lg:col-span-2 space-y-8">
-          
-          {/* Operations performance SVG Graph */}
+
+          {/* Operations performance graph - real monthly data */}
           <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
             <div className="flex items-center justify-between mb-6">
               <div>
                 <h3 className="font-bold text-gray-800 text-base">Evolução Mensal de Visitas</h3>
-                <p className="text-gray-400 text-xs">Total de atendimentos concluídos nos últimos 6 meses</p>
+                <p className="text-gray-400 text-xs">Visitas concluídas nos últimos 6 meses</p>
               </div>
-              <div className="flex items-center gap-4 text-xs font-semibold">
-                <div className="flex items-center gap-1">
-                  <span className="w-2.5 h-2.5 rounded-full bg-green-600" />
-                  <span className="text-gray-600">Presencial</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
-                  <span className="text-gray-600">Reabilitação</span>
-                </div>
+              <div className="text-xs font-semibold text-gray-600">
+                {months.reduce((s, m) => s + m.count, 0)} atendimentos no período
               </div>
             </div>
 
-            {/* Custom Responsive SVG Chart */}
             <div className="h-60 w-full relative">
-              <svg className="w-full h-full" viewBox="0 0 600 240" preserveAspectRatio="none">
+              <svg className="w-full h-full" viewBox={`0 0 ${chartW} ${chartH}`} preserveAspectRatio="none">
                 {/* Horizontal grid lines */}
-                <line x1="40" y1="40" x2="580" y2="40" stroke="#F3F4F6" strokeWidth="1" strokeDasharray="4 4" />
-                <line x1="40" y1="90" x2="580" y2="90" stroke="#F3F4F6" strokeWidth="1" strokeDasharray="4 4" />
-                <line x1="40" y1="140" x2="580" y2="140" stroke="#F3F4F6" strokeWidth="1" strokeDasharray="4 4" />
-                <line x1="40" y1="190" x2="580" y2="190" stroke="#F3F4F6" strokeWidth="1" strokeDasharray="4 4" />
+                {[0, 1, 2, 3].map(i => (
+                  <line key={i} x1="20" y1={30 + i * 40} x2={chartW - 10} y2={30 + i * 40} stroke="#F3F4F6" strokeWidth="1" strokeDasharray="4 4" />
+                ))}
 
-                {/* Shaded Area underneath the line */}
-                <path
-                  d="M 60 200 L 140 130 L 240 160 L 340 100 L 440 70 L 540 50 L 540 200 Z"
-                  fill="url(#blue-gradient)"
-                  opacity="0.12"
-                />
-
-                {/* Shaded Area for emerald line */}
-                <path
-                  d="M 60 210 L 140 180 L 240 150 L 340 120 L 440 110 L 540 80 L 540 200 Z"
-                  fill="url(#emerald-gradient)"
-                  opacity="0.08"
-                />
-
-                {/* SVG Gradients */}
-                <defs>
-                  <linearGradient id="blue-gradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#2563EB" />
-                    <stop offset="100%" stopColor="#FFFFFF" />
-                  </linearGradient>
-                  <linearGradient id="emerald-gradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#10B981" />
-                    <stop offset="100%" stopColor="#FFFFFF" />
-                  </linearGradient>
-                </defs>
-
-                {/* Primary Trend Line (Blue) */}
-                <path
-                  d="M 60 200 Q 140 130 240 160 T 340 100 T 440 70 T 540 50"
-                  fill="none"
-                  stroke="#2563EB"
-                  strokeWidth="3.5"
-                  strokeLinecap="round"
-                />
-
-                {/* Secondary Trend Line (Emerald) */}
-                <path
-                  d="M 60 210 Q 140 180 240 150 T 340 120 T 440 110 T 540 80"
-                  fill="none"
-                  stroke="#10B981"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                />
-
-                {/* Interactive Dots */}
-                <circle cx="60" cy="200" r="4" fill="#2563EB" stroke="#FFFFFF" strokeWidth="2" />
-                <circle cx="140" cy="130" r="4" fill="#2563EB" stroke="#FFFFFF" strokeWidth="2" />
-                <circle cx="240" cy="160" r="4" fill="#2563EB" stroke="#FFFFFF" strokeWidth="2" />
-                <circle cx="340" cy="100" r="4" fill="#2563EB" stroke="#FFFFFF" strokeWidth="2" />
-                <circle cx="440" cy="70" r="4" fill="#2563EB" stroke="#FFFFFF" strokeWidth="2" />
-                <circle cx="540" cy="50" r="5" fill="#2563EB" stroke="#FFFFFF" strokeWidth="2.5" />
-
-                {/* X Axis Labels */}
-                <text x="60" y="225" fill="#9CA3AF" fontSize="10" textAnchor="middle" fontWeight="bold">Jan</text>
-                <text x="140" y="225" fill="#9CA3AF" fontSize="10" textAnchor="middle" fontWeight="bold">Fev</text>
-                <text x="240" y="225" fill="#9CA3AF" fontSize="10" textAnchor="middle" fontWeight="bold">Mar</text>
-                <text x="340" y="225" fill="#9CA3AF" fontSize="10" textAnchor="middle" fontWeight="bold">Abr</text>
-                <text x="440" y="225" fill="#9CA3AF" fontSize="10" textAnchor="middle" fontWeight="bold">Mai</text>
-                <text x="540" y="225" fill="#9CA3AF" fontSize="10" textAnchor="middle" fontWeight="bold">Jun</text>
+                {/* Bars */}
+                {months.map((m, i) => {
+                  const x = gap + i * (barW + gap);
+                  const barH = Math.max(4, (m.count / maxMonthly) * 150);
+                  const y = chartH - 25 - barH;
+                  return (
+                    <g key={i}>
+                      <rect x={x} y={y} width={barW} height={barH} rx="6" fill={i === months.length - 1 ? '#16A34A' : '#2563EB'} opacity={i === months.length - 1 ? 1 : 0.55} />
+                      <text x={x + barW / 2} y={y - 6} fill="#374151" fontSize="11" textAnchor="middle" fontWeight="bold">{m.count}</text>
+                      <text x={x + barW / 2} y={chartH - 8} fill="#9CA3AF" fontSize="10" textAnchor="middle" fontWeight="bold">{m.label}</text>
+                    </g>
+                  );
+                })}
               </svg>
             </div>
           </div>
@@ -287,21 +286,16 @@ export default function DashboardView({ setView, searchQuery }: DashboardViewPro
             <div>
               <h3 className="font-bold text-gray-800 text-base">Alocação de Especialidades</h3>
               <p className="text-gray-400 text-xs mb-4">Equipe multidisciplinar em operação ativa</p>
-              
+
               <div className="space-y-3">
-                {[
-                  { name: 'Enfermagem', count: tenantProfessionals.filter(p => p.specialty === 'Enfermeiro' || p.specialty === 'Técnico de Enfermagem').length, pct: '50%', color: 'bg-green-600' },
-                  { name: 'Fisioterapia', count: tenantProfessionals.filter(p => p.specialty === 'Fisioterapeuta').length, pct: '30%', color: 'bg-emerald-500' },
-                  { name: 'Medicina', count: tenantProfessionals.filter(p => p.specialty === 'Médico').length, pct: '15%', color: 'bg-indigo-600' },
-                  { name: 'Outros', count: 1, pct: '5%', color: 'bg-purple-500' },
-                ].map((spec, index) => (
+                {specialtyStats.map((spec, index) => (
                   <div key={index}>
                     <div className="flex justify-between text-xs font-semibold text-gray-600 mb-1">
                       <span>{spec.name}</span>
-                      <span>{spec.count} profissionais ({spec.pct})</span>
+                      <span>{spec.count} profissionais ({spec.pct}%)</span>
                     </div>
                     <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
-                      <div className={`${spec.color} h-full`} style={{ width: spec.pct }} />
+                      <div className={`${spec.color} h-full`} style={{ width: `${spec.pct}%` }} />
                     </div>
                   </div>
                 ))}
@@ -311,19 +305,27 @@ export default function DashboardView({ setView, searchQuery }: DashboardViewPro
             <div className="border-l border-gray-100 pl-0 md:pl-6 flex flex-col justify-between">
               <div>
                 <h3 className="font-bold text-gray-800 text-base">Atividade Financeira</h3>
-                <p className="text-gray-400 text-xs mb-4">Faturamento estimado das escalas em andamento</p>
-                
+                <p className="text-gray-400 text-xs mb-4">Faturamento das visitas concluídas</p>
+
                 <div className="p-4 bg-gray-50 rounded-xl border border-gray-200/60">
-                  <span className="text-xs text-gray-400 font-medium">Faturamento Estimado das Escalas</span>
+                  <span className="text-xs text-gray-400 font-medium">Faturamento no mês atual</span>
                   <div className="flex items-baseline gap-2 mt-1">
                     <span className="text-2xl font-bold text-gray-800">
-                      R$ {tenantVisits.reduce((acc, curr) => acc + curr.value, 0).toLocaleString('pt-BR')}
+                      R$ {thisMonthValue.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
-                    <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded flex items-center gap-0.5">
-                      +12.4% <ArrowUpRight className="w-3 h-3" />
-                    </span>
+                    {monthlyDelta !== null && (
+                      <span className={`text-xs font-semibold px-1.5 py-0.5 rounded flex items-center gap-0.5 ${
+                        monthlyDelta >= 0 ? 'text-emerald-600 bg-emerald-50' : 'text-rose-600 bg-rose-50'
+                      }`}>
+                        {monthlyDelta >= 0 ? '+' : ''}{monthlyDelta.toFixed(1)}%
+                      </span>
+                    )}
                   </div>
-                  <span className="text-[10px] text-gray-400 block mt-1">Comparado ao mesmo período do mês anterior</span>
+                  <span className="text-[10px] text-gray-400 block mt-1">
+                    {monthlyDelta !== null
+                      ? 'Comparado às visitas concluídas no mês anterior'
+                      : 'Sem visitas concluídas no mês anterior para comparação'}
+                  </span>
                 </div>
               </div>
 
@@ -331,7 +333,7 @@ export default function DashboardView({ setView, searchQuery }: DashboardViewPro
                 onClick={() => setView('finance')}
                 className="w-full py-2.5 bg-gray-50 text-gray-600 hover:bg-gray-100 font-semibold text-xs rounded-lg transition-colors border border-gray-200 flex items-center justify-center gap-1 mt-4"
               >
-                <span>Acessar Conciliação Financeira</span>
+                <span>Acessar Painel Financeiro</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </button>
             </div>
@@ -341,17 +343,20 @@ export default function DashboardView({ setView, searchQuery }: DashboardViewPro
 
         {/* Right Side: Smart Alerts AI & Quick Visit Feed */}
         <div className="space-y-8">
-          {/* AI Insight (Clean minimalist light gradient style) */}
+          {/* Operational Insight (computed from real data) */}
           <div className="bg-gradient-to-br from-indigo-50 to-green-50 border border-indigo-100 p-6 rounded-2xl">
             <div className="flex items-center gap-2 mb-3">
               <Sparkles className="w-5 h-5 text-indigo-600" />
-              <h3 className="text-indigo-800 font-bold text-sm uppercase tracking-wider">Resumo Inteligente</h3>
+              <h3 className="text-indigo-800 font-bold text-sm uppercase tracking-wider">Resumo Operacional</h3>
             </div>
             <p className="text-sm text-indigo-700 leading-relaxed">
-              &quot;Francisco Souza apresentou melhora na saturação. Sugerimos antecipar a fisioterapia respiratória de amanhã para o período da manhã.&quot;
+              {insight}
             </p>
-            <button className="mt-4 w-full bg-white text-indigo-600 text-xs font-bold py-2 rounded-lg border border-indigo-200 hover:bg-indigo-600 hover:text-white transition-all shadow-sm">
-              Aplicar sugestão
+            <button
+              onClick={() => setView('alerts')}
+              className="mt-4 w-full bg-white text-indigo-600 text-xs font-bold py-2 rounded-lg border border-indigo-200 hover:bg-indigo-600 hover:text-white transition-all shadow-sm"
+            >
+              Ver alertas e detalhes
             </button>
           </div>
 
@@ -404,7 +409,7 @@ export default function DashboardView({ setView, searchQuery }: DashboardViewPro
                 todayVisits.map((visit) => {
                   const pat = patients.find(p => p.id === visit.patientId);
                   const prof = professionals.find(p => p.id === visit.professionalId);
-                  
+
                   return (
                     <div key={visit.id} className="p-3 border border-gray-100 rounded-xl hover:bg-gray-50 transition-colors flex justify-between items-center bg-white">
                       <div className="flex-1 min-w-0 pr-3">

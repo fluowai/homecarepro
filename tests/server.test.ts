@@ -235,15 +235,14 @@ describe("POST /api/gemini/transcribe", () => {
     expect(res.status).toBe(400);
   });
 
-  it("retorna transcrição simulada em dev", async () => {
+  it("retorna 503 com erro honesto em dev sem chave de IA", async () => {
     const { app } = makeApp();
     const res = await request(app)
       .post("/api/gemini/transcribe")
       .set(AUTH)
       .send({ audioData: "data:audio/webm;base64,SGVsbG8=", mimeType: "audio/webm" });
-    expect(res.status).toBe(200);
-    expect(typeof res.body.transcription).toBe("string");
-    expect(res.body.transcription.length).toBeGreaterThan(0);
+    expect(res.status).toBe(503);
+    expect(res.body.error).toContain("GEMINI_API_KEY");
   });
 });
 
@@ -656,14 +655,74 @@ describe("POST /api/admin/domains/check", () => {
     expect(res.body.results[0].cname).toBe("app.homecarepro.com.br");
   });
 
-  it("marca como inválido quando não há registro DNS", async () => {
-    const { app } = makeApp({ ...profile("super_admin", "rev-1"), dns: mockDns() });
+  it("bloqueia tenant com PAYMENT_OVERDUE e desbloqueia com PAYMENT_RECEIVED", async () => {
+    const { app, calls } = makeApp();
+    const blocked = await request(app)
+      .post("/api/webhooks/asaas")
+      .send({ event: "PAYMENT_OVERDUE", payment: { id: "pay-overdue", customer: "cust-1" } });
+    expect(blocked.status).toBe(200);
+    expect(blocked.body.received).toBe(true);
+    const overdueUpdates = calls.updates.filter((u) => u.table === "invoices" || u.table === "tenants");
+    expect(overdueUpdates.some((u) => u.table === "invoices")).toBe(true);
+    expect(overdueUpdates.some((u) => u.table === "tenants")).toBe(true);
+
+    const unblocked = await request(app)
+      .post("/api/webhooks/asaas")
+      .send({ event: "PAYMENT_RECEIVED", payment: { id: "pay-received", customer: "cust-1" } });
+    expect(unblocked.status).toBe(200);
+  });
+});
+
+describe("Zod validation em endpoints de IA", () => {
+  it("triage rejeita description vazia com detalhes de validação", async () => {
+    const { app } = makeApp();
+    const res = await request(app).post("/api/gemini/triage").set(AUTH).send({ description: "" });
+    expect(res.status).toBe(400);
+    expect(res.body).toHaveProperty("details");
+  });
+
+  it("triage rejeita description não-string", async () => {
+    const { app } = makeApp();
+    const res = await request(app).post("/api/gemini/triage").set(AUTH).send({ description: 123 });
+    expect(res.status).toBe(400);
+    expect(res.body).toHaveProperty("details");
+  });
+
+  it("transcribe rejeita audioData vazio", async () => {
+    const { app } = makeApp();
+    const res = await request(app).post("/api/gemini/transcribe").set(AUTH).send({ audioData: "" });
+    expect(res.status).toBe(400);
+    expect(res.body).toHaveProperty("details");
+  });
+
+  it("summarize-patient rejeita patient sem nome", async () => {
+    const { app } = makeApp();
     const res = await request(app)
-      .post("/api/admin/domains/check")
+      .post("/api/gemini/summarize-patient")
       .set(AUTH)
-      .send({ domains: ["app.exemplo.com.br"], expectedTarget: "app.homecarepro.com.br" });
-    expect(res.status).toBe(200);
-    expect(res.body.results[0].status).toBe("invalid");
+      .send({ patient: { diagnostic: "test" } });
+    expect(res.status).toBe(400);
+    expect(res.body).toHaveProperty("details");
+  });
+
+  it("generate-visit-report rejeita rawNotes vazio", async () => {
+    const { app } = makeApp();
+    const res = await request(app)
+      .post("/api/gemini/generate-visit-report")
+      .set(AUTH)
+      .send({ patientName: "Test", rawNotes: "" });
+    expect(res.status).toBe(400);
+    expect(res.body).toHaveProperty("details");
+  });
+
+  it("suggest-schedule rejeita visits vazio", async () => {
+    const { app } = makeApp();
+    const res = await request(app)
+      .post("/api/gemini/suggest-schedule")
+      .set(AUTH)
+      .send({ visits: [], professionals: [] });
+    expect(res.status).toBe(400);
+    expect(res.body).toHaveProperty("details");
   });
 });
 

@@ -18,15 +18,30 @@ export default function CoopFinanceView() {
   const tenantProfessionals = professionals.filter(p => p.tenantId === activeTenantId);
   const activeProf = selectedProfId ? tenantProfessionals.find(p => p.id === selectedProfId) : null;
 
-  // Filtra as visitas do cooperado selecionado que estão concluídas
+  // Filtra as visitas do cooperado selecionado que estão concluídas no mês atual
+  const now = new Date();
   const profVisits = visits.filter(v => 
     v.tenantId === activeTenantId && 
     v.professionalId === selectedProfId && 
-    v.status === 'concluida'
+    v.status === 'concluida' &&
+    new Date(v.date).getMonth() === now.getMonth() &&
+    new Date(v.date).getFullYear() === now.getFullYear()
   );
 
-  // Cálculos de Gamificação
-  const score = activeProf?.score || Math.floor(Math.random() * 40) + 60; // Mock score 60-100
+  // Score de Assiduidade real (0-100), derivado da produção do cooperado:
+  // 70% conclusão das visitas agendadas + 30% registros de check-in
+  const profAllVisits = visits.filter(v =>
+    v.tenantId === activeTenantId &&
+    v.professionalId === selectedProfId &&
+    (v.status === 'agendada' || v.status === 'em_andamento' || v.status === 'concluida')
+  );
+  const totalScheduled = profAllVisits.length;
+  const completedCount = profAllVisits.filter(v => v.status === 'concluida').length;
+  const withCheckIn = profAllVisits.filter(v => v.checkInTime).length;
+  const computedScore = totalScheduled === 0
+    ? 0
+    : Math.min(100, Math.round((completedCount / totalScheduled) * 70 + (withCheckIn / totalScheduled) * 30));
+  const score = activeProf?.score ?? computedScore;
   const tier = score >= 90 ? 'Diamante' : score >= 75 ? 'Ouro' : score >= 50 ? 'Prata' : 'Bronze';
 
   const tierColors = {
@@ -36,7 +51,7 @@ export default function CoopFinanceView() {
     'Bronze': 'bg-orange-100 text-orange-800 border-orange-200'
   };
 
-  // Cálculos Estatutários (Valores simulados para o exemplo baseados nas visitas)
+  // Deduções estatutárias calculadas a partir da produção real do cooperado
   const totalBruto = profVisits.reduce((acc, v) => acc + (v.baseValue || v.value), 0);
   const taxaAdm = totalBruto * 0.15; // 15% taxa administrativa
   const fates = totalBruto * 0.05; // 5% Fundo de Assistência Técnica, Educacional e Social
@@ -44,6 +59,32 @@ export default function CoopFinanceView() {
   const inss = totalBruto * 0.11; // 11% retenção INSS
   
   const totalLiquido = totalBruto - taxaAdm - fates - quotaCapital - inss;
+
+  const handleDownloadExtract = () => {
+    if (!activeProf) return;
+    const content = [
+      'EXTRATO DE REPASSE - COOPERATIVA',
+      `Cooperado: ${activeProf.name} (${activeProf.registration || 'reg. não informado'})`,
+      `Especialidade: ${activeProf.specialty}`,
+      `Período: ${now.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}`,
+      '',
+      `Produção Bruta: R$ ${totalBruto.toFixed(2)} (${profVisits.length} plantões)`,
+      `Taxa ADM (15%): - R$ ${taxaAdm.toFixed(2)}`,
+      `FATES (5%): - R$ ${fates.toFixed(2)}`,
+      `Quota-Capital: - R$ ${quotaCapital.toFixed(2)}`,
+      `INSS (11%): - R$ ${inss.toFixed(2)}`,
+      `Repasse Líquido: R$ ${totalLiquido.toFixed(2)}`,
+      '',
+      'Este é um extrato estimado gerado pelo sistema. O pagamento é processado pela tesouraria.',
+    ].join('\n');
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `extrato_${activeProf.name.replace(/\s+/g, '_')}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <div className="space-y-6">
@@ -65,9 +106,9 @@ export default function CoopFinanceView() {
             ))}
           </select>
           {activeProf && (
-            <button className="flex items-center gap-2 px-4 py-2 bg-slate-800 text-white font-semibold text-sm rounded-lg shadow-sm hover:bg-slate-700 transition-colors">
+            <button onClick={handleDownloadExtract} className="flex items-center gap-2 px-4 py-2 bg-slate-800 text-white font-semibold text-sm rounded-lg shadow-sm hover:bg-slate-700 transition-colors">
               <Download className="w-4 h-4" />
-              <span>Baixar Extrato PDF</span>
+              <span>Baixar Extrato</span>
             </button>
           )}
         </div>
@@ -175,7 +216,7 @@ export default function CoopFinanceView() {
                         </div>
                         <div className="text-right">
                           <p className="font-bold text-slate-800">R$ {(visit.baseValue || visit.value).toFixed(2)}</p>
-                          <p className="text-[10px] text-emerald-600 font-semibold bg-emerald-50 px-2 py-0.5 rounded mt-1 inline-block">Creditado</p>
+                          <p className="text-[10px] text-slate-500 bg-slate-100 px-2 py-0.5 rounded mt-1 inline-block">Aguardando repasse</p>
                         </div>
                       </div>
                     ))}

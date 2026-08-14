@@ -122,7 +122,7 @@ export default function AudioDictationModal({
 
     } catch (err: any) {
       console.error("Microphone access error:", err);
-      setErrorMsg("Acesso ao microfone negado ou não disponível. Você pode usar a gravação simulada para testar.");
+      setErrorMsg("Acesso ao microfone negado ou indisponível. Permita o uso do microfone no navegador e tente novamente.");
     }
   };
 
@@ -135,38 +135,6 @@ export default function AudioDictationModal({
         timerIntervalRef.current = null;
       }
     }
-  };
-
-  // Simulated recording for quick testing / environments without mic permissions
-  const handleSimulatedRecording = async () => {
-    setErrorMsg(null);
-    setIsRecording(true);
-    setRecordingTime(0);
-
-    timerIntervalRef.current = window.setInterval(() => {
-      setRecordingTime(prev => {
-        if (prev >= 4) {
-          if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
-          setIsRecording(false);
-          setIsProcessing(true);
-
-          setTimeout(async () => {
-            const simulatedSamples = [
-              "Paciente relatou melhora significativa no quadro respiratório. Saturação mantida em 96% em ar ambiente. Dieta enteral aceita sem refluxo.",
-              "Realizado curativo em lesão sacra com soro fisiológico e cobertura de hidrogel. Aspecto da ferida granulando, sem sinais de infecção.",
-              "Atendimento de avaliação técnica concluído. Família interessada no plano de cuidados de 12 horas para acompanhamento geriátrico.",
-              "Fisioterapia motora efetuada com sucesso. Exercícios de fortalecimento de membros inferiores e treino de marcha com andador."
-            ];
-            const randomSample = simulatedSamples[Math.floor(Math.random() * simulatedSamples.length)];
-            setTranscribedText(randomSample);
-            setIsProcessing(false);
-          }, 1200);
-
-          return 5;
-        }
-        return prev + 1;
-      });
-    }, 1000);
   };
 
   const handleReset = () => {
@@ -241,12 +209,6 @@ export default function AudioDictationModal({
               <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
               <div>
                 <p className="font-semibold">{errorMsg}</p>
-                <button
-                  onClick={handleSimulatedRecording}
-                  className="mt-1 text-green-600 underline font-bold"
-                >
-                  Clique aqui para testar com Ditado Simulado
-                </button>
               </div>
             </div>
           )}
@@ -307,15 +269,6 @@ export default function AudioDictationModal({
                 <div>
                   <h4 className="font-bold text-xs text-slate-700">Clique para iniciar ditado de voz</h4>
                   <p className="text-[11px] text-slate-400 mt-0.5">Fale claramente sobre a evolução, sinais vitais ou ocorrências do paciente.</p>
-                </div>
-
-                <div className="pt-2 border-t border-slate-200/60 flex items-center justify-center gap-3 text-xs">
-                  <button
-                    onClick={handleSimulatedRecording}
-                    className="text-slate-500 hover:text-green-600 font-medium underline text-[11px]"
-                  >
-                    Ou simular ditado rápido (Demonstração)
-                  </button>
                 </div>
               </div>
             )}

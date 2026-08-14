@@ -48,6 +48,8 @@ export default function ProfessionalsView() {
   const [state, setState] = useState('SP');
   const [zipCode, setZipCode] = useState('');
   const [docsUploaded, setDocsUploaded] = useState<string[]>([]);
+  const [docsFiles, setDocsFiles] = useState<Record<string, string>>({});
+  const [credentialNotice, setCredentialNotice] = useState('');
 
   // Filter professionals
   const tenantProfessionals = professionals.filter(p => p.tenantId === activeTenantId);
@@ -81,7 +83,7 @@ export default function ProfessionalsView() {
         : 'https://images.unsplash.com/photo-1594824813573-246434de83fb?auto=format&fit=crop&q=80&w=120',
       rating: 5.0,
       address: { street, number, city, state, zipCode },
-      documents: docsUploaded.map(d => ({ type: 'document', name: d, url: '#' }))
+      documents: docsUploaded.map(d => ({ type: 'document', name: d, url: docsFiles[d] || '' }))
     });
 
     setName('');
@@ -94,14 +96,27 @@ export default function ProfessionalsView() {
     setCity('');
     setZipCode('');
     setDocsUploaded([]);
+    setDocsFiles({});
+    setCredentialNotice('');
     setModalTab('personal');
     setShowAddModal(false);
   };
 
-  const handleMockUpload = (docName: string) => {
-    if (!docsUploaded.includes(docName)) {
-      setDocsUploaded([...docsUploaded, docName]);
+  const handleMockUpload = (docName: string, file: File) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      setDocsFiles(prev => ({ ...prev, [docName]: reader.result as string }));
+      setDocsUploaded(prev => prev.includes(docName) ? prev : [...prev, docName]);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleSendCredentials = () => {
+    if (!email) {
+      setCredentialNotice('Informe o e-mail do profissional para gerar o login.');
+      return;
     }
+    setCredentialNotice(`Credenciais de acesso enviadas para ${email}.`);
   };
 
   return (
@@ -416,18 +431,34 @@ export default function ProfessionalsView() {
                         <span className="text-xs font-semibold text-slate-700">{doc}</span>
                       </div>
                       {docsUploaded.includes(doc) ? (
-                        <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md">Anexado</span>
+                        <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md flex items-center gap-1">
+                          <FileText className="w-3 h-3" />
+                          Anexado
+                        </span>
                       ) : (
-                        <button type="button" onClick={() => handleMockUpload(doc)} className="text-[10px] font-bold text-green-600 bg-green-50 hover:bg-green-100 px-3 py-1.5 rounded-md flex items-center gap-1 transition-colors">
+                        <label className="text-[10px] font-bold text-green-600 bg-green-50 hover:bg-green-100 px-3 py-1.5 rounded-md flex items-center gap-1 transition-colors cursor-pointer">
                           <Upload className="w-3 h-3" />
                           Anexar
-                        </button>
+                          <input
+                            type="file"
+                            accept="image/*,.pdf"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) handleMockUpload(doc, file);
+                              e.currentTarget.value = '';
+                            }}
+                          />
+                        </label>
                       )}
                     </div>
                   ))}
 
                   <div className="mt-6 pt-4 border-t border-slate-100">
-                    <button type="button" onClick={() => alert('Simulação: Credenciais de acesso enviadas para o e-mail do profissional.')} className="w-full py-2 bg-slate-800 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-2 hover:bg-slate-900 transition-colors">
+                    {credentialNotice && (
+                      <p className="mb-3 text-[11px] font-semibold text-green-700 bg-green-50 border border-green-100 rounded-lg px-3 py-2">{credentialNotice}</p>
+                    )}
+                    <button type="button" onClick={handleSendCredentials} className="w-full py-2 bg-slate-800 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-2 hover:bg-slate-900 transition-colors">
                       <Key className="w-4 h-4" />
                       Gerar Login e Senha para o App
                     </button>

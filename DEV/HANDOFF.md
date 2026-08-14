@@ -1,14 +1,23 @@
 # Handoff
 
+## 🔴 Imediato — ação external (bloqueia produção)
+1. **Rotacionar `SUPABASE_SERVICE_ROLE_KEY`** no painel Supabase. A chave antiga foi commitada em `docker-compose.prod.yml` e ainda está no histórico git.
+2. **Purgar histórico git** com `git filter-repo` para remover a chave e o anon key do histórico. O CI secret scan só verifica working tree, não history.
+3. **Invalidar `VITE_SUPABASE_ANON_KEY`** (também exposta no histórico).
+
 ## Próximo contexto
-1. **Testar fluxo de convite ponta a ponta** no browser: mega admin cria revenda → copia link → logout → aceite (email+senha) → login automático como Super Admin → criar clínica filha com convite.
-2. **Rotacionar a service role key no painel Supabase** (chave antiga foi commitada; purge do histórico git com filter-repo + force-push) — ação manual externa.
-3. **Pendência de segurança**: `POST /api/invites/accept` e `GET /api/invites/:token` são públicos por design (convite é o token); avaliar revogação/limite de tentativas e monitoramento de abuso.
-4. Decidir modelo de cadastro em produção (invite-only / aprovação manual) e configurar confirmação de e-mail no Supabase.
-5. Implementar upload real de arquivos (Supabase Storage) ou ocultar a feature "Arquivos" — hoje é só metadata.
-6. Substituir WhatsApp simulado por Evolution API ou marcar como "demo".
-7. Adicionar testes de RLS/tenant isolation, endpoints e E2E.
-8. Backups testados; observabilidade (agregação de logs).
+1. Validar no browser os fluxos reais (já corrigidos de mocks).
+2. Testar fluxo de convite ponta a ponta: mega admin cria revenda → link → aceite → login como Super Admin → clínica filha.
+3. CSP nonce migration (server.ts env injection → nonce ou JSON estático).
+4. Migrar localStorage → sessionStorage com expiração (LGPD).
+5. Supabase email confirmation + password reset.
+6. Zod validation em endpoints de IA.
+7. Testes RLS (opt-in), E2E, componentes.
+
+## Correção de mocks e simulações (implementado 2026-08-09)
+- Todos os KPIs/elementos fake removidos ou computados de dados reais; faturas persistidas; IA sem fallback de conteúdo clínico simulado.
+- Migration `20260809120000_fix_invoices_schema.sql` aplicada (13 aplicadas / 0 pendentes).
+- Validações: typecheck OK, `npx vitest run` (64 verdes), `npm run build` OK.
 
 ## Convites de revenda (implementado 2026-08-07)
 - Migration `20260807000000_add_tenant_invitations.sql` aplicada (10 aplicadas / 0 pendentes).

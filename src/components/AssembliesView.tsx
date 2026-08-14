@@ -12,16 +12,19 @@ import {
 } from 'lucide-react';
 
 export default function AssembliesView() {
-  const { assemblies, assemblyVotes, addAssembly, voteAssembly, professionals, activeTenantId } = useHomeCareStore();
+  const { assemblies, assemblyVotes, addAssembly, voteAssembly, professionals, activeTenantId, user } = useHomeCareStore();
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [documentUrl, setDocumentUrl] = useState('');
-  const [selectedProfId, setSelectedProfId] = useState('');
 
   const tenantAssemblies = assemblies.filter(a => a.tenantId === activeTenantId);
-  const tenantProfessionals = professionals.filter(p => p.tenantId === activeTenantId);
+
+  // The logged-in user votes as their own professional record (linked by e-mail).
+  const myProfessionalId = user?.email
+    ? professionals.find(p => p.tenantId === activeTenantId && p.email?.trim().toLowerCase() === user.email!.trim().toLowerCase())?.id
+    : undefined;
 
   const handleCreateAssembly = (e: React.FormEvent) => {
     e.preventDefault();
@@ -60,22 +63,11 @@ export default function AssembliesView() {
         </button>
       </div>
 
-      <div className="bg-indigo-50 border border-indigo-100 p-4 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div className="flex items-center gap-3 text-indigo-800">
-          <Users className="w-5 h-5" />
-          <span className="font-semibold text-sm">Simular Acesso de Cooperado:</span>
+      {!myProfessionalId && (
+        <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl text-slate-600 text-sm">
+          Sua conta não está vinculada a um cooperado cadastrado (mesmo e-mail), então você acompanha os resultados como administrador.
         </div>
-        <select
-          value={selectedProfId}
-          onChange={(e) => setSelectedProfId(e.target.value)}
-          className="bg-white border border-indigo-200 rounded-lg py-2 px-4 text-sm font-semibold text-slate-700 shadow-sm focus:outline-none w-full sm:w-64"
-        >
-          <option value="">(Visão do Administrador)</option>
-          {tenantProfessionals.map(p => (
-            <option key={p.id} value={p.id}>{p.name}</option>
-          ))}
-        </select>
-      </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {tenantAssemblies.map(assembly => {
@@ -84,7 +76,7 @@ export default function AssembliesView() {
           const rejects = votes.filter(v => v.vote === 'reject').length;
           const abstains = votes.filter(v => v.vote === 'abstain').length;
 
-          const profVote = selectedProfId ? votes.find(v => v.professionalId === selectedProfId) : null;
+          const profVote = myProfessionalId ? votes.find(v => v.professionalId === myProfessionalId) : null;
 
           return (
             <div key={assembly.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
@@ -114,7 +106,7 @@ export default function AssembliesView() {
 
               {/* Votação / Resultado */}
               <div className="p-5 bg-slate-50">
-                {!selectedProfId ? (
+                {!myProfessionalId ? (
                   // Admin View: Results
                   <div>
                     <h4 className="text-xs font-bold text-slate-400 uppercase mb-3 tracking-wider">Parcial de Votos</h4>
@@ -143,19 +135,19 @@ export default function AssembliesView() {
                         <h4 className="text-xs font-bold text-slate-600 mb-2 text-center">Registrar o seu Voto</h4>
                         <div className="flex gap-2">
                           <button 
-                            onClick={() => voteAssembly(assembly.id, selectedProfId, 'approve')}
+                            onClick={() => myProfessionalId && voteAssembly(assembly.id, myProfessionalId, 'approve')}
                             className="flex-1 flex justify-center items-center gap-1.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-700 py-2 rounded-lg font-bold text-xs transition-colors"
                           >
                             <ThumbsUp className="w-3.5 h-3.5" /> Aprovar
                           </button>
                           <button 
-                            onClick={() => voteAssembly(assembly.id, selectedProfId, 'reject')}
+                            onClick={() => myProfessionalId && voteAssembly(assembly.id, myProfessionalId, 'reject')}
                             className="flex-1 flex justify-center items-center gap-1.5 bg-rose-100 hover:bg-rose-200 text-rose-700 py-2 rounded-lg font-bold text-xs transition-colors"
                           >
                             <ThumbsDown className="w-3.5 h-3.5" /> Rejeitar
                           </button>
                           <button 
-                            onClick={() => voteAssembly(assembly.id, selectedProfId, 'abstain')}
+                            onClick={() => myProfessionalId && voteAssembly(assembly.id, myProfessionalId, 'abstain')}
                             className="flex-1 flex justify-center items-center gap-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 py-2 rounded-lg font-bold text-xs transition-colors"
                           >
                             <MinusCircle className="w-3.5 h-3.5" /> Abster

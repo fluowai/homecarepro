@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Building, Activity, Search, Plus, Shield, Link2, Star, CheckCircle, UserPlus, CalendarCheck, TrendingUp, LayoutDashboard, Package, Globe, Palette, LifeBuoy, Settings } from 'lucide-react';
 import { useHomeCareStore } from '../store';
-import { AdminLayout } from './AdminLayout';
 import { WhitelabelConfig } from './WhitelabelConfig';
 import { PlanManager } from './PlanManager';
 import { SupportDesk } from './SupportDesk';
@@ -12,6 +11,7 @@ import { Tenant } from '../types';
 
 interface ResellerViewProps {
   onExit: (view: string) => void;
+  activeSection?: string;
 }
 
 const MENU_GROUPS = [
@@ -43,10 +43,9 @@ const MENU_GROUPS = [
   },
 ];
 
-export default function ResellerView({ onExit }: ResellerViewProps) {
+export default function ResellerView({ onExit, activeSection = 'overview' }: ResellerViewProps) {
   const { tenants, activeTenantId, regenerateInvite } = useHomeCareStore();
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeSection, setActiveSection] = useState('overview');
   const [creatingClinic, setCreatingClinic] = useState(false);
   const [reinviteTenant, setReinviteTenant] = useState<Tenant | null>(null);
   const [reinviteEmail, setReinviteEmail] = useState('');
@@ -61,7 +60,7 @@ export default function ResellerView({ onExit }: ResellerViewProps) {
   const stats = [
     { label: 'Clínicas Clientes', value: myClinics.length, icon: Building, color: 'bg-indigo-500', bgColor: 'bg-indigo-50' },
     { label: 'Clínicas Ativas', value: activeClinics.length, icon: CheckCircle, color: 'bg-green-500', bgColor: 'bg-green-50' },
-    { label: 'Convites Pendentes', value: '—', icon: Link2, color: 'bg-amber-500', bgColor: 'bg-amber-50' },
+    { label: 'Clínicas Bloqueadas', value: myClinics.filter(t => t.status === 'blocked').length, icon: Link2, color: 'bg-amber-500', bgColor: 'bg-amber-50' },
     { label: 'Status da Revenda', value: myReseller?.status === 'blocked' ? 'Bloqueada' : 'Ativa', icon: Activity, color: 'bg-blue-500', bgColor: 'bg-blue-50' },
   ];
 
@@ -125,7 +124,7 @@ export default function ResellerView({ onExit }: ResellerViewProps) {
                 <Building className="w-10 h-10 mx-auto mb-3 text-gray-300" />
                 <p className="text-sm">Nenhuma clínica vinculada ainda.</p>
                 <button
-                  onClick={() => { setActiveSection('clinics'); setCreatingClinic(true); }}
+                  onClick={() => setCreatingClinic(true)}
                   className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl transition-colors"
                 >
                   <Plus className="w-4 h-4" />
@@ -305,19 +304,18 @@ export default function ResellerView({ onExit }: ResellerViewProps) {
     }
   };
 
+  const currentMenu = MENU_GROUPS.flatMap((g) => g.items).find((i) => i.id === activeSection);
+  const title = currentMenu?.label || 'Visão Geral';
+  const subtitle = `${myReseller?.name || 'Carregando...'} — gestão exclusiva da sua rede de clínicas e identidade visual.`;
+
   return (
-    <AdminLayout
-      brand="Super Admin"
-      brandSubtitle="Painel da Revenda"
-      accent="purple"
-      title={MENU_GROUPS.flatMap((g) => g.items).find((i) => i.id === activeSection)?.label || 'Visão Geral'}
-      subtitle={`${myReseller?.name || 'Carregando...'} — gestão exclusiva da sua rede de clínicas e identidade visual.`}
-      menuGroups={MENU_GROUPS}
-      active={activeSection}
-      onSelect={setActiveSection}
-      onExit={() => onExit('dashboard')}
-      actions={
-        activeSection === 'clinics' ? (
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h2 className="text-2xl font-bold text-slate-800 tracking-tight">{title}</h2>
+          <p className="text-slate-500 text-sm mt-1">{subtitle}</p>
+        </div>
+        {activeSection === 'clinics' && (
           <button
             onClick={() => setCreatingClinic(true)}
             className="flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm rounded-xl transition-all shadow-sm"
@@ -325,9 +323,9 @@ export default function ResellerView({ onExit }: ResellerViewProps) {
             <Plus className="w-4 h-4" />
             <span>Nova Clínica</span>
           </button>
-        ) : undefined
-      }
-    >
+        )}
+      </div>
+
       {renderSection()}
 
       {creatingClinic && (
@@ -413,7 +411,7 @@ export default function ResellerView({ onExit }: ResellerViewProps) {
           }}
         />
       )}
-    </AdminLayout>
+    </div>
   );
 }
 

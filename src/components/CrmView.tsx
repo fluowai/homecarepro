@@ -22,7 +22,6 @@ import AudioDictationModal from './AudioDictationModal';
 export default function CrmView() {
   const { leads, activeTenantId, addLead, updateLead, deleteLead } = useHomeCareStore();
   const [showAddModal, setShowAddModal] = useState(false);
-  
   // Audio dictation states
   const [showDictationModal, setShowDictationModal] = useState(false);
   const [activeDictationLead, setActiveDictationLead] = useState<CRMLead | null>(null);
@@ -77,12 +76,62 @@ export default function CrmView() {
   const shiftLeadStage = (leadId: string, currentStatus: LeadStatus, direction: 'next' | 'prev') => {
     const statusOrder: LeadStatus[] = ['lead', 'avaliacao', 'proposta', 'fechado'];
     const idx = statusOrder.indexOf(currentStatus);
-    
+
     if (direction === 'next' && idx < statusOrder.length - 1) {
-      updateLead(leadId, { status: statusOrder[idx + 1] });
+      const nextStatus = statusOrder[idx + 1];
+      updateLead(leadId, { status: nextStatus });
+      if (nextStatus === 'fechado') {
+        const lead = tenantLeads.find(l => l.id === leadId);
+        if (lead) closeLeadAsContract(lead);
+      }
     } else if (direction === 'prev' && idx > 0) {
       updateLead(leadId, { status: statusOrder[idx - 1] });
     }
+  };
+
+  const closeLeadAsContract = (lead: CRMLead) => {
+    const store = useHomeCareStore.getState();
+    const existing = store.patients.find(p =>
+      p.tenantId === activeTenantId && p.email?.trim().toLowerCase() === lead.email?.trim().toLowerCase()
+    );
+    let patientId = existing?.id;
+
+    if (!patientId) {
+      store.addPatient({
+        name: lead.name,
+        birthDate: '',
+        cpf: '',
+        phone: lead.phone,
+        email: lead.email,
+        status: 'active',
+        planType: 'Mensal',
+        avatar: '',
+        diagnostic: 'Aguardando avaliação técnica',
+        allergies: [],
+        medications: [],
+        files: [],
+        timeline: [],
+        address: { street: '', number: '', city: '', state: '', zipCode: '' },
+      });
+      const created = useHomeCareStore.getState().patients.find(p =>
+        p.tenantId === activeTenantId && p.email?.trim().toLowerCase() === lead.email?.trim().toLowerCase()
+      );
+      patientId = created?.id;
+    }
+
+    if (!patientId) {
+      alert('Não foi possível criar o paciente vinculado a este lead.');
+      return;
+    }
+
+    store.addContract({
+      patientId,
+      title: `Contrato de Prestação de Serviços - ${lead.name}`,
+      status: 'active',
+      value: lead.estimatedValue,
+      startDate: new Date().toISOString().split('T')[0],
+    });
+    alert(`Contrato criado para ${lead.name}. Gerencie-o no módulo de Contratos.`);
   };
 
   const handleOpenDictationForLead = (lead: CRMLead) => {

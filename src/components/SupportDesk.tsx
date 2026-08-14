@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LifeBuoy, Search, Filter, MessageSquare, Loader2, Clock, CheckCircle } from 'lucide-react';
+import { LifeBuoy, Search, MessageSquare, Loader2, Clock, CheckCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { SupportTicket } from '../types';
 
@@ -79,19 +79,16 @@ export function SupportDesk() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <div className="relative">
-            <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input 
-              type="text" 
-              placeholder="Buscar assunto..." 
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9 pr-4 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 w-64 shadow-sm"
-            />
-          </div>
-          <button className="p-2 border border-gray-200 rounded-lg bg-white hover:bg-gray-50 text-gray-600 shadow-sm">
-            <Filter className="w-4 h-4" />
-          </button>
+        <div className="relative">
+          <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <input 
+            type="text" 
+            placeholder="Buscar assunto..." 
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9 pr-4 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 w-64 shadow-sm"
+          />
+        </div>
         </div>
       </div>
 
@@ -105,7 +102,6 @@ export function SupportDesk() {
                 <th className="p-4">Status</th>
                 <th className="p-4">Prioridade</th>
                 <th className="p-4">Abertura</th>
-                <th className="p-4 text-right pr-6">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -134,17 +130,12 @@ export function SupportDesk() {
                       {new Date(ticket.createdAt).toLocaleDateString('pt-BR')}
                     </span>
                   </td>
-                  <td className="p-4 text-right pr-6">
-                    <button className="text-indigo-600 hover:text-indigo-800 text-sm font-semibold">
-                      Responder
-                    </button>
-                  </td>
                 </tr>
               ))}
               {tickets.length === 0 && (
                 <tr>
                   <td colSpan={6} className="p-8 text-center text-gray-500">
-                    Nenhum chamado aberto. Tudo tranquilo! 🎉
+                    Nenhum chamado aberto. Tudo tranquilo!
                   </td>
                 </tr>
               )}

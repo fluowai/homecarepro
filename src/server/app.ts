@@ -6,6 +6,49 @@ import rateLimit from "express-rate-limit";
 import { GoogleGenAI } from "@google/genai";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { promises as dnsImpl } from "node:dns";
+import { z } from "zod";
+
+// ── Zod validation schemas for AI endpoints ────────────────────────
+
+const transcribeSchema = z.object({
+  audioData: z.string().min(1),
+  mimeType: z.string().optional(),
+});
+
+const summarizePatientSchema = z.object({
+  patient: z.object({
+    name: z.string().min(1),
+    birthDate: z.string().optional(),
+    diagnostic: z.string().optional(),
+    allergies: z.array(z.string()).optional().default([]),
+    medications: z.array(z.string()).optional().default([]),
+    timeline: z.array(z.any()).optional().default([]),
+  }),
+});
+
+const visitReportSchema = z.object({
+  patientName: z.string().min(1).optional(),
+  professionalName: z.string().min(1).optional(),
+  rawNotes: z.string().min(1),
+  vitals: z.object({
+    pa: z.string().optional(),
+    fc: z.string().optional(),
+    temp: z.string().optional(),
+    sat: z.string().optional(),
+  }).optional(),
+});
+
+const suggestScheduleSchema = z.object({
+  visits: z.array(z.any()).min(1),
+  professionals: z.array(z.any()).min(1),
+  patients: z.array(z.any()).optional().default([]),
+});
+
+const triageSchema = z.object({
+  description: z.string().min(1),
+  patientAge: z.number().int().positive().optional(),
+  mainCondition: z.string().min(1).optional(),
+});
 
 // ── App Factory (testable) ───────────────────────────────────────
 // server.ts bootstraps the real environment and calls createApp().
@@ -44,12 +87,20 @@ export function createApp(options: CreateAppOptions) {
   // ── Express App ─────────────────────────────────────────────────
   const app = express();
 
+  // CSP nonce middleware — generates a per-request nonce for inline scripts
+  app.use((req, res, next) => {
+    res.locals.cspNonce = crypto.randomBytes(16).toString("base64");
+    next();
+  });
+
   // Security headers
   app.use(helmet({
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+        scriptSrc: isProduction
+          ? ["'self'", (req: express.Request, res: express.Response) => `'nonce-${res.locals.cspNonce}'`]
+          : ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
         styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
         imgSrc: ["'self'", "data:", "https:"],
         connectSrc: ["'self'", SUPABASE_URL, "ws://localhost:*", "http://localhost:*"].filter(Boolean),
@@ -180,19 +231,17 @@ export function createApp(options: CreateAppOptions) {
   // 1. Transcrição de Áudio
   app.post("/api/gemini/transcribe", requireAuth, aiLimiter, async (req, res) => {
     try {
-      const { audioData, mimeType } = req.body;
-
-      if (!audioData || typeof audioData !== "string") {
-        return res.status(400).json({ error: "audioData em formato base64 é obrigatório" });
+      const result = transcribeSchema.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({ error: "Validation error", details: result.error.errors });
       }
+      const { audioData, mimeType } = result.data;
 
       if (!ai) {
         const blocked = aiUnavailable(res);
         if (blocked) return blocked;
 
-        return res.json({
-          transcription: "Nota de áudio capturada: Paciente relata estabilidade clínica no atendimento domiciliar, sem queixas agudas. Família orientada quanto ao horário de medicação."
-        });
+        return res.status(503).json({ error: "Servidor de IA não configurado. Defina GEMINI_API_KEY para habilitar a transcrição." });
       }
 
       const cleanBase64 = audioData.includes(",") ? audioData.split(",")[1] : audioData;
@@ -225,18 +274,17 @@ export function createApp(options: CreateAppOptions) {
   // 2. Resumo do Paciente com IA
   app.post("/api/gemini/summarize-patient", requireAuth, aiLimiter, async (req, res) => {
     try {
-      const { patient } = req.body;
-      if (!patient) {
-        return res.status(400).json({ error: "Patient object is required" });
+      const result = summarizePatientSchema.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({ error: "Validation error", details: result.error.errors });
       }
+      const { patient } = result.data;
 
       if (!ai) {
         const blocked = aiUnavailable(res);
         if (blocked) return blocked;
 
-        return res.json({
-          summary: `[Simulação de IA] O paciente ${patient.name}, ${getAge(patient.birthDate)} anos, apresenta quadro de ${patient.diagnostic}. Possui alergia a ${patient.allergies.join(", ") || "nenhum componente informado"} e faz uso contínuo de: ${patient.medications.join(", ") || "nenhum medicamento informado"}. Recomenda-se acompanhamento rigoroso e monitoramento de sinais vitais.`
-        });
+        return res.status(503).json({ error: "Servidor de IA não configurado. Defina GEMINI_API_KEY para gerar o resumo." });
       }
 
       const prompt = `Você é um médico especialista em auditoria e coordenação de Home Care (atendimento domiciliar).
@@ -274,19 +322,17 @@ INSTRUÇÕES DO RESUMO:
   // 3. Geração de Relatório de Visita
   app.post("/api/gemini/generate-visit-report", requireAuth, aiLimiter, async (req, res) => {
     try {
-      const { patientName, professionalName, rawNotes, vitals } = req.body;
-
-      if (!rawNotes) {
-        return res.status(400).json({ error: "rawNotes is required" });
+      const result = visitReportSchema.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({ error: "Validation error", details: result.error.errors });
       }
+      const { patientName, professionalName, rawNotes, vitals } = result.data;
 
       if (!ai) {
         const blocked = aiUnavailable(res);
         if (blocked) return blocked;
 
-        return res.json({
-          report: `[Simulação de IA] RELATÓRIO DE EVOLUÇÃO DE HOME CARE\n\nPaciente: ${patientName || "Não especificado"}\nProfissional: ${professionalName || "Não especificado"}\n\nEvolução Clínica:\n- Sinais Vitais informados: PA: ${vitals?.pa || "Normal"}, FC: ${vitals?.fc || "Normal"} bpm, Temp: ${vitals?.temp || "Normal"}°C.\n- Observação anotada: "${rawNotes}".\n\nConduta realizada: Paciente bem adaptado, respondendo favoravelmente aos estímulos. Higiene mantida. Sem intercorrências durante o período de atendimento.`
-        });
+        return res.status(503).json({ error: "Servidor de IA não configurado. Defina GEMINI_API_KEY para gerar o relatório." });
       }
 
       const prompt = `Você é um enfermeiro supervisor de Home Care. Traduza as anotações brutas e rápidas do profissional de campo em uma Evolução de Enfermagem Técnica e extremamente profissional (Relatório de Visita), adequada para prontuário e apresentação para a família/plano de saúde.
@@ -322,19 +368,17 @@ INSTRUÇÕES DO RELATÓRIO:
   // 4. Sugestão de Agenda Otimizada
   app.post("/api/gemini/suggest-schedule", requireAuth, aiLimiter, async (req, res) => {
     try {
-      const { visits, professionals, patients } = req.body;
-
-      if (!visits || !professionals) {
-        return res.status(400).json({ error: "visits and professionals data are required" });
+      const result = suggestScheduleSchema.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({ error: "Validation error", details: result.error.errors });
       }
+      const { visits, professionals, patients } = result.data;
 
       if (!ai) {
         const blocked = aiUnavailable(res);
         if (blocked) return blocked;
 
-        return res.json({
-          suggestion: `[Simulação de IA] SUGESTÃO DE OTIMIZAÇÃO DE ESCALAS\n\n1. Rota Centro-Sul: Agrupar as visitas dos pacientes no bairro Vila Mariana com o Enfermeiro Carlos para reduzir tempo de deslocamento em 25%.\n2. Alocação de Especialidades: Direcionar a Dra. Patrícia (Fisioterapeuta) para o paciente Marcos no primeiro horário, otimizando o período de reabilitação muscular matinal.\n3. Rodízio de Escala: Manter o Técnico Thiago de sobreaviso no setor Norte para cobrir eventuais atrasos de trânsito.`
-        });
+        return res.status(503).json({ error: "Servidor de IA não configurado. Defina GEMINI_API_KEY para gerar a sugestão." });
       }
 
       const prompt = `Você é um coordenador de logística e operações médicas de uma empresa de Home Care.
@@ -371,11 +415,11 @@ Crie um plano estratégico de escala otimizada com:
   // 5. Triagem Inteligente
   app.post("/api/gemini/triage", requireAuth, aiLimiter, async (req, res) => {
     try {
-      const { description, patientAge, mainCondition } = req.body;
-
-      if (!description || typeof description !== "string" || !description.trim()) {
-        return res.status(400).json({ error: "description is required" });
+      const result = triageSchema.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({ error: "Validation error", details: result.error.errors });
       }
+      const { description, patientAge, mainCondition } = result.data;
 
       if (!ai) {
         const blocked = aiUnavailable(res);
@@ -740,6 +784,80 @@ Apenas o objeto JSON valido, sem formatacao Markdown adicional nem blocos de cod
     }
   });
 
+  // ── Internal Team (Mega Admin) ──────────────────────────────────
+
+  // Create an internal team member (system tenant) via invite link
+  app.post("/api/admin/users", requireAuth, globalLimiter, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const profile = await getProfile(userId);
+      if (!profile || profile.role !== "mega_admin") {
+        return res.status(403).json({ error: "Acesso negado." });
+      }
+
+      const { fullName, email, role } = req.body;
+      if (!fullName || !email) {
+        return res.status(400).json({ error: "Nome completo e e-mail são obrigatórios." });
+      }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return res.status(400).json({ error: "E-mail inválido." });
+      }
+
+      const targetRole = role === "mega_admin" ? "mega_admin" : "system_support";
+      const token = newInviteToken();
+      const { error } = await supabaseAdmin.from("tenant_invitations").insert({
+        tenant_id: "system",
+        email: String(email).toLowerCase(),
+        role: targetRole,
+        token,
+        status: "pending",
+        expires_at: new Date(Date.now() + INVITE_TTL_MS).toISOString(),
+        created_by: userId,
+      });
+      if (error) throw error;
+
+      logEvent("INFO", "System team invite created", { email, role: targetRole, createdBy: userId });
+      res.status(201).json({ inviteLink: `${appUrl}/?invite=${token}`, email, role: targetRole });
+    } catch (error: any) {
+      logEvent("ERROR", "System user invite failed", { error: error.message });
+      res.status(500).json({ error: "Falha ao criar convite." });
+    }
+  });
+
+  // Remove an internal team member (Mega Admin only)
+  app.delete("/api/admin/users/:id", requireAuth, globalLimiter, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const profile = await getProfile(userId);
+      if (!profile || profile.role !== "mega_admin") {
+        return res.status(403).json({ error: "Acesso negado." });
+      }
+
+      const targetId = (req.params as any).id;
+      if (targetId === userId) {
+        return res.status(400).json({ error: "Você não pode remover a si mesmo." });
+      }
+
+      const { data: target } = await supabaseAdmin
+        .from("user_profiles")
+        .select("tenant_id")
+        .eq("id", targetId)
+        .single();
+      if (!target || target.tenant_id !== "system") {
+        return res.status(404).json({ error: "Membro do time interno não encontrado." });
+      }
+
+      await supabaseAdmin.from("user_profiles").delete().eq("id", targetId);
+      await supabaseAdmin.auth.admin.deleteUser(targetId);
+
+      logEvent("INFO", "System team member removed", { targetId, byUserId: userId });
+      res.json({ success: true });
+    } catch (error: any) {
+      logEvent("ERROR", "System user removal failed", { error: error.message });
+      res.status(500).json({ error: "Falha ao remover o membro." });
+    }
+  });
+
   // ── Domain Validation (Mega Admin & Super Admin) ────────────────
   async function checkDomain(domain: string, expectedTarget: string) {
     const host = String(domain || "").toLowerCase().trim().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
@@ -964,21 +1082,29 @@ Apenas o objeto JSON valido, sem formatacao Markdown adicional nem blocos de cod
       processedWebhookIds.add(dedupKey);
 
       if (event === "PAYMENT_RECEIVED" || event === "PAYMENT_CONFIRMED") {
-        // Update invoice status
         await supabaseAdmin
           .from("invoices")
           .update({ status: "RECEIVED", payment_date: new Date().toISOString() })
           .eq("asaas_payment_id", payment.id);
 
-        // Optionally logic to unblock a tenant if they were overdue
+        if (payment.customer) {
+          await supabaseAdmin
+            .from("tenants")
+            .update({ status: "active" })
+            .eq("asaas_customer_id", payment.customer);
+        }
       } else if (event === "PAYMENT_OVERDUE") {
         await supabaseAdmin
           .from("invoices")
           .update({ status: "OVERDUE" })
           .eq("asaas_payment_id", payment.id);
 
-        // Block tenant logic (could be async or delayed)
-        // await supabaseAdmin.from("tenants").update({ status: "blocked" }).eq("asaas_customer_id", payment.customer);
+        if (payment.customer) {
+          await supabaseAdmin
+            .from("tenants")
+            .update({ status: "blocked" })
+            .eq("asaas_customer_id", payment.customer);
+        }
       }
 
       res.json({ received: true });

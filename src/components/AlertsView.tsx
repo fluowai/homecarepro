@@ -20,9 +20,8 @@ export default function AlertsView() {
   const { 
     alertConfig, 
     updateAlertConfig, 
-    getCalculatedAlerts,
-    patients,
-    medicines
+    resolveAlert,
+    getCalculatedAlerts
   } = useHomeCareStore();
 
   const [activeTab, setActiveTab] = useState<'alerts' | 'settings'>('alerts');
@@ -35,17 +34,11 @@ export default function AlertsView() {
   const [lowStockVal, setLowStockVal] = useState(alertConfig?.lowStockThreshold || 5);
   const [enableNotify, setEnableNotify] = useState(alertConfig?.enableSystemNotifications !== false);
 
-  // We can track dismissed alerts locally in a set so they disappear when clicked "Resolver"
-  const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(new Set());
-
-  // Get alerts computed dynamically from the store!
+  // Get alerts computed dynamically from the store (resolved alerts are persisted)
   const rawAlerts = getCalculatedAlerts();
   
-  // Filter out dismissed alerts
-  const activeAlerts = rawAlerts.filter(a => !dismissedAlerts.has(a.id));
-
   // Filter based on select tab type
-  const filteredAlerts = activeAlerts.filter(a => {
+  const filteredAlerts = rawAlerts.filter(a => {
     if (filterType === 'all') return true;
     return a.type === filterType;
   });
@@ -63,9 +56,7 @@ export default function AlertsView() {
   };
 
   const handleResolveAlert = (id: string) => {
-    const updated = new Set(dismissedAlerts);
-    updated.add(id);
-    setDismissedAlerts(updated);
+    resolveAlert(id);
   };
 
   return (
@@ -88,7 +79,7 @@ export default function AlertsView() {
             }`}
           >
             <Bell className="w-3.5 h-3.5 text-green-600" />
-            <span>Alertas Ativos ({activeAlerts.length})</span>
+            <span>Alertas Ativos ({rawAlerts.length})</span>
           </button>
           <button
             onClick={() => setActiveTab('settings')}
@@ -113,7 +104,7 @@ export default function AlertsView() {
               <div>
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Críticos / Alerta Geral</span>
                 <p className="text-xl font-bold text-slate-800 mt-0.5">
-                  {activeAlerts.filter(a => a.severity === 'critical').length}
+                  {rawAlerts.filter(a => a.severity === 'critical').length}
                 </p>
               </div>
             </div>
@@ -125,7 +116,7 @@ export default function AlertsView() {
               <div>
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Atenção Necessária</span>
                 <p className="text-xl font-bold text-slate-800 mt-0.5">
-                  {activeAlerts.filter(a => a.severity === 'warning').length}
+                  {rawAlerts.filter(a => a.severity === 'warning').length}
                 </p>
               </div>
             </div>
@@ -137,7 +128,7 @@ export default function AlertsView() {
               <div>
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Pacientes Sem Visita</span>
                 <p className="text-xl font-bold text-slate-800 mt-0.5">
-                  {activeAlerts.filter(a => a.type === 'no_visit').length}
+                  {rawAlerts.filter(a => a.type === 'no_visit').length}
                 </p>
               </div>
             </div>
@@ -149,7 +140,7 @@ export default function AlertsView() {
               <div>
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Farmácia Crítica</span>
                 <p className="text-xl font-bold text-slate-800 mt-0.5">
-                  {activeAlerts.filter(a => a.type === 'low_stock' || a.type === 'expiry').length}
+                  {rawAlerts.filter(a => a.type === 'low_stock' || a.type === 'expiry').length}
                 </p>
               </div>
             </div>
@@ -164,7 +155,7 @@ export default function AlertsView() {
                 filterType === 'all' ? 'bg-slate-100 text-slate-800' : 'text-slate-500 hover:bg-slate-50'
               }`}
             >
-              Todos ({activeAlerts.length})
+              Todos ({rawAlerts.length})
             </button>
             <button
               onClick={() => setFilterType('no_visit')}
@@ -172,7 +163,7 @@ export default function AlertsView() {
                 filterType === 'no_visit' ? 'bg-rose-50 text-rose-700' : 'text-slate-500 hover:bg-slate-50'
               }`}
             >
-              Sem Visita Recente ({activeAlerts.filter(a => a.type === 'no_visit').length})
+              Sem Visita Recente ({rawAlerts.filter(a => a.type === 'no_visit').length})
             </button>
             <button
               onClick={() => setFilterType('low_stock')}
@@ -180,7 +171,7 @@ export default function AlertsView() {
                 filterType === 'low_stock' ? 'bg-amber-50 text-amber-700' : 'text-slate-500 hover:bg-slate-50'
               }`}
             >
-              Estoque Baixo ({activeAlerts.filter(a => a.type === 'low_stock').length})
+              Estoque Baixo ({rawAlerts.filter(a => a.type === 'low_stock').length})
             </button>
             <button
               onClick={() => setFilterType('expiry')}
@@ -188,7 +179,7 @@ export default function AlertsView() {
                 filterType === 'expiry' ? 'bg-purple-50 text-purple-700' : 'text-slate-500 hover:bg-slate-50'
               }`}
             >
-              Vencimento de Medicamento ({activeAlerts.filter(a => a.type === 'expiry').length})
+              Vencimento de Medicamento ({rawAlerts.filter(a => a.type === 'expiry').length})
             </button>
           </div>
 

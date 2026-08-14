@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Building2, Users, CreditCard, Activity, Search, Filter, Plus, Shield, Server, Package, LifeBuoy, Link2, LayoutDashboard, Globe, UserCog, Wrench, Settings } from 'lucide-react';
 import { useHomeCareStore } from '../store';
-import { AdminLayout } from './AdminLayout';
 import { PlanManager } from './PlanManager';
 import { SupportDesk } from './SupportDesk';
 import { GlobalUserManager } from './GlobalUserManager';
@@ -13,6 +12,7 @@ import { Tenant } from '../types';
 
 interface SystemAdminViewProps {
   onExit: (view: string) => void;
+  activeSection?: string;
 }
 
 const MENU_GROUPS = [
@@ -40,10 +40,9 @@ const MENU_GROUPS = [
   },
 ];
 
-export default function SystemAdminView({ onExit }: SystemAdminViewProps) {
+export default function SystemAdminView({ onExit, activeSection = 'overview' }: SystemAdminViewProps) {
   const { tenants, regenerateInvite } = useHomeCareStore();
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeSection, setActiveSection] = useState('overview');
   const [editingTenant, setEditingTenant] = useState<Tenant | null>(null);
   const [reinviteTenant, setReinviteTenant] = useState<Tenant | null>(null);
   const [reinviteEmail, setReinviteEmail] = useState('');
@@ -59,10 +58,10 @@ export default function SystemAdminView({ onExit }: SystemAdminViewProps) {
   const clinics = filteredTenants.filter((t) => t.parentId != null);
 
   const stats = [
-    { label: 'Revendas Ativas', value: resellers.length, icon: Building2, color: 'bg-indigo-500', bgColor: 'bg-indigo-50' },
-    { label: 'Clínicas/Clientes', value: clinics.length + resellers.length, icon: Users, color: 'bg-green-500', bgColor: 'bg-green-50' },
-    { label: 'Receita Global Estimada', value: 'R$ 45.2K', icon: CreditCard, color: 'bg-emerald-500', bgColor: 'bg-emerald-50' },
-    { label: 'Status do Sistema', value: '100% Online', icon: Activity, color: 'bg-blue-500', bgColor: 'bg-blue-50' },
+    { label: 'Revendas Ativas', value: resellers.filter(t => t.status !== 'blocked').length, icon: Building2, color: 'bg-indigo-500', bgColor: 'bg-indigo-50' },
+    { label: 'Instâncias Cadastradas', value: clinics.length + resellers.length, icon: Users, color: 'bg-green-500', bgColor: 'bg-green-50' },
+    { label: 'Instâncias Ativas', value: filteredTenants.filter(t => t.status !== 'blocked').length, icon: CreditCard, color: 'bg-emerald-500', bgColor: 'bg-emerald-50' },
+    { label: 'Instâncias Bloqueadas', value: filteredTenants.filter(t => t.status === 'blocked').length, icon: Activity, color: 'bg-blue-500', bgColor: 'bg-blue-50' },
   ];
 
   const renderOverview = () => (
@@ -116,18 +115,11 @@ export default function SystemAdminView({ onExit }: SystemAdminViewProps) {
           </p>
           <div className="flex flex-col gap-2">
             <button
-              onClick={() => setActiveSection('network')}
+              onClick={() => document.getElementById('btn-nova-revenda')?.click()}
               className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm rounded-xl transition-colors"
             >
               <Plus className="w-4 h-4" />
               Nova Revenda
-            </button>
-            <button
-              onClick={() => setActiveSection('domains')}
-              className="flex items-center gap-2 px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold text-sm rounded-xl transition-colors"
-            >
-              <Globe className="w-4 h-4" />
-              Validar Domínios
             </button>
           </div>
         </div>
@@ -269,29 +261,29 @@ export default function SystemAdminView({ onExit }: SystemAdminViewProps) {
     }
   };
 
+  const currentMenu = MENU_GROUPS.flatMap((g) => g.items).find((i) => i.id === activeSection);
+  const title = currentMenu?.label || 'Visão Geral';
+  const subtitle = "Visão global de revendas, clientes whitelabel, planos e suporte.";
+
   return (
-    <AdminLayout
-      brand="Mega Admin"
-      brandSubtitle="Gestão do Sistema"
-      accent="indigo"
-      title={MENU_GROUPS.flatMap((g) => g.items).find((i) => i.id === activeSection)?.label || 'Visão Geral'}
-      subtitle="Visão global de revendas, clientes whitelabel, planos e suporte."
-      menuGroups={MENU_GROUPS}
-      active={activeSection}
-      onSelect={setActiveSection}
-      onExit={() => onExit('dashboard')}
-      actions={
-        activeSection === 'network' ? (
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h2 className="text-2xl font-bold text-slate-800 tracking-tight">{title}</h2>
+          <p className="text-slate-500 text-sm mt-1">{subtitle}</p>
+        </div>
+        {activeSection === 'network' && (
           <button
+            id="btn-nova-revenda"
             onClick={() => setEditingTenant({ id: '', name: '', logo: '', cnpj: '', plan: 'Free', status: 'active' } as Tenant)}
             className="flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm rounded-xl transition-all shadow-sm"
           >
             <Plus className="w-4 h-4" />
             <span>Nova Revenda</span>
           </button>
-        ) : undefined
-      }
-    >
+        )}
+      </div>
+
       {renderSection()}
 
       {editingTenant && (
@@ -377,7 +369,7 @@ export default function SystemAdminView({ onExit }: SystemAdminViewProps) {
           }}
         />
       )}
-    </AdminLayout>
+    </div>
   );
 }
 
