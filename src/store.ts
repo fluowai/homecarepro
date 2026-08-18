@@ -472,6 +472,13 @@ interface HomeCareState {
   currentUserRole: 'mega_admin' | 'super_admin' | 'admin' | 'auditor' | 'professional' | 'patient' | 'system_support';
   setCurrentUserRole: (role: 'mega_admin' | 'super_admin' | 'admin' | 'auditor' | 'professional' | 'patient' | 'system_support') => void;
 
+  // Impersonation (Suporte)
+  isImpersonating: boolean;
+  originalTenantId: string | null;
+  originalRole: string | null;
+  startImpersonation: (tenantId: string) => void;
+  stopImpersonation: () => void;
+
   // Auth actions
   init: () => Promise<void>;
   signOut: () => Promise<void>;
@@ -707,6 +714,43 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
   currentUserRole: 'admin',
   setCurrentUserRole: (role) => {
     set({ currentUserRole: role });
+  },
+
+  // Impersonation
+  isImpersonating: false,
+  originalTenantId: null,
+  originalRole: null,
+  startImpersonation: (tenantId) => {
+    const currentTenantId = get().activeTenantId;
+    const currentRole = get().currentUserRole;
+    
+    // Determine the role for the target tenant
+    const targetTenant = get().tenants.find(t => t.id === tenantId);
+    if (!targetTenant) return;
+    
+    const targetRole = targetTenant.parentId ? 'admin' : 'super_admin';
+
+    set({
+      isImpersonating: true,
+      originalTenantId: get().isImpersonating ? get().originalTenantId : currentTenantId,
+      originalRole: get().isImpersonating ? get().originalRole : currentRole,
+      activeTenantId: tenantId,
+      currentUserRole: targetRole
+    });
+    saveToStorage('activeTenantId', tenantId);
+  },
+  stopImpersonation: () => {
+    const { originalTenantId, originalRole } = get();
+    if (originalTenantId && originalRole) {
+      set({
+        isImpersonating: false,
+        originalTenantId: null,
+        originalRole: null,
+        activeTenantId: originalTenantId,
+        currentUserRole: originalRole as any
+      });
+      saveToStorage('activeTenantId', originalTenantId);
+    }
   },
 
   // ── Auth ────────────────────────────────────────────────────

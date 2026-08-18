@@ -8,9 +8,11 @@ interface TopbarProps {
 }
 
 export default function Topbar({ onSearch, onMenuClick }: TopbarProps) {
-  const { patients, visits, messages, activeTenantId, profile, signOut, getCalculatedAlerts } = useHomeCareStore();
+  const { patients, visits, messages, activeTenantId, tenants, profile, signOut, getCalculatedAlerts, isImpersonating, stopImpersonation } = useHomeCareStore();
   const [showNotifications, setShowNotifications] = useState(false);
   const [isSearchExpanded, setIsSearchExpanded] = useState(false);
+  
+  const activeTenant = tenants.find(t => t.id === activeTenantId);
   
   // Real clinical notifications from the store's analytical engine
   const clinicalAlerts = getCalculatedAlerts();
@@ -44,8 +46,26 @@ export default function Topbar({ onSearch, onMenuClick }: TopbarProps) {
   const pendingCount = notifications.length;
 
   return (
-    <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4 lg:px-8 z-10 shadow-sm sticky top-0 w-full">
-      {/* Mobile Menu Toggle */}
+    <>
+      {isImpersonating && (
+        <div className="bg-indigo-600 px-4 py-2 flex items-center justify-between text-white text-sm font-medium shadow-sm w-full z-20 relative">
+          <div className="flex items-center gap-2">
+            <ShieldAlert className="w-4 h-4" />
+            <span>Você está acessando como suporte na instância <strong>{activeTenant?.name || 'Desconhecida'}</strong>.</span>
+          </div>
+          <button 
+            onClick={() => {
+              stopImpersonation();
+              window.location.href = '/';
+            }}
+            className="px-3 py-1 bg-white/10 hover:bg-white/20 rounded text-xs transition-colors"
+          >
+            Sair do modo suporte
+          </button>
+        </div>
+      )}
+      <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4 lg:px-8 z-10 shadow-sm sticky top-0 w-full">
+        {/* Mobile Menu Toggle */}
       <button 
         onClick={onMenuClick}
         className="lg:hidden p-2 -ml-2 text-gray-500 hover:text-green-600 transition-colors"
@@ -142,6 +162,7 @@ export default function Topbar({ onSearch, onMenuClick }: TopbarProps) {
           </button>
         </div>
       </div>
-    </header>
+      </header>
+    </>
   );
 }
