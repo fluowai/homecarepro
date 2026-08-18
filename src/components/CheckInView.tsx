@@ -18,9 +18,11 @@ import {
   User,
   Camera,
   Pill,
-  Trash2
+  Trash2,
+  Loader2
 } from 'lucide-react';
 import { useHomeCareStore } from '../store';
+import { uploadFileToMinio } from '../lib/upload';
 
 export default function CheckInView() {
   const { 
@@ -69,6 +71,9 @@ export default function CheckInView() {
   // Photo states
   const [inPhotoPreview, setInPhotoPreview] = useState<string | null>(null);
   const [outPhotoPreview, setOutPhotoPreview] = useState<string | null>(null);
+  const [inPhotoFile, setInPhotoFile] = useState<File | null>(null);
+  const [outPhotoFile, setOutPhotoFile] = useState<File | null>(null);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
 
   // Filters for today's visits
   const todayStr = new Date().toISOString().split('T')[0];
@@ -94,6 +99,8 @@ export default function CheckInView() {
       setSelectedVisitId('');
       setInPhotoPreview(null);
       setOutPhotoPreview(null);
+      setInPhotoFile(null);
+      setOutPhotoFile(null);
     }, 300);
   };
 
@@ -113,7 +120,7 @@ export default function CheckInView() {
 
   const handleCheckIn = async () => {
     if (!selectedVisitId) return;
-    if (!inPhotoPreview) {
+    if (!inPhotoPreview || !inPhotoFile) {
       alert("A foto do local (check-in) é obrigatória para validar sua presença.");
       return;
     }
@@ -124,7 +131,19 @@ export default function CheckInView() {
     }
     const locationStr = `${coords.lat.toFixed(4)},${coords.lng.toFixed(4)} (Confirmado via GPS)`;
     
-    checkInVisit(selectedVisitId, locationStr, coords, inPhotoPreview);
+    let photoUrl = inPhotoPreview;
+    if (!isOffline) {
+      try {
+        setIsUploadingPhoto(true);
+        photoUrl = await uploadFileToMinio(inPhotoFile);
+      } catch (err: any) {
+        alert(`Erro no upload da foto: ${err.message}. O registro usará a foto localmente.`);
+      } finally {
+        setIsUploadingPhoto(false);
+      }
+    }
+
+    checkInVisit(selectedVisitId, locationStr, coords, photoUrl);
   };
 
   const handleAddMed = () => {
@@ -211,7 +230,7 @@ ${rawNotes}
       return;
     }
     
-    if (!outPhotoPreview) {
+    if (!outPhotoPreview || !outPhotoFile) {
       alert("A foto de check-out é obrigatória para atestar a finalização.");
       return;
     }
@@ -239,7 +258,19 @@ ${rawNotes}
 
     const finalReport = (generatedReport || `Evolução Clínica Simplificada:\nSinais Vitais: PA ${pa} mmHg | FC ${fc} bpm | Temp ${temp}°C | Sat O2 ${sat}%.\nNotas: ${rawNotes}`) + medsReport;
     
-    checkOutVisit(selectedVisitId, locationStr, finalReport, { pa, fc, temp, sat }, rawNotes, usedMeds, coords, outPhotoPreview);
+    let photoUrl = outPhotoPreview;
+    if (!isOffline) {
+      try {
+        setIsUploadingPhoto(true);
+        photoUrl = await uploadFileToMinio(outPhotoFile);
+      } catch (err: any) {
+        alert(`Erro no upload da foto: ${err.message}. O registro usará a foto localmente.`);
+      } finally {
+        setIsUploadingPhoto(false);
+      }
+    }
+    
+    checkOutVisit(selectedVisitId, locationStr, finalReport, { pa, fc, temp, sat }, rawNotes, usedMeds, coords, photoUrl);
     
     // Clear bedside states
     setRawNotes('');
@@ -268,6 +299,9 @@ ${rawNotes}
   const handlePhotoCapture = (e: React.ChangeEvent<HTMLInputElement>, type: 'in' | 'out') => {
     const file = e.target.files?.[0];
     if (file) {
+      if (type === 'in') setInPhotoFile(file);
+      else setOutPhotoFile(file);
+      
       const reader = new FileReader();
       reader.onloadend = () => {
         if (type === 'in') setInPhotoPreview(reader.result as string);
@@ -539,9 +573,11 @@ ${rawNotes}
                       
                       <button 
                         onClick={handleCheckIn} 
-                        className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-bold text-sm rounded-xl shadow-md transition-all active:scale-95 flex items-center gap-2"
+                        disabled={isUploadingPhoto}
+                        className="px-6 py-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-bold text-sm rounded-xl shadow-md transition-all active:scale-95 flex items-center gap-2"
                       >
-                        <MapPin className="w-4 h-4" /> Bater Ponto (GPS)
+                        {isUploadingPhoto ? <Loader2 className="w-4 h-4 animate-spin" /> : <MapPin className="w-4 h-4" />} 
+                        {isUploadingPhoto ? 'Enviando Foto...' : 'Bater Ponto (GPS)'}
                       </button>
                     </div>
                   ) : (
@@ -746,9 +782,11 @@ ${rawNotes}
                       
                       <button 
                         onClick={handleCheckOut} 
-                        className="px-6 py-3 bg-gray-900 hover:bg-black text-white font-bold text-sm rounded-xl shadow-md transition-all active:scale-95 flex items-center gap-2"
+                        disabled={isUploadingPhoto}
+                        className="px-6 py-3 bg-gray-900 hover:bg-black disabled:bg-gray-400 text-white font-bold text-sm rounded-xl shadow-md transition-all active:scale-95 flex items-center gap-2"
                       >
-                        Assinar e Sair <ArrowRight className="w-4 h-4" />
+                        {isUploadingPhoto ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Assinar e Sair'} 
+                        {!isUploadingPhoto && <ArrowRight className="w-4 h-4" />}
                       </button>
                     </div>
                   ) : selectedVisit.status === 'concluida' ? (

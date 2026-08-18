@@ -615,11 +615,7 @@ Apenas o objeto JSON valido, sem formatacao Markdown adicional nem blocos de cod
         .eq("custom_domain", domain)
         .single();
 
-      // If no custom domain, assume we are on the main domain or a generic one,
-      // we could also look up by a subdomain slug if we added a `slug` field.
-      // For now, if no match is found, we can return the system tenant or null.
       if (!tenant) {
-        // As fallback for testing, let's return a default tenant or null
         const { data: defaultTenant } = await supabaseAdmin
           .from("tenants")
           .select("id, name, logo, primary_color, secondary_color, status")
@@ -638,8 +634,30 @@ Apenas o objeto JSON valido, sem formatacao Markdown adicional nem blocos de cod
 
       res.json(tenant);
     } catch (error: any) {
-      logEvent("ERROR", "Tenant resolution failed", { error: error.message });
       res.status(500).json({ error: "Failed to resolve tenant" });
+    }
+  });
+
+  // ── File Uploads (MinIO) ─────────────────────────────────────────
+  app.post("/api/upload/presigned-url", requireAuth, globalLimiter, async (req, res) => {
+    try {
+      const { fileName, mimeType } = req.body;
+      if (!fileName || !mimeType) {
+        return res.status(400).json({ error: "fileName and mimeType are required" });
+      }
+
+      // Dynamic import to avoid breaking test environments that don't have MinIO
+      const { getUploadPresignedUrl } = await import("./minio");
+      
+      const safeName = fileName.replace(/[^a-zA-Z0-9.-]/g, "_");
+      const uniqueFileName = `${Date.now()}-${safeName}`;
+      
+      const { uploadUrl, publicUrl } = await getUploadPresignedUrl(uniqueFileName, mimeType);
+
+      res.json({ uploadUrl, publicUrl });
+    } catch (error: any) {
+      console.error("[Upload] Error generating presigned URL:", error);
+      res.status(500).json({ error: "Falha ao gerar URL de upload." });
     }
   });
 
@@ -1022,6 +1040,89 @@ Apenas o objeto JSON valido, sem formatacao Markdown adicional nem blocos de cod
     } catch (error: any) {
       logEvent("ERROR", "Invite accept failed", { error: error.message });
       res.status(500).json({ error: "Falha ao criar a conta." });
+    }
+  });
+
+  // Public: check if an email has a pending invite (First Access flow)
+  app.post("/api/auth/check-first-access", globalLimiter, async (req, res) => {
+    try {
+      const { email } = req.body;
+      if (!email) {
+        return res.status(400).json({ error: "E-mail obrigatório." });
+      }
+
+      const { data: invite, error } = await supabaseAdmin
+        .from("tenant_invitations")
+        .select("id, status, expires_at")
+        .eq("email", email.toLowerCase().trim())
+        .eq("status", "pending")
+        .maybeSingle();
+
+      if (error && error.code !== "PGRST116") throw error;
+
+      if (!invite || new Date(invite.expires_at).getTime() < Date.now()) {
+        return res.json({ hasPendingInvite: false });
+      }
+
+      res.json({ hasPendingInvite: true });
+    } catch (error: any) {
+      logEvent("ERROR", "Check first access failed", { error: error.message });
+      res.status(500).json({ error: "Falha ao verificar convite pendente." });
+    }
+  });
+
+  // Public: accept an invite by email directly (First Access flow)
+  app.post("/api/invites/accept-by-email", authLimiter, async (req, res) => {
+    try {
+      const { email, fullName, password } = req.body;
+      if (!email || !fullName || !password) {
+        return res.status(400).json({ error: "Preencha todos os campos." });
+      }
+      if (password.length < 6) {
+        return res.status(400).json({ error: "A senha deve ter pelo menos 6 caracteres." });
+      }
+
+      const normalizedEmail = email.toLowerCase().trim();
+
+      const { data: invite, error } = await supabaseAdmin
+        .from("tenant_invitations")
+        .select("id, tenant_id, role, status, expires_at")
+        .eq("email", normalizedEmail)
+        .eq("status", "pending")
+        .maybeSingle();
+
+      if (error) throw error;
+      if (!invite) {
+        return res.status(404).json({ error: "Nenhum convite pendente encontrado para este e-mail." });
+      }
+      if (new Date(invite.expires_at).getTime() < Date.now()) {
+        return res.status(410).json({ error: "Convite expirado. Solicite um novo à administração." });
+      }
+
+      const { data: created, error: createError } = await supabaseAdmin.auth.admin.createUser({
+        email: normalizedEmail,
+        password,
+        email_confirm: true,
+        user_metadata: {
+          full_name: fullName,
+          tenant_id: invite.tenant_id,
+          role: invite.role,
+        },
+      });
+      if (createError) {
+        if (String(createError.message || "").toLowerCase().includes("already")) {
+          return res.status(409).json({ error: "Já existe uma conta com este e-mail. Se esqueceu a senha, utilize a opção de recuperação." });
+        }
+        throw createError;
+      }
+
+      await supabaseAdmin.from("tenant_invitations").update({ status: "accepted", accepted_at: new Date().toISOString() }).eq("id", invite.id);
+
+      logEvent("INFO", "Invite accepted by email (First Access)", { userId: created?.user?.id, tenantId: invite.tenant_id, role: invite.role });
+      res.status(201).json({ success: true, email: normalizedEmail, role: invite.role });
+    } catch (error: any) {
+      logEvent("ERROR", "Accept by email failed", { error: error.message });
+      res.status(500).json({ error: "Falha ao criar a conta no primeiro acesso." });
     }
   });
 

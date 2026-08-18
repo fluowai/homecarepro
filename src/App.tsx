@@ -32,6 +32,7 @@ const FamilyDashboardView = lazy(() => import('./components/FamilyDashboardView'
 const CoopFinanceView = lazy(() => import('./components/CoopFinanceView'));
 const AssembliesView = lazy(() => import('./components/AssembliesView'));
 const TenantUserManager = lazy(() => import('./components/TenantUserManager').then(m => ({ default: m.default || m.TenantUserManager })));
+const WelcomeTour = lazy(() => import('./components/WelcomeTour'));
 
 function LoadingScreen() {
   return (
@@ -63,6 +64,7 @@ export default function App() {
   const [currentView, setView] = useState<string>('dashboard');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [showTour, setShowTour] = useState(false);
 
   const init = useHomeCareStore((s) => s.init);
   const isLoading = useHomeCareStore((s) => s.isLoading);
@@ -70,11 +72,25 @@ export default function App() {
   const tenants = useHomeCareStore((s) => s.tenants);
   const activeTenantId = useHomeCareStore((s) => s.activeTenantId);
   const currentUserRole = useHomeCareStore((s) => s.currentUserRole);
+  const profile = useHomeCareStore((s) => s.profile);
 
   useEffect(() => {
     init();
   }, [init]);
 
+  useEffect(() => {
+    if (isAuthenticated) {
+      const tourSeen = localStorage.getItem('hcp_tour_seen');
+      if (!tourSeen) {
+        setShowTour(true);
+      }
+    }
+  }, [isAuthenticated]);
+
+  const handleTourComplete = () => {
+    localStorage.setItem('hcp_tour_seen', 'true');
+    setShowTour(false);
+  };
   useEffect(() => {
     if (currentUserRole === 'mega_admin' && currentView === 'dashboard') {
       setView('mega_overview');
@@ -204,6 +220,15 @@ export default function App() {
           onMenuClick={() => setIsSidebarOpen(true)}
         />
       </div>
+
+      {showTour && (
+        <Suspense fallback={null}>
+          <WelcomeTour 
+            onComplete={handleTourComplete} 
+            userName={profile?.full_name || 'Usuário'} 
+          />
+        </Suspense>
+      )}
     </div>
   );
 }
