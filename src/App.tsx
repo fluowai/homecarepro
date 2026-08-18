@@ -31,6 +31,7 @@ const ResellerView = lazy(() => import('./components/ResellerView'));
 const FamilyDashboardView = lazy(() => import('./components/FamilyDashboardView'));
 const CoopFinanceView = lazy(() => import('./components/CoopFinanceView'));
 const AssembliesView = lazy(() => import('./components/AssembliesView'));
+const TenantUserManager = lazy(() => import('./components/TenantUserManager').then(m => ({ default: m.default || m.TenantUserManager })));
 
 function LoadingScreen() {
   return (
@@ -137,6 +138,8 @@ export default function App() {
         return <CoopFinanceView />;
       case 'assemblies':
         return <AssembliesView />;
+      case 'users':
+        return <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto"><TenantUserManager /></div>;
       case 'mega_overview':
       case 'mega_network':
       case 'mega_plans':
@@ -149,6 +152,7 @@ export default function App() {
       case 'super_clinics':
       case 'super_plans':
       case 'super_domains':
+      case 'super_users':
       case 'super_whitelabel':
       case 'super_support':
         return <ResellerView activeSection={currentView.replace('super_', '')} onExit={handleSetView} />;

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Building, Activity, Search, Plus, Shield, Link2, Star, CheckCircle, UserPlus, CalendarCheck, TrendingUp, LayoutDashboard, Package, Globe, Palette, LifeBuoy, Settings } from 'lucide-react';
+import { Building, Activity, Search, Plus, Shield, Link2, Star, CheckCircle, UserPlus, CalendarCheck, TrendingUp, LayoutDashboard, Package, Globe, Palette, LifeBuoy, Settings, Users } from 'lucide-react';
 import { useHomeCareStore } from '../store';
 import { WhitelabelConfig } from './WhitelabelConfig';
 import { PlanManager } from './PlanManager';
@@ -7,6 +7,7 @@ import { SupportDesk } from './SupportDesk';
 import { TenantEditorModal } from './TenantEditorModal';
 import { InviteLinkModal } from './InviteLinkModal';
 import { DomainValidator } from './DomainValidator';
+import TenantUserManager from './TenantUserManager';
 import { Tenant } from '../types';
 
 interface ResellerViewProps {
@@ -27,6 +28,7 @@ const MENU_GROUPS = [
       { id: 'clinics', label: 'Cadastro & Clínicas', icon: Building },
       { id: 'plans', label: 'Planos', icon: Package },
       { id: 'domains', label: 'Validação de Domínios', icon: Globe },
+      { id: 'users', label: 'Usuários e Equipe', icon: Users },
     ],
   },
   {
@@ -309,6 +311,8 @@ export default function ResellerView({ onExit, activeSection = 'overview' }: Res
         return <WhitelabelConfig />;
       case 'domains':
         return <DomainValidator scope="mine" />;
+      case 'users':
+        return <div className="p-6 bg-gray-50/30"><TenantUserManager /></div>;
       default:
         return renderOverview();
     }
