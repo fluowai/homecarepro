@@ -4,7 +4,7 @@ FROM node:22-alpine AS builder
 WORKDIR /app
 
 COPY package.json package-lock.json* bun.lock* ./
-RUN npm ci --ignore-scripts
+RUN npm install
 
 COPY . .
 
