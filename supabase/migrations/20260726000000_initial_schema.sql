@@ -6,6 +6,7 @@
 -- 1. EXTENSIONS
 -- ============================================================================
 create extension if not exists "uuid-ossp";
+create extension if not exists "pgcrypto";
 
 -- 2. HELPER: get current user's tenant
 -- ============================================================================
@@ -259,3 +260,33 @@ $$ language plpgsql security definer;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure public.handle_new_user();
+
+-- 7. UPDATED_AT TRIGGER (maintains updated_at on row modification)
+-- ============================================================================
+create or replace function public.set_updated_at()
+returns trigger as $$
+begin
+  new.updated_at := now();
+  return new;
+end;
+$$ language plpgsql security definer;
+
+-- Apply updated_at trigger to tables that have the column
+DO $$
+declare
+  t text;
+begin
+  for t in
+    select tablename
+    from pg_tables
+    where schemaname = 'public'
+      and tablename in ('patients', 'professionals', 'visits', 'leads', 'messages', 'medicines', 'surveys', 'subscriptions', 'invoices', 'saas_plans', 'support_tickets', 'tenant_invitations', 'contracts', 'proposals', 'health_insurances')
+      and exists (
+        select 1 from information_schema.columns
+        where table_schema = 'public' and table_name = pg_tables.tablename and column_name = 'updated_at'
+      )
+  loop
+    execute format('create trigger set_updated_at_%I before update on public.%I for each row execute function public.set_updated_at()', t, t);
+  end loop;
+end $$;
+

@@ -44,3 +44,29 @@
 - `POST /api/admin/tenants/:id/invite`: 403 super_admin sem ownership; 201 novo link; 400 sem adminEmail.
 - `GET /api/invites/:token`: 404 inválido; 200 com tenant; 410 expirado.
 - `POST /api/invites/accept`: 400 incompleto/senha curta; 201 cria conta e marca aceito; 409 e-mail já existente.
+
+## Última verificação (2026-08-14) — Análise de schema SQL completo
+
+| Item | Resultado |
+|---|---|
+| Migrations existentes | ✅ 13 arquivos em `supabase/migrations/` (ordem cronológica correta) |
+| FULL_DATABASE_SCHEMA.sql | ✅ Concatenação atualizada de todas as 13 migrations |
+| Tabelas definidas no SQL | ✅ 24 tabelas (tenants, user_profiles, user_tenants, patients, professionals, visits, leads, messages, medicines, surveys, survey_config, alert_config, health_insurances, subscriptions, invoices, saas_plans, support_tickets, ticket_messages, tenant_invitations, medication_administrations, proposals, contracts, assemblies, assembly_votes) |
+| Tabelas referenciadas no código | ✅ Todas as 24 tabelas correspondem a referências no store.ts/app.ts/componentes |
+| Functions SECURITY DEFINER | ✅ 3 funções (get_user_role, get_user_tenant_id, has_tenant_access) com `search_path=public` |
+| Extensão `uuid-ossp` | ✅ Criada (fornece `uuid_generate_v4()` usada em support_tickets/ticket_messages) |
+| Extensão `pgcrypto` | ❌ **AUSENTE** — `gen_random_uuid()` usada em billing + tenant_invitations sem a extensão criada |
+| RLS em todas as tabelas | ✅ Todas têm RLS + policies |
+| Trigger on_auth_user_created | ✅ Auto-cria user_profile + sync user_tenants |
+| Run-sql.js | ✅ Transacional, tracking em schema_migrations, --baseline |
+| `npm run typecheck` | ✅ Sem erros |
+| `npm run build` | ✅ 716 KB (< 1.5 MB) |
+| `npx vitest run` | ✅ 64 passed, 14 skipped |
+| `npm audit --audit-level=high` | ✅ 0 vulnerabilidades |
+
+### ⚠️ Issues para corrigir
+1. **[CRÍTICO] `pgcrypto` extension faltando**: Adicionar `create extension if not exists "pgcrypto";` à migration inicial ou como uma migration separada (primeira a rodar). Sem isso, `node run-sql.js` falha em `20260729111700_add_billing_schema.sql` em DB limpo.
+2. **[MÉDIO] `schema_migrations` sem RLS**: Adicionar `ALTER TABLE public.schema_migrations ENABLE ROW LEVEL SECURITY; CREATE POLICY ... ON public.schema_migrations;` no run-sql.js após criar a tabela, ou incluir no runner. Evita falha no teste estrutural de RLS.
+3. **[MÉDIO] Triggers `updated_at`**: Criar triggers para auto-atualizar `updated_at` em tabelas que têm essa coluna (invoices, subscriptions, contracts, proposals, support_tickets, patients, medicine_administrations, assemblies, assembly_votes).
+4. **[BAIXO] `visitToRow` JSONB coords**: A função em store.ts passa coords como string `"lat,lng"` para colunas `jsonb`. Corrigir para passar objeto JSON `{lat, lng}` ou `{type:"Point",coordinates:[lng,lat]}`.
+5. **[BAIXO] `assemblyVoteToRow` missing `tenant_id`**: Adicionar `tenant_id: get().activeTenantId` ao objeto retornado.

@@ -79,3 +79,29 @@
 - Refactored server.ts to inject VITE_ environment variables into index.html via window.__ENV__ to solve production Docker issues.
 - Updated src/lib/supabase.ts to prioritize window.__ENV__ over import.meta.env.
 - Removed duplicate /api/health route from server.ts.
+
+## 2026-08-14 — Análise de schema SQL completo
+
+### Análise cruzada: migrations SQL vs. código da aplicação (store.ts, app.ts, types.ts, componentes, testes)
+
+### 🚨 CRÍTICO: Extensão `pgcrypto` ausente
+- `gen_random_uuid()` é usada em 3 migrations mas **nenhuma migration cria a extensão `pgcrypto`**:
+  - `20260729111700_add_billing_schema.sql` → colunas `id` de `subscriptions` e `invoices` (`DEFAULT gen_random_uuid()`)
+  - `20260807000000_add_tenant_invitations.sql` → coluna `id` de `tenant_invitations` (`DEFAULT gen_random_uuid()`)
+- Apenas `uuid-ossp` é criada (`create extension if not exists "uuid-ossp"`), que fornece `uuid_generate_v4()` — usada em `support_tickets` e `ticket_messages`.
+- Em Supabase, `pgcrypto` vem pré-habilitada, mas ao rodar `node run-sql.js` contra um DB Postgres limpo, a migration do billing **falhará** com `function gen_random_uuid() does not exist`.
+
+### 🟡 Outros achados (não bloqueantes)
+1. **`schema_migrations` sem RLS**: tabela criada por `run-sql.js` sem row security → falha no teste estrutural de RLS (`rls.integration.test.ts` verifica que TODAS as tabelas `public` têm RLS).
+2. **Sem triggers `updated_at`**: tabelas como `invoices`, `subscriptions`, `contracts`, `support_tickets` têm coluna `updated_at` mas nenhum trigger auto-atualiza. A aplicação seta `updatedAt` no TS, mas inserts via `invoiceToRow` não incluem `updated_at`.
+3. **`visitToRow` envia string para coluna `jsonb`**: `check_in_coords`/`check_out_coords` são `jsonb` no DB, mas a store serializa como `"lat,lng"` (não é JSON válido) → falha silenciosa no `upsertRow`.
+4. **`assemblyVoteToRow` omite `tenant_id`**: tabela `assembly_votes` tem `tenant_id NOT NULL`, mas a função de mapeamento não o inclui → insert falha.
+5. **`proposals` table**: criada no SQL mas sem integração no store.ts (CRUD não implementado).
+
+### Tabelas e colunas: status geral
+- 24 tabelas definidas no SQL, todas referenciadas corretamente no código.
+- 6 funções (get_user_tenant_id, has_tenant_access, get_user_role, handle_new_user, sync_user_primary_tenant, generate_invite_token) definidas e hardenidas com `search_path=public`.
+- RLS habilitado e policies criadas em todas as tabelas com dados.
+- Índices de tenant criados em todas as tabelas principais.
+
+### Migrations aplicadas: 13/13 (0 pendentes) ✅

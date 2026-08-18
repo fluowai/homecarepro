@@ -1,0 +1,71 @@
+version: '3.8'
+
+services:
+  # ─── Backend API (Express) — isolated container ─────────────
+  homecarepro-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    image: homecarepro/backend:latest
+    container_name: homecarepro-backend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - APP_URL=${APP_URL:-http://localhost:3000}
+      - VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - ASAAS_API_KEY=${ASAAS_API_KEY}
+      - ASAAS_WEBHOOK_TOKEN=${ASAAS_WEBHOOK_TOKEN}
+      - RESEND_API_KEY=${RESEND_API_KEY}
+    networks:
+      - homecarepro-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:3000/api/health', (r)=>{process.exit(r.statusCode===200?0:1)})"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ─── Frontend SPA (nginx static) — isolated container ────────
+  homecarepro-frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+      args:
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
+        VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY}
+        VITE_ENABLE_DEMO_MODE: ${VITE_ENABLE_DEMO_MODE:-false}
+    image: homecarepro/frontend:latest
+    container_name: homecarepro-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    environment:
+      - BACKEND_HOST=homecarepro-backend:3000
+    networks:
+      - homecarepro-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  homecarepro-network:
+    name: homecarepro-network
+    driver: bridge

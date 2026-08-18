@@ -7,6 +7,7 @@
 -- 1. EXTENSIONS
 -- ============================================================================
 create extension if not exists "uuid-ossp";
+create extension if not exists "pgcrypto";
 
 -- 2. HELPER: get current user's tenant
 -- ============================================================================
@@ -469,6 +470,7 @@ CREATE TRIGGER on_user_profile_created
 
 -- 1. EXTENSIONS
 create extension if not exists "uuid-ossp";
+create extension if not exists "pgcrypto";
 
 -- 2. TABLES
 -- ============================================================================
@@ -829,6 +831,16 @@ drop trigger if exists on_user_profile_created on public.user_profiles cascade;
 create trigger on_user_profile_created
   after insert or update of tenant_id, role on public.user_profiles
   for each row execute procedure public.sync_user_primary_tenant();
+
+-- 8. UPDATED_AT TRIGGER (maintains updated_at on row modification)
+-- ============================================================================
+create or replace function public.set_updated_at()
+returns trigger as $$
+begin
+  new.updated_at := now();
+  return new;
+end;
+$$ language plpgsql security definer;
 
 -- 7. SEED DATA (System Setup & Demo)
 -- ============================================================================

@@ -1,0 +1,19 @@
+{
+  email admin@homecarepro.com.br
+  on_demand_tls {
+    # Ask the backend directly (it has the Supabase service-role key to query tenants)
+    ask http://homecarepro-backend:3000/api/internal/caddy-ask
+    interval 2m
+    burst 5
+  }
+}
+
+# On-Demand TLS for the main domain and every customer whitelabel domain
+https:// {
+  tls {
+    on_demand
+  }
+
+  reverse_proxy homecarepro-frontend:80
+  encode gzip
+}

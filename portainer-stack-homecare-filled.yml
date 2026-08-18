@@ -16,6 +16,8 @@ services:
       ASAAS_API_KEY: "YOUR_ASAAS_API_KEY"
       ASAAS_WEBHOOK_TOKEN: "YOUR_ASAAS_WEBHOOK_TOKEN"
       RESEND_API_KEY: "YOUR_RESEND_API_KEY"
+    ports:
+      - "3000:3000"
     networks:
       - wootech1
       - homecarepro_internal
@@ -39,7 +41,7 @@ services:
         - "traefik.http.routers.hcpro_web.service=hcpro_web_svc"
         - "traefik.http.services.hcpro_web_svc.loadbalancer.server.port=3000"
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3000/api/health"]
       interval: 30s
       timeout: 5s
       retries: 3

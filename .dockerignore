@@ -12,5 +12,7 @@ coverage/
 supabase/
 run-sql.js
 metadata.json
-vite.config.ts
-tsconfig.json
+test-results/
+e2e/
+tests/
+
