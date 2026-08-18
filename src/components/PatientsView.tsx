@@ -18,10 +18,12 @@ import {
   ArrowLeft,
   Users,
   Pill,
-  Package
+  Package,
+  Loader2
 } from 'lucide-react';
 import { useHomeCareStore } from '../store';
 import { Patient } from '../types';
+import { uploadFileToMinio } from '../lib/upload';
 
 interface PatientsViewProps {
   searchQuery: string;
@@ -80,6 +82,7 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
 
   // File uploading
   const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   // Filter patients
   const tenantPatients = patients.filter(p => p.tenantId === activeTenantId);
@@ -186,13 +189,13 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
     setEventVitals({ pa: '', fc: '', temp: '', sat: '', pain: '' });
   };
 
-  const handleFileUpload = (e: React.FormEvent) => {
+  const handleFileUpload = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedPatientId || !pendingFile) return;
 
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const url = reader.result as string;
+    setIsUploading(true);
+    try {
+      const url = await uploadFileToMinio(pendingFile);
       addPatientFile(
         selectedPatientId,
         pendingFile.name,
@@ -200,9 +203,13 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
         pendingFile.type || 'application/octet-stream',
         url
       );
-    };
-    reader.readAsDataURL(pendingFile);
-    setPendingFile(null);
+      setPendingFile(null);
+    } catch (error) {
+      console.error('Error uploading file:', error);
+      alert('Falha ao enviar arquivo. Verifique sua conexão e tente novamente.');
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   return (
@@ -466,11 +473,11 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
                   </label>
                   <button
                     type="submit"
-                    disabled={!pendingFile}
+                    disabled={!pendingFile || isUploading}
                     className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white font-semibold text-xs rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
                   >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Anexar</span>
+                    {isUploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+                    <span>{isUploading ? 'Enviando...' : 'Anexar'}</span>
                   </button>
                 </form>
 

@@ -14,10 +14,12 @@ import {
   Upload,
   MapPin,
   Key,
-  AlertTriangle
+  AlertTriangle,
+  Loader2
 } from 'lucide-react';
 import { useHomeCareStore } from '../store';
 import { ProfessionalStatus, ProfessionalSpecialty } from '../types';
+import { uploadFileToMinio } from '../lib/upload';
 
 export default function ProfessionalsView() {
   const { 
@@ -49,6 +51,7 @@ export default function ProfessionalsView() {
   const [zipCode, setZipCode] = useState('');
   const [docsUploaded, setDocsUploaded] = useState<string[]>([]);
   const [docsFiles, setDocsFiles] = useState<Record<string, string>>({});
+  const [isUploading, setIsUploading] = useState<string | null>(null);
   const [credentialNotice, setCredentialNotice] = useState('');
 
   // Filter professionals
@@ -102,13 +105,18 @@ export default function ProfessionalsView() {
     setShowAddModal(false);
   };
 
-  const handleMockUpload = (docName: string, file: File) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      setDocsFiles(prev => ({ ...prev, [docName]: reader.result as string }));
+  const handleUploadDoc = async (docName: string, file: File) => {
+    setIsUploading(docName);
+    try {
+      const url = await uploadFileToMinio(file);
+      setDocsFiles(prev => ({ ...prev, [docName]: url }));
       setDocsUploaded(prev => prev.includes(docName) ? prev : [...prev, docName]);
-    };
-    reader.readAsDataURL(file);
+    } catch (error) {
+      console.error('Error uploading doc:', error);
+      alert('Falha ao enviar documento. Tente novamente.');
+    } finally {
+      setIsUploading(null);
+    }
   };
 
   const handleSendCredentials = () => {
@@ -435,6 +443,11 @@ export default function ProfessionalsView() {
                           <FileText className="w-3 h-3" />
                           Anexado
                         </span>
+                      ) : isUploading === doc ? (
+                        <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-3 py-1.5 rounded-md flex items-center gap-1 cursor-not-allowed">
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                          Enviando...
+                        </span>
                       ) : (
                         <label className="text-[10px] font-bold text-green-600 bg-green-50 hover:bg-green-100 px-3 py-1.5 rounded-md flex items-center gap-1 transition-colors cursor-pointer">
                           <Upload className="w-3 h-3" />
@@ -445,7 +458,7 @@ export default function ProfessionalsView() {
                             className="hidden"
                             onChange={(e) => {
                               const file = e.target.files?.[0];
-                              if (file) handleMockUpload(doc, file);
+                              if (file) handleUploadDoc(doc, file);
                               e.currentTarget.value = '';
                             }}
                           />
