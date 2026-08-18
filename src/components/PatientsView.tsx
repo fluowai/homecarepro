@@ -19,7 +19,8 @@ import {
   Users,
   Pill,
   Package,
-  Loader2
+  Loader2,
+  Camera
 } from 'lucide-react';
 import { useHomeCareStore } from '../store';
 import { Patient } from '../types';
@@ -65,6 +66,7 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
   const [insuranceId, setInsuranceId] = useState('');
   const [monthlyPackageValue, setMonthlyPackageValue] = useState<number | ''>('');
   const [padScope, setPadScope] = useState('');
+  const [contractDuration, setContractDuration] = useState('');
   const [diagnostic, setDiagnostic] = useState('');
   const [allergiesText, setAllergiesText] = useState('');
   const [medicationsText, setMedicationsText] = useState('');
@@ -83,6 +85,9 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
   // File uploading
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+
+  const isManager = ['mega_admin', 'super_admin', 'admin', 'operator'].includes(currentUserRole);
 
   // Filter patients
   const tenantPatients = patients.filter(p => p.tenantId === activeTenantId);
@@ -103,6 +108,11 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
       alert("Por favor, preencha pelo menos Nome, Data de Nascimento e Diagnóstico.");
       return;
     }
+    
+    if (!street || !number || !city || !state || !zipCode) {
+      alert("Para garantir a validação de Check-in, o endereço completo do paciente é obrigatório.");
+      return;
+    }
 
     addPatient({
       name,
@@ -116,7 +126,8 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
       insuranceId,
       monthlyPackageValue: Number(monthlyPackageValue) || undefined,
       padScope,
-      avatar: gender === 'M' ? 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&q=80&w=120' : 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=120',
+      contractDuration,
+      avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(name)}&backgroundColor=059669`,
       diagnostic,
       allergies: allergiesText.split(',').map(s => s.trim()).filter(Boolean),
       medications: medicationsText.split(',').map(s => s.trim()).filter(Boolean),
@@ -142,8 +153,7 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
     setInsuranceId('');
     setMonthlyPackageValue('');
     setPadScope('');
-    setDiagnostic('');
-    setEmail('');
+    setContractDuration('');
     setDiagnostic('');
     setAllergiesText('');
     setMedicationsText('');
@@ -212,6 +222,23 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
     }
   };
 
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedPatientId) return;
+
+    setIsUploadingAvatar(true);
+    try {
+      const url = await uploadFileToMinio(file);
+      updatePatient(selectedPatientId, { avatar: url });
+    } catch (error) {
+      console.error('Error uploading avatar:', error);
+      alert('Falha ao enviar foto. Verifique sua conexão e tente novamente.');
+    } finally {
+      setIsUploadingAvatar(false);
+    }
+    e.target.value = '';
+  };
+
   return (
     <div className="space-y-6">
       {/* Detail View Mode */}
@@ -261,26 +288,49 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
 
           {/* Profile Card */}
           <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-center md:items-start gap-6">
-            <img
-              src={selectedPatient.avatar || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=120"}
-              alt={selectedPatient.name}
-              className="w-16 h-16 rounded-2xl object-cover border border-slate-200 shadow-sm"
-              referrerPolicy="no-referrer"
-            />
+            <div className="relative group">
+              <img
+                src={selectedPatient.avatar || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(selectedPatient.name)}&backgroundColor=059669`}
+                alt={selectedPatient.name}
+                className="w-16 h-16 rounded-2xl object-cover border border-slate-200 shadow-sm transition-opacity group-hover:opacity-70"
+                referrerPolicy="no-referrer"
+              />
+              <label className="absolute inset-0 flex flex-col items-center justify-center bg-black/40 text-white rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                {isUploadingAvatar ? <Loader2 className="w-5 h-5 animate-spin" /> : <Camera className="w-5 h-5" />}
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleAvatarUpload}
+                  disabled={isUploadingAvatar}
+                />
+              </label>
+            </div>
             <div className="flex-1 text-center md:text-left min-w-0">
               <h2 className="text-xl font-bold text-slate-800 tracking-tight">{selectedPatient.name}</h2>
               <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 mt-1.5 text-xs text-slate-500">
                 <span>CPF: {selectedPatient.cpf}</span>
                 <span>•</span>
                 <span>Data de Nascimento: {selectedPatient.birthDate}</span>
-                <span>•</span>
-                <span className="px-2 py-0.5 rounded bg-green-50 text-green-700 font-semibold uppercase text-[10px] tracking-wide">
-                  {selectedPatient.insuranceId ? (insurances.find(i => i.id === selectedPatient.insuranceId)?.name || selectedPatient.planType) : selectedPatient.planType}
-                </span>
-                {selectedPatient.monthlyPackageValue && (
+                
+                {isManager && (
                   <>
                     <span>•</span>
-                    <span className="text-emerald-600 font-bold">Pacote: R$ {selectedPatient.monthlyPackageValue}</span>
+                    <span className="px-2 py-0.5 rounded bg-green-50 text-green-700 font-semibold uppercase text-[10px] tracking-wide">
+                      {selectedPatient.insuranceId ? (insurances.find(i => i.id === selectedPatient.insuranceId)?.name || selectedPatient.planType) : selectedPatient.planType}
+                    </span>
+                    {selectedPatient.monthlyPackageValue && (
+                      <>
+                        <span>•</span>
+                        <span className="text-emerald-600 font-bold">Pacote: R$ {selectedPatient.monthlyPackageValue}</span>
+                      </>
+                    )}
+                    {selectedPatient.contractDuration && (
+                      <>
+                        <span>•</span>
+                        <span className="text-indigo-600 font-semibold">Contrato: {selectedPatient.contractDuration}</span>
+                      </>
+                    )}
                   </>
                 )}
               </div>
@@ -922,6 +972,16 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
                           className="w-full bg-slate-50 border border-slate-200 rounded-lg text-xs px-3 py-2 text-slate-700 focus:outline-none"
                         />
                       </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Tempo de Contrato</label>
+                        <input
+                          type="text"
+                          value={contractDuration}
+                          onChange={(e) => setContractDuration(e.target.value)}
+                          placeholder="Ex: 12 meses"
+                          className="w-full bg-slate-50 border border-slate-200 rounded-lg text-xs px-3 py-2 text-slate-700 focus:outline-none"
+                        />
+                      </div>
                       <div className="md:col-span-2">
                         <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Descrição do PAD (Plano de Atenção Domiciliar)</label>
                         <input
@@ -963,6 +1023,7 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
                         <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Rua / Logradouro</label>
                         <input
                           type="text"
+                          required
                           value={street}
                           onChange={(e) => setStreet(e.target.value)}
                           placeholder="Rua das Acácias"
@@ -973,6 +1034,7 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
                         <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Número</label>
                         <input
                           type="text"
+                          required
                           value={number}
                           onChange={(e) => setNumber(e.target.value)}
                           placeholder="123"
@@ -983,6 +1045,7 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
                         <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">CEP</label>
                         <input
                           type="text"
+                          required
                           value={zipCode}
                           onChange={(e) => setZipCode(e.target.value)}
                           placeholder="01000-000"
@@ -993,6 +1056,7 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
                         <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Cidade</label>
                         <input
                           type="text"
+                          required
                           value={city}
                           onChange={(e) => setCity(e.target.value)}
                           placeholder="São Paulo"
@@ -1003,6 +1067,7 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
                         <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Estado</label>
                         <input
                           type="text"
+                          required
                           value={state}
                           onChange={(e) => setState(e.target.value)}
                           placeholder="SP"

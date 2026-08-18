@@ -83,6 +83,7 @@ export interface Patient {
   insuranceId?: string;
   monthlyPackageValue?: number;
   padScope?: string;
+  contractDuration?: string;
   avatar: string;
   diagnostic: string;
   allergies: string[];

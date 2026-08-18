@@ -651,8 +651,19 @@ ${rawNotes}
 
                   {/* Bedside raw notes */}
                   <div>
-                    <label className="text-[10px] font-bold text-gray-400 uppercase block mb-1.5">Evolução Bruta</label>
-                    <textarea required rows={3} placeholder="Descreva os achados clínicos e a conduta..." value={rawNotes} onChange={(e) => setRawNotes(e.target.value)} disabled={selectedVisit.status !== 'em_andamento'} className="w-full bg-white border border-gray-200 rounded-xl text-xs p-3 text-gray-800 outline-none focus:border-green-600 focus:ring-1 focus:ring-green-600" />
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="text-[10px] font-bold text-gray-400 uppercase">Evolução Bruta</label>
+                      {selectedVisit.status === 'em_andamento' && (
+                        <button 
+                          type="button" 
+                          onClick={() => setRawNotes(prev => (prev ? prev + '\n\n' : '') + `Data: ___ / ___ / ___\nHorário Entrada: __:__ | Saída: __:__\n\n1. Condições de chegada (Orientado, desorientado, sonolento, agitado):\n\n2. Estado emocional e comportamento (Tranquilo, ansioso, irritado, colaborativo):\n\n3. Cuidados realizados (Higiene, banho, hidratação, fraldas, locomoção, conforto):\n\n4. Administração de medicamentos (Aceitação):\n\n5. Alimentação (Refeições, quantidade, intercorrências):\n\n6. Eliminações fisiológicas (Urina/Evacuação - aspecto e quantidade):\n\n7. Atividades realizadas (Caminhada, estímulos, visitas, exercícios):\n\n8. Períodos de descanso e sono do paciente:\n\n9. Intercorrências clínicas (situação atípica observada):\n\nObservações (Horários importantes para acompanhamento):\n`)}
+                          className="text-[10px] text-green-600 font-bold hover:underline bg-green-50 px-2 py-0.5 rounded"
+                        >
+                          + Modelo Cuidador(a)
+                        </button>
+                      )}
+                    </div>
+                    <textarea required rows={5} placeholder="Descreva os achados clínicos e a conduta..." value={rawNotes} onChange={(e) => setRawNotes(e.target.value)} disabled={selectedVisit.status !== 'em_andamento'} className="w-full bg-white border border-gray-200 rounded-xl text-xs p-3 text-gray-800 outline-none focus:border-green-600 focus:ring-1 focus:ring-green-600" />
                   </div>
 
                   {/* Administração de Medicamentos */}
