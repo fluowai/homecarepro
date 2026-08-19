@@ -15,6 +15,7 @@ import {
   Mic,
   Volume2
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { useHomeCareStore } from '../store';
 import { LeadStatus, CRMLead } from '../types';
 import AudioDictationModal from './AudioDictationModal';
@@ -49,7 +50,7 @@ export default function CrmView() {
   const handleCreateLead = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name) {
-      alert("Por favor, preencha o nome do Lead.");
+      toast.error("Por favor, preencha o nome do Lead.");
       return;
     }
 
@@ -120,7 +121,7 @@ export default function CrmView() {
     }
 
     if (!patientId) {
-      alert('Não foi possível criar o paciente vinculado a este lead.');
+      toast.error('Não foi possível criar o paciente vinculado a este lead.');
       return;
     }
 
@@ -131,7 +132,7 @@ export default function CrmView() {
       value: lead.estimatedValue,
       startDate: new Date().toISOString().split('T')[0],
     });
-    alert(`Contrato criado para ${lead.name}. Gerencie-o no módulo de Contratos.`);
+    toast.success(`Contrato criado para ${lead.name}. Gerencie-o no módulo de Contratos.`);
   };
 
   const handleOpenDictationForLead = (lead: CRMLead) => {

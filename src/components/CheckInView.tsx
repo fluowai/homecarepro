@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { useHomeCareStore } from '../store';
 import { uploadFileToMinio } from '../lib/upload';
+import { toast } from 'sonner';
 
 export default function CheckInView() {
   const { 
@@ -120,13 +121,13 @@ export default function CheckInView() {
 
   const handleCheckIn = async () => {
     if (!selectedVisitId) return;
-    if (!inPhotoPreview || !inPhotoFile) {
-      alert("A foto do local (check-in) é obrigatória para validar sua presença.");
+    if (!inPhotoPreview) {
+      toast.error("A foto do local (check-in) é obrigatória para validar sua presença.");
       return;
     }
     const coords = await getCurrentPosition();
     if (!coords) {
-      alert("Não foi possível obter a localização GPS. Verifique as permissões de localização do navegador.");
+      toast.error("Não foi possível obter a localização GPS. Verifique as permissões de localização do navegador.");
       return;
     }
     const locationStr = `${coords.lat.toFixed(4)},${coords.lng.toFixed(4)} (Confirmado via GPS)`;
@@ -135,9 +136,9 @@ export default function CheckInView() {
     if (!isOffline) {
       try {
         setIsUploadingPhoto(true);
-        photoUrl = await uploadFileToMinio(inPhotoFile);
+        photoUrl = await uploadFileToMinio(inPhotoFile!);
       } catch (err: any) {
-        alert(`Erro no upload da foto: ${err.message}. O registro usará a foto localmente.`);
+        toast.error(`Erro no upload da foto: ${err.message}. O registro usará a foto localmente.`);
       } finally {
         setIsUploadingPhoto(false);
       }
@@ -165,7 +166,7 @@ export default function CheckInView() {
 
   const handleConfirmPin = () => {
     if (pin !== '1234') {
-      alert("PIN inválido. Tente '1234'.");
+      toast.error("PIN inválido. Tente '1234'.");
       return;
     }
     if (pendingMedToAdd) {
@@ -179,8 +180,8 @@ export default function CheckInView() {
   };
 
   const handleGenerateAiReport = async () => {
-    if (!selectedVisitId || !rawNotes) {
-      alert("Por favor, digite algumas anotações brutas antes de pedir a evolução à IA.");
+    if (!selectedVisitId || !rawNotes.trim()) {
+      toast.error("Por favor, digite algumas anotações brutas antes de pedir a evolução à IA.");
       return;
     }
     
@@ -226,12 +227,12 @@ ${rawNotes}
     if (!selectedVisitId) return;
 
     if (!pa || !fc || !temp || !sat) {
-      alert("Para profissionais de saúde, é obrigatório o preenchimento de todos os sinais vitais antes do check-out.");
+      toast.error("Para profissionais de saúde, é obrigatório o preenchimento de todos os sinais vitais antes do check-out.");
       return;
     }
     
-    if (!outPhotoPreview || !outPhotoFile) {
-      alert("A foto de check-out é obrigatória para atestar a finalização.");
+    if (!outPhotoPreview) {
+      toast.error("A foto de check-out é obrigatória para atestar a finalização.");
       return;
     }
 
@@ -246,7 +247,7 @@ ${rawNotes}
 
     const coords = await getCurrentPosition();
     if (!coords) {
-      alert("Não foi possível obter a localização GPS no check-out. Verifique as permissões de localização do navegador.");
+      toast.error("Não foi possível obter a localização GPS no check-out. Verifique as permissões de localização do navegador.");
       return;
     }
     const locationStr = `${coords.lat.toFixed(4)},${coords.lng.toFixed(4)} (Confirmado via GPS)`;

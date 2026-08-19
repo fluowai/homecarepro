@@ -25,6 +25,7 @@ import {
 import { useHomeCareStore } from '../store';
 import { Patient } from '../types';
 import { uploadFileToMinio } from '../lib/upload';
+import { toast } from 'sonner';
 
 interface PatientsViewProps {
   searchQuery: string;
@@ -105,12 +106,12 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
   const handleCreatePatient = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !birthDate || !diagnostic) {
-      alert("Por favor, preencha pelo menos Nome, Data de Nascimento e Diagnóstico.");
+      toast.error("Por favor, preencha pelo menos Nome, Data de Nascimento e Diagnóstico.");
       return;
     }
     
-    if (!street || !number || !city || !state || !zipCode) {
-      alert("Para garantir a validação de Check-in, o endereço completo do paciente é obrigatório.");
+    if (!zipCode || !street || !number || !city || !state) {
+      toast.error("Para garantir a validação de Check-in, o endereço completo do paciente é obrigatório.");
       return;
     }
 
@@ -216,7 +217,7 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
       setPendingFile(null);
     } catch (error) {
       console.error('Error uploading file:', error);
-      alert('Falha ao enviar arquivo. Verifique sua conexão e tente novamente.');
+      toast.error('Falha ao enviar arquivo. Verifique sua conexão e tente novamente.');
     } finally {
       setIsUploading(false);
     }
@@ -232,7 +233,7 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
       updatePatient(selectedPatientId, { avatar: url });
     } catch (error) {
       console.error('Error uploading avatar:', error);
-      alert('Falha ao enviar foto. Verifique sua conexão e tente novamente.');
+      toast.error('Falha ao enviar foto. Verifique sua conexão e tente novamente.');
     } finally {
       setIsUploadingAvatar(false);
     }

@@ -12,6 +12,7 @@ import AuthView from './components/AuthView';
 import InviteAcceptView from './components/InviteAcceptView';
 import { supabase } from './lib/supabase';
 import { useHomeCareStore } from './store';
+import { Toaster } from 'sonner';
 
 const DashboardView = lazy(() => import('./components/DashboardView'));
 const PatientsView = lazy(() => import('./components/PatientsView'));
@@ -194,6 +195,8 @@ export default function App() {
           `}
         </style>
       )}
+
+      <Toaster position="top-right" richColors />
 
       <Sidebar
         currentView={currentView}

@@ -12,6 +12,7 @@ import {
   Info,
   CalendarCheck
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { useHomeCareStore } from '../store';
 
 export default function CommunicationView() {
@@ -80,7 +81,7 @@ export default function CommunicationView() {
       .filter(v => v.tenantId === activeTenantId && v.patientId === activePatientId && (v.status === 'agendada' || v.status === 'open_shift'))
       .sort((a, b) => (a.date + a.timeStart).localeCompare(b.date + b.timeStart))[0];
     if (!nextVisit) {
-      alert('Este paciente não possui visitas futuras agendadas para gerar o lembrete.');
+      toast.error('Este paciente não possui visitas futuras agendadas para gerar o lembrete.');
       return;
     }
     const prof = professionals.find(p => p.id === nextVisit.professionalId);

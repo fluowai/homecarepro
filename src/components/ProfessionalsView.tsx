@@ -20,6 +20,7 @@ import {
 import { useHomeCareStore } from '../store';
 import { ProfessionalStatus, ProfessionalSpecialty } from '../types';
 import { uploadFileToMinio } from '../lib/upload';
+import { toast } from 'sonner';
 
 export default function ProfessionalsView() {
   const { 
@@ -68,7 +69,7 @@ export default function ProfessionalsView() {
   const handleCreateProfessional = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !registration) {
-      alert("Por favor, preencha o nome e o registro profissional (COREN/CRM/CREFITO).");
+      toast.error("Por favor, preencha o nome e o registro profissional (COREN/CRM/CREFITO).");
       return;
     }
 
@@ -113,7 +114,7 @@ export default function ProfessionalsView() {
       setDocsUploaded(prev => prev.includes(docName) ? prev : [...prev, docName]);
     } catch (error) {
       console.error('Error uploading doc:', error);
-      alert('Falha ao enviar documento. Tente novamente.');
+      toast.error('Falha ao enviar documento. Tente novamente.');
     } finally {
       setIsUploading(null);
     }

@@ -9,6 +9,7 @@ import { TenantEditorModal } from './TenantEditorModal';
 import { InviteLinkModal } from './InviteLinkModal';
 import { DomainValidator } from './DomainValidator';
 import { Tenant } from '../types';
+import { toast } from 'sonner';
 
 interface SystemAdminViewProps {
   onExit: (view: string) => void;
@@ -142,7 +143,7 @@ export default function SystemAdminView({ onExit, activeSection = 'overview' }: 
             />
           </div>
           <button
-            onClick={() => alert('Filtro de tenants - em breve mais opções')}
+            onClick={() => toast.info('Filtro de tenants - em breve mais opções')}
             className="p-2 border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600"
           >
             <Filter className="w-4 h-4" />

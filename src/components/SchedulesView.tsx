@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { useHomeCareStore } from '../store';
 import { VisitStatus } from '../types';
+import { toast } from 'sonner';
 
 export default function SchedulesView() {
   const { 
@@ -79,7 +80,7 @@ export default function SchedulesView() {
   const handleCreateVisit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!patientId || !professionalId) {
-      alert("Por favor, selecione um paciente e um profissional.");
+      toast.error("Por favor, selecione um paciente e um profissional.");
       return;
     }
 
@@ -128,7 +129,7 @@ export default function SchedulesView() {
         <button
           onClick={() => {
             if (tenantPatients.length === 0 || tenantProfessionals.length === 0) {
-              alert("Por favor, certifique-se de possuir pacientes e profissionais cadastrados.");
+              toast.error("Por favor, certifique-se de possuir pacientes e profissionais cadastrados.");
               return;
             }
             setPatientId(tenantPatients[0]?.id || '');
@@ -406,7 +407,7 @@ export default function SchedulesView() {
                               if (sel.value) {
                                 acceptOpenShift(visit.id, sel.value);
                               } else {
-                                alert('Selecione o cooperado que aceitou o plantão.');
+                                toast.error('Selecione o cooperado que aceitou o plantão.');
                               }
                             }}
                             className="bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] px-3 py-1.5 rounded-lg font-bold transition-colors w-full"

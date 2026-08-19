@@ -3,6 +3,7 @@ import { X, Globe, Palette, Save, AlertTriangle, CheckCircle, ShieldAlert, Edit3
 import { useHomeCareStore } from '../store';
 import { Tenant } from '../types';
 import { InviteLinkModal } from './InviteLinkModal';
+import { toast } from 'sonner';
 
 interface TenantEditorModalProps {
   tenant: Tenant;
@@ -40,11 +41,11 @@ export function TenantEditorModal({ tenant, isCreating = false, onClose }: Tenan
 
   const handleSave = async () => {
     if (!name.trim()) {
-      alert('Nome da inst\u00e2ncia \u00e9 obrigat\u00f3rio.');
+      toast.error('Nome da inst\u00e2ncia \u00e9 obrigat\u00f3rio.');
       return;
     }
     if (isCreating && !adminEmail.trim()) {
-      alert('Informe o e-mail do administrador para gerar o link de convite.');
+      toast.error('Informe o e-mail do administrador para gerar o link de convite.');
       return;
     }
     setLoading(true);
@@ -81,7 +82,7 @@ export function TenantEditorModal({ tenant, isCreating = false, onClose }: Tenan
       }, 1500);
     } catch (error: any) {
       console.error(error);
-      alert(error.message || 'Erro ao salvar.');
+      toast.error(error.message || 'Erro ao salvar.');
     } finally {
       setLoading(false);
     }

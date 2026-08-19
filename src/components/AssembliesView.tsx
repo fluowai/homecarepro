@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useHomeCareStore } from '../store';
+import { toast } from 'sonner';
 import {
   Users,
   FileText,
@@ -29,7 +30,7 @@ export default function AssembliesView() {
   const handleCreateAssembly = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title || !description) {
-      alert("Título e descrição são obrigatórios.");
+      toast.error("Título e descrição são obrigatórios.");
       return;
     }
 

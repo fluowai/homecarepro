@@ -7,6 +7,7 @@ import { GoogleGenAI } from "@google/genai";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { promises as dnsImpl } from "node:dns";
 import { z } from "zod";
+import { sendInviteEmail } from "./utils/mailer";
 
 // ── Zod validation schemas for AI endpoints ────────────────────────
 
@@ -730,6 +731,11 @@ Apenas o objeto JSON valido, sem formatacao Markdown adicional nem blocos de cod
       });
       if (inviteError) throw inviteError;
 
+      const inviteLink = `${appUrl}/?invite=${token}`;
+      
+      // Enviar email transacional (não bloqueia a resposta, dispara em background)
+      sendInviteEmail(adminEmail, inviteLink, inviteRole, "Sistema HomeCare Pro").catch(err => console.error("Async email error", err));
+
       logEvent("INFO", "Tenant created with invitation", { tenantId, role: inviteRole, createdBy: userId, adminName: adminName || "" });
       res.status(201).json({
         tenant: {
@@ -794,8 +800,11 @@ Apenas o objeto JSON valido, sem formatacao Markdown adicional nem blocos de cod
       });
       if (inviteError) throw inviteError;
 
+      const inviteLink = `${appUrl}/?invite=${token}`;
+      sendInviteEmail(adminEmail, inviteLink, inviteRole, "Sistema HomeCare Pro").catch(err => console.error("Async email error", err));
+
       logEvent("INFO", "Invite regenerated", { tenantId, role: inviteRole, adminName: adminName || "" });
-      res.status(201).json({ inviteLink: `${appUrl}/?invite=${token}` });
+      res.status(201).json({ inviteLink });
     } catch (error: any) {
       logEvent("ERROR", "Invite regeneration failed", { error: error.message });
       res.status(500).json({ error: "Falha ao gerar novo convite." });
@@ -834,8 +843,11 @@ Apenas o objeto JSON valido, sem formatacao Markdown adicional nem blocos de cod
       });
       if (error) throw error;
 
+      const inviteLink = `${appUrl}/?invite=${token}`;
+      sendInviteEmail(String(email).toLowerCase(), inviteLink, targetRole, "Administração do Sistema").catch(err => console.error("Async email error", err));
+
       logEvent("INFO", "System team invite created", { email, role: targetRole, createdBy: userId });
-      res.status(201).json({ inviteLink: `${appUrl}/?invite=${token}`, email, role: targetRole });
+      res.status(201).json({ inviteLink, email, role: targetRole });
     } catch (error: any) {
       logEvent("ERROR", "System user invite failed", { error: error.message });
       res.status(500).json({ error: "Falha ao criar convite." });
