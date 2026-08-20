@@ -105,3 +105,51 @@
 - Índices de tenant criados em todas as tabelas principais.
 
 ### Migrations aplicadas: 13/13 (0 pendentes) ✅
+
+## 2026-08-19 — Análise: Acesso por Subdomínio (Multi-Tenant via Subdomain)
+
+### Análise de gaps para subdomínio → tenant (documento completo em `DEV/SUBDOMAIN_ANALYSIS.md`)
+
+**Objetivo**: permitir que cada revenda/clínica acesse pelo seu subdomínio (`clinicabc.homecarepro.com.br`).
+
+#### O que EXISTE hoje
+- **Database**: `tenants` tem `custom_domain` (domínio próprio) mas **não** `subdomain`
+- **Caddy**: catch-all `https://` com on-demand TLS → `/api/internal/caddy-ask`
+- **`/api/tenant/resolve`**: lookup por `custom_domain` → fallback `system` (apenas branding)
+- **`/api/internal/caddy-ask`**: valida `custom_domain` (não valida subdomains)
+- **Frontend `whitelabel.ts`**: usa `window.location.hostname` → branding CSS apenas
+- **Frontend `store.ts`**: `init()` carrega todos tenants via RLS; `activeTenantId` = `profile.tenant_id` (NÃO do subdomain)
+- **Auth**: sem redirect pós-login para subdomain
+- **UI**: `WhitelabelConfig` e `TenantEditorModal` não têm campo `subdomain`
+- **Deploy**: sem wildcard DNS, sem `VITE_APP_BASE_DOMAIN`
+
+#### O que FALTA (11 itens 🔴 + 4 itens 🟡)
+1. Coluna `subdomain` na tabela `tenants` + unique index + CHECK reserved words
+2. `/api/tenant/resolve` estender para lookup por subdomain
+3. `/api/internal/caddy-ask` validar subdomains
+4. Caddyfile wildcard `*.homecarepro.com.br`
+5. docker-compose wildcard DNS + APP_BASE_DOMAIN
+6. `whitelabel.ts` parsear subdomain
+7. `store.ts` init() forçar activeTenantId pelo subdomain
+8. Redirect pós-login → subdomain do tenant
+9. UI: campo `subdomain` em WhitelabelConfig + TenantEditorModal + types.ts
+10. `VITE_APP_BASE_DOMAIN` em .env
+   11. Supabase cookie domain cross-subdomain
+
+**Plano de implementação**: 15 tarefas em 5 fases (infra → frontend → UI → server → testes). Detalhes em `DEV/SUBDOMAIN_ANALYSIS.md`.
+
+## 2026-08-20 — Subdomain Multi-Tenant IMPLEMENTADO (100%)
+
+### Implementado
+- **Migration aplicada**: `supabase/migrations/20260819000000_add_tenant_subdomain.sql` (registrada em `schema_migrations`, 14/14 migrations aplicadas)
+- **Coluna `subdomain`** + CHECK constraint + índice único na tabela `tenants`
+- **Backfill**: todos os 8 tenants receberam subdomains (ex: `audicare`, `sc-saude`, `clinica-teste`)
+- **Server**: `extractSubdomain()` + `slugifySubdomain()` helpers; `/api/tenant/resolve` e `/api/internal/caddy-ask` resolvem por subdomain; `POST /api/admin/tenants` auto-gera/valida subdomain; `PUT /api/tenant/config` atualiza subdomain
+- **Frontend**: `src/lib/subdomain.ts` (nova), `whitelabel.ts` atualizado, `store.ts` com resolução de `activeTenantId` pelo subdomain, `App.tsx` com redirect pós-login
+- **UI**: campo `subdomain` em `WhitelabelConfig` e `TenantEditorModal` com preview em tempo real
+- **Infra**: Caddyfile wildcard `*.homecare.wootech.com.br`, Docker Compose com `APP_BASE_DOMAIN`, `Dockerfile.frontend` com build arg
+- **Domínio principal**: `homecare.wootech.com.br` (subdomains: `<sub>.homecare.wootech.com.br`; domínios custom: `audcare.com.br`, `app.audcare.com.br`, etc.)
+
+### Verificado
+- Vitest: **90 passed, 0 failed, 14 skipped** (integração RLS)
+- Build: ✅ `vite build` + `esbuild` produção OK

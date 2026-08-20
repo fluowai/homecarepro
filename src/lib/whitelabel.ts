@@ -1,10 +1,10 @@
+import { extractSubdomain } from './subdomain';
+
 export async function initWhitelabel() {
   try {
     const domain = window.location.hostname;
-    // Call the resolution endpoint
     const url = `/api/tenant/resolve?domain=${encodeURIComponent(domain)}`;
-    
-    // In dev mode, we might need absolute URL to backend, but Vite proxies /api
+
     const response = await fetch(url);
     if (!response.ok) return;
 
@@ -22,14 +22,25 @@ export async function initWhitelabel() {
         root.style.setProperty('--color-indigo-600', tenant.secondary_color);
         root.style.setProperty('--color-indigo-700', tenant.secondary_color);
       }
-      
-      // Store globally so AuthView can read the logo
+
       (window as any)._tenantBranding = {
         name: tenant.name,
-        logo: tenant.logo
+        logo: tenant.logo,
+        subdomain: tenant.subdomain,
+        customDomain: tenant.custom_domain,
       };
+
+      // Also resolve and expose the subdomain for the store to use
+      const subdomain = extractSubdomain(domain);
+      if (subdomain) {
+        (window as any)._resolvedSubdomain = subdomain;
+      }
     }
   } catch (error) {
     console.error("Failed to load whitelabel configuration:", error);
   }
+}
+
+export function getResolvedTenantInfo(): { name: string; logo: string; subdomain?: string; customDomain?: string } {
+  return (window as any)._tenantBranding || { name: 'HomeCare Pro', logo: '', subdomain: undefined, customDomain: undefined };
 }

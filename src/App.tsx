@@ -12,6 +12,7 @@ import AuthView from './components/AuthView';
 import InviteAcceptView from './components/InviteAcceptView';
 import { supabase } from './lib/supabase';
 import { useHomeCareStore } from './store';
+import { extractSubdomain, getAppBaseDomain, buildTenantUrl } from './lib/subdomain';
 import { Toaster } from 'sonner';
 
 const DashboardView = lazy(() => import('./components/DashboardView'));
@@ -78,6 +79,27 @@ export default function App() {
   useEffect(() => {
     init();
   }, [init]);
+
+  // Redirect to tenant subdomain after login if on main domain
+  useEffect(() => {
+    if (!isAuthenticated || !profile) return;
+
+    // Don't redirect during invite flow
+    const hasInvite = new URLSearchParams(window.location.search).has('invite');
+    if (hasInvite) return;
+
+    // Don't redirect mega_admins (they manage from the main domain)
+    if (profile.role === 'mega_admin') return;
+
+    const tenant = tenants.find(t => t.id === profile.tenant_id);
+    if (!tenant?.subdomain || tenant.id === 'system') return;
+
+    // Only redirect if currently on the main domain (no subdomain)
+    const currentSubdomain = extractSubdomain(window.location.hostname);
+    if (!currentSubdomain) {
+      window.location.href = buildTenantUrl(tenant.subdomain);
+    }
+  }, [isAuthenticated, profile, tenants]);
 
   useEffect(() => {
     if (isAuthenticated) {

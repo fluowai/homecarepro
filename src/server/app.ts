@@ -66,6 +66,7 @@ export interface CreateAppOptions {
   isProduction?: boolean;
   asaasWebhookToken?: string;
   appUrl?: string;
+  appBaseDomain?: string;
   enableRateLimit?: boolean;
   dns?: DnsClient;
 }
@@ -77,6 +78,7 @@ export function createApp(options: CreateAppOptions) {
     isProduction = false,
     asaasWebhookToken,
     appUrl = "http://localhost:3000",
+    appBaseDomain = "localhost",
     enableRateLimit = true,
     dns: dnsClient,
   } = options;
@@ -84,6 +86,49 @@ export function createApp(options: CreateAppOptions) {
   const dns = dnsClient ?? dnsImpl;
 
   const SUPABASE_URL = process.env.VITE_SUPABASE_URL || "";
+  const APP_BASE_DOMAIN = appBaseDomain || process.env.APP_BASE_DOMAIN || "homecare.wootech.com.br";
+
+  const RESERVED_SUBDOMAINS = new Set([
+    'admin', 'api', 'app', 'system', 'www', 'mail', 'ftp', 'ns',
+    'dashboard', 'login', 'cdn', 'status', 'blog', 'docs', 'help',
+    'support', 'secure', 'checkout', 'pay', 'billing',
+  ]);
+
+  function extractSubdomain(hostname: string): string | null {
+    const normalizedBase = APP_BASE_DOMAIN.replace(/^https?:\/\//, '').replace(/\/.*$/, '').toLowerCase();
+    const cleanHost = hostname.toLowerCase().trim().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+
+    if (cleanHost === normalizedBase || cleanHost === `www.${normalizedBase}`) {
+      return null;
+    }
+
+    if (cleanHost.endsWith(`.${normalizedBase}`)) {
+      const sub = cleanHost.slice(0, -(normalizedBase.length + 1));
+      if (sub && sub !== 'www' && !sub.includes('.')) {
+        return sub;
+      }
+    }
+
+    if (process.env.NODE_ENV === 'development' && (cleanHost.includes('localhost') || cleanHost.includes('127.0.0.1'))) {
+      const parts = cleanHost.split(':')[0].split('.');
+      if (parts.length > 1 && parts[0] !== 'localhost') {
+        return parts[0];
+      }
+    }
+
+    return null;
+  }
+
+  function slugifySubdomain(name: string): string {
+    return name
+      .toLowerCase()
+      .trim()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 63);
+  }
 
   // ── Express App ─────────────────────────────────────────────────
   const app = express();
@@ -555,7 +600,7 @@ Apenas o objeto JSON valido, sem formatacao Markdown adicional nem blocos de cod
   app.put("/api/tenant/config", requireAuth, globalLimiter, async (req, res) => {
     try {
       const userId = (req as any).userId;
-      const { customDomain, primaryColor, secondaryColor, logo, tenantId } = req.body;
+       const { customDomain, primaryColor, secondaryColor, logo, subdomain, tenantId } = req.body;
 
       const { data: profile } = await supabaseAdmin
         .from("user_profiles")
@@ -582,20 +627,47 @@ Apenas o objeto JSON valido, sem formatacao Markdown adicional nem blocos de cod
         }
       }
 
+      // Validate and resolve subdomain
+      let resolvedSubdomain = subdomain;
+      if (subdomain !== undefined) {
+        resolvedSubdomain = (subdomain || "").trim().toLowerCase();
+        if (resolvedSubdomain) {
+          const subClean = slugifySubdomain(resolvedSubdomain);
+          if (!subClean || RESERVED_SUBDOMAINS.has(subClean) || subClean !== resolvedSubdomain) {
+            return res.status(400).json({ error: "Subdomínio inválido. Use apenas letras, números e hífen (não inicie/finalise com hífen). Valores reservados não são permitidos." });
+          }
+          resolvedSubdomain = subClean;
+          const { data: existing } = await supabaseAdmin
+            .from("tenants")
+            .select("id")
+            .eq("subdomain", resolvedSubdomain)
+            .neq("id", targetTenantId)
+            .maybeSingle();
+          if (existing) {
+            return res.status(400).json({ error: `Subdomínio "${resolvedSubdomain}" já está em uso por outra conta.` });
+          }
+        }
+      }
+
+      const updateData: Record<string, unknown> = {
+        custom_domain: customDomain || null,
+        primary_color: primaryColor || null,
+        secondary_color: secondaryColor || null,
+        logo: logo || null,
+        subdomain: resolvedSubdomain !== undefined ? (resolvedSubdomain || null) : undefined,
+      };
+      // Remove undefined keys so we don't overwrite with undefined
+      Object.keys(updateData).forEach(k => updateData[k] === undefined && delete updateData[k]);
+
       const { error } = await supabaseAdmin
         .from("tenants")
-        .update({
-          custom_domain: customDomain || null,
-          primary_color: primaryColor || null,
-          secondary_color: secondaryColor || null,
-          logo: logo || null
-        })
+        .update(updateData)
         .eq("id", targetTenantId);
 
       if (error) throw error;
 
-      logEvent("INFO", "Tenant config updated", { targetTenantId, customDomain });
-      res.json({ success: true });
+      logEvent("INFO", "Tenant config updated", { targetTenantId, customDomain, subdomain: resolvedSubdomain });
+      res.json({ success: true, subdomain: resolvedSubdomain });
     } catch (error: any) {
       logEvent("ERROR", "Tenant config update failed", { error: error.message });
       res.status(500).json({ error: "Falha ao atualizar configuração." });
@@ -612,14 +684,30 @@ Apenas o objeto JSON valido, sem formatacao Markdown adicional nem blocos de cod
       // Try to find tenant by custom_domain first
       let { data: tenant } = await supabaseAdmin
         .from("tenants")
-        .select("id, name, logo, primary_color, secondary_color, status")
+        .select("id, name, logo, primary_color, secondary_color, status, custom_domain, subdomain")
         .eq("custom_domain", domain)
         .single();
 
+      // If not found by custom_domain, try to resolve by subdomain
+      if (!tenant) {
+        const subdomain = extractSubdomain(domain);
+        if (subdomain) {
+          const { data: subTenant } = await supabaseAdmin
+            .from("tenants")
+            .select("id, name, logo, primary_color, secondary_color, status, custom_domain, subdomain")
+            .eq("subdomain", subdomain)
+            .single();
+          if (subTenant) {
+            tenant = subTenant;
+          }
+        }
+      }
+
+      // Fallback to system tenant
       if (!tenant) {
         const { data: defaultTenant } = await supabaseAdmin
           .from("tenants")
-          .select("id, name, logo, primary_color, secondary_color, status")
+          .select("id, name, logo, primary_color, secondary_color, status, custom_domain, subdomain")
           .eq("id", "system")
           .single();
         tenant = defaultTenant;
@@ -687,7 +775,7 @@ Apenas o objeto JSON valido, sem formatacao Markdown adicional nem blocos de cod
         return res.status(403).json({ error: "Acesso negado." });
       }
 
-      const { name, cnpj, plan, logo, customDomain, primaryColor, secondaryColor, adminEmail, adminName, parentId } = req.body;
+      const { name, cnpj, plan, logo, customDomain, primaryColor, secondaryColor, subdomain, adminEmail, adminName, parentId } = req.body;
       if (!name || !adminEmail) {
         return res.status(400).json({ error: "Nome da instância e e-mail do administrador são obrigatórios." });
       }
@@ -704,6 +792,45 @@ Apenas o objeto JSON valido, sem formatacao Markdown adicional nem blocos de cod
       }
       const inviteRole = targetParent ? "admin" : "super_admin";
 
+      // Resolve subdomain: use provided or auto-generate from name
+      let resolvedSubdomain = (subdomain || "").trim().toLowerCase();
+      if (resolvedSubdomain) {
+        const subClean = slugifySubdomain(resolvedSubdomain);
+        if (!subClean || RESERVED_SUBDOMAINS.has(subClean) || subClean !== resolvedSubdomain) {
+          return res.status(400).json({ error: "Subdomínio inválido. Use apenas letras, números e hífen (não inicie/finalise com hífen). Valores reservados não são permitidos." });
+        }
+        resolvedSubdomain = subClean;
+        // Check uniqueness
+        const { data: existing } = await supabaseAdmin
+          .from("tenants")
+          .select("id")
+          .eq("subdomain", resolvedSubdomain)
+          .maybeSingle();
+        if (existing) {
+          return res.status(400).json({ error: `Subdomínio "${resolvedSubdomain}" já está em uso.` });
+        }
+      } else {
+        // Auto-generate from name
+        resolvedSubdomain = slugifySubdomain(name);
+        if (!resolvedSubdomain || RESERVED_SUBDOMAINS.has(resolvedSubdomain)) {
+          resolvedSubdomain = `tenant-${Date.now().toString(36)}`;
+        }
+        // Ensure uniqueness with suffix
+        let tries = 0;
+        let unique = resolvedSubdomain;
+        while (tries < 20) {
+          const { data: existing } = await supabaseAdmin
+            .from("tenants")
+            .select("id")
+            .eq("subdomain", unique)
+            .maybeSingle();
+          if (!existing) break;
+          tries++;
+          unique = `${resolvedSubdomain}-${tries}`;
+        }
+        resolvedSubdomain = unique;
+      }
+
       const tenantId = `tenant-${Date.now().toString(36)}-${crypto.randomBytes(3).toString("hex")}`;
       const { error: insertError } = await supabaseAdmin.from("tenants").insert({
         id: tenantId,
@@ -714,6 +841,7 @@ Apenas o objeto JSON valido, sem formatacao Markdown adicional nem blocos de cod
         status: "active",
         parent_id: targetParent,
         custom_domain: customDomain || null,
+        subdomain: resolvedSubdomain,
         primary_color: primaryColor || null,
         secondary_color: secondaryColor || null,
       });
@@ -736,7 +864,7 @@ Apenas o objeto JSON valido, sem formatacao Markdown adicional nem blocos de cod
       // Enviar email transacional (não bloqueia a resposta, dispara em background)
       sendInviteEmail(adminEmail, inviteLink, inviteRole, "Sistema HomeCare Pro").catch(err => console.error("Async email error", err));
 
-      logEvent("INFO", "Tenant created with invitation", { tenantId, role: inviteRole, createdBy: userId, adminName: adminName || "" });
+      logEvent("INFO", "Tenant created with invitation", { tenantId, role: inviteRole, createdBy: userId, adminName: adminName || "", subdomain: resolvedSubdomain });
       res.status(201).json({
         tenant: {
           id: tenantId,
@@ -746,11 +874,13 @@ Apenas o objeto JSON valido, sem formatacao Markdown adicional nem blocos de cod
           logo: logo || "",
           parentId: targetParent,
           status: "active",
+          subdomain: resolvedSubdomain,
           customDomain: customDomain || undefined,
           primaryColor: primaryColor || undefined,
           secondaryColor: secondaryColor || undefined,
         },
         inviteLink: `${appUrl}/?invite=${token}`,
+        tenantUrl: resolvedSubdomain ? `https://${resolvedSubdomain}.${APP_BASE_DOMAIN}` : undefined,
       });
     } catch (error: any) {
       logEvent("ERROR", "Tenant creation failed", { error: error.message });
@@ -1146,8 +1276,9 @@ Apenas o objeto JSON valido, sem formatacao Markdown adicional nem blocos de cod
         return res.status(400).send("Missing domain");
       }
 
-      // Always allow the main domain and api subdomain
-      if (domain === "homecarepro.com.br" || domain === "api.homecarepro.com.br" || domain.includes("localhost")) {
+      // Always allow the main domain, base domain, and localhost
+      const normalizedDomain = domain.toLowerCase().trim();
+      if (normalizedDomain === APP_BASE_DOMAIN || domain.includes("localhost")) {
         return res.status(200).send("OK");
       }
 
@@ -1155,11 +1286,25 @@ Apenas o objeto JSON valido, sem formatacao Markdown adicional nem blocos de cod
       const { data: tenant } = await supabaseAdmin
         .from("tenants")
         .select("id, status")
-        .eq("custom_domain", domain)
+        .eq("custom_domain", normalizedDomain)
         .single();
 
       if (tenant && tenant.status === "active") {
         return res.status(200).send("OK");
+      }
+
+      // Check if domain is a valid subdomain of the base domain
+      const subdomain = extractSubdomain(normalizedDomain);
+      if (subdomain) {
+        const { data: subTenant } = await supabaseAdmin
+          .from("tenants")
+          .select("id, status")
+          .eq("subdomain", subdomain)
+          .single();
+
+        if (subTenant && subTenant.status === "active") {
+          return res.status(200).send("OK");
+        }
       }
 
       return res.status(404).send("Not Found");

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { User } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured } from './lib/supabase';
+import { extractSubdomain } from './lib/subdomain';
 import {
   Patient,
   Professional,
@@ -488,7 +489,7 @@ interface HomeCareState {
   addTenant: (tenant: Omit<Tenant, 'id'> & { id?: string }) => void;
   updateTenant: (id: string, updates: Partial<Tenant>) => void;
   refreshTenants: () => Promise<void>;
-  createTenantWithInvite: (input: { name: string; cnpj?: string; plan?: string; logo?: string; customDomain?: string; primaryColor?: string; secondaryColor?: string; adminEmail: string; parentId?: string; tenantType?: 'homecare' | 'cooperativa' }) => Promise<{ tenant: Tenant; inviteLink: string }>;
+  createTenantWithInvite: (input: { name: string; cnpj?: string; plan?: string; logo?: string; customDomain?: string; subdomain?: string; primaryColor?: string; secondaryColor?: string; adminEmail: string; parentId?: string; tenantType?: 'homecare' | 'cooperativa' }) => Promise<{ tenant: Tenant; inviteLink: string; tenantUrl?: string }>;
   regenerateInvite: (tenantId: string, adminEmail: string) => Promise<string>;
 
   // Offline/Sync Actions
@@ -791,7 +792,18 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
 
       if (profileError) throw profileError;
 
-      const tenantId = profile.tenant_id;
+      const profileTenantId = profile.tenant_id;
+
+      // Determine the active tenant: prioritize subdomain context over profile
+      const currentHostname = typeof window !== 'undefined' ? window.location.hostname : '';
+      const subdomain = extractSubdomain(currentHostname);
+      let activeTenantId = profileTenantId;
+
+      if (subdomain) {
+        // After tenants are loaded, check if the subdomain matches an accessible tenant
+        // This is set AFTER the tenants array is built below
+        (window as any)._pendingSubdomain = subdomain;
+      }
 
       // Load all tenant data from Supabase
       const [tenantsRes, patientsRes, profsRes, visitsRes, leadsRes, msgsRes, medsRes, surveysRes, surveyCfgRes, alertCfgRes, insurancesRes, assembliesRes, assemblyVotesRes, contractsRes, invoicesRes] = await Promise.all([
@@ -803,8 +815,8 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
         supabase.from('messages').select('*'),
         supabase.from('medicines').select('*'),
         supabase.from('surveys').select('*'),
-        supabase.from('survey_config').select('*').eq('tenant_id', tenantId).maybeSingle(),
-        supabase.from('alert_config').select('*').eq('tenant_id', tenantId).maybeSingle(),
+        supabase.from('survey_config').select('*').eq('tenant_id', profileTenantId).maybeSingle(),
+        supabase.from('alert_config').select('*').eq('tenant_id', profileTenantId).maybeSingle(),
         supabase.from('health_insurances').select('*'),
         supabase.from('assemblies').select('*'),
         supabase.from('assembly_votes').select('*'),
@@ -822,6 +834,7 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
         status: (r.status as Tenant['status']) || 'active',
         tenantType: (r.tenant_type as Tenant['tenantType']) || 'homecare',
         customDomain: (r.custom_domain as string) || undefined,
+        subdomain: (r.subdomain as string) || undefined,
         primaryColor: (r.primary_color as string) || undefined,
         secondaryColor: (r.secondary_color as string) || undefined,
       }));
@@ -853,7 +866,39 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
           }
         : DEFAULT_ALERT_CONFIG;
 
-      // Persist to localStorage as cache
+      // Resolve tenant by subdomain: if the current hostname has a subdomain that matches
+      // an accessible tenant, use that tenant as the active one
+      let resolvedTenantId = profileTenantId;
+      if (subdomain) {
+        const subdomainTenant = tenants.find(t => t.subdomain === subdomain && t.id !== 'system');
+        if (subdomainTenant) {
+          resolvedTenantId = subdomainTenant.id;
+          // If the subdomain tenant differs from profile tenant, re-fetch tenant configs
+          if (resolvedTenantId !== profileTenantId) {
+            const [subSurveyCfgRes, subAlertCfgRes] = await Promise.all([
+              supabase.from('survey_config').select('*').eq('tenant_id', resolvedTenantId).maybeSingle(),
+              supabase.from('alert_config').select('*').eq('tenant_id', resolvedTenantId).maybeSingle(),
+            ]);
+            if (subSurveyCfgRes.data) {
+              Object.assign(surveyConfig, {
+                channel: subSurveyCfgRes.data.channel,
+                autoSend: subSurveyCfgRes.data.auto_send,
+                messageTemplate: subSurveyCfgRes.data.message_template,
+              });
+            }
+            if (subAlertCfgRes.data) {
+              Object.assign(alertConfig, {
+                maxDaysWithoutVisit: subAlertCfgRes.data.max_days_without_visit,
+                expiryWarningDays: subAlertCfgRes.data.expiry_warning_days,
+                lowStockThreshold: subAlertCfgRes.data.low_stock_threshold,
+                enableSystemNotifications: subAlertCfgRes.data.enable_system_notifications,
+              });
+            }
+          }
+        }
+      }
+
+      // Persist to sessionStorage as cache
       saveToStorage('patients', patients);
       saveToStorage('professionals', professionals);
       saveToStorage('visits', visits);
@@ -868,7 +913,7 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
       saveToStorage('invoices', invoices);
       saveToStorage('surveyConfig', surveyConfig);
       saveToStorage('alertConfig', alertConfig);
-      saveToStorage('activeTenantId', tenantId);
+      saveToStorage('activeTenantId', resolvedTenantId);
 
       set({
         user,
@@ -876,7 +921,7 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
         currentUserRole: profile.role as any,
         isAuthenticated: true,
         isLoading: false,
-        activeTenantId: tenantId,
+        activeTenantId: resolvedTenantId,
         tenants,
         patients,
         professionals,
@@ -929,6 +974,7 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
       status: newTenant.status || 'active',
       tenant_type: newTenant.tenantType || 'homecare',
       custom_domain: newTenant.customDomain || null,
+      subdomain: newTenant.subdomain || null,
       primary_color: newTenant.primaryColor || null,
       secondary_color: newTenant.secondaryColor || null,
     });
@@ -938,7 +984,7 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
     const current = get().tenants;
     const next = current.map(t => t.id === id ? { ...t, ...updates } : t);
     set({ tenants: next });
-    
+
     // update backend
     const updated = next.find(t => t.id === id);
     if (updated) {
@@ -952,6 +998,7 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
         status: updated.status || 'active',
         tenant_type: updated.tenantType || 'homecare',
         custom_domain: updated.customDomain || null,
+        subdomain: updated.subdomain || null,
         primary_color: updated.primaryColor || null,
         secondary_color: updated.secondaryColor || null
       });
@@ -973,6 +1020,7 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
         status: (r.status as Tenant['status']) || 'active',
         tenantType: (r.tenant_type as Tenant['tenantType']) || 'homecare',
         customDomain: (r.custom_domain as string) || undefined,
+        subdomain: (r.subdomain as string) || undefined,
         primaryColor: (r.primary_color as string) || undefined,
         secondaryColor: (r.secondary_color as string) || undefined,
       }));
@@ -1008,13 +1056,14 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
       status: result.tenant.status || 'active',
       tenantType: result.tenant.tenantType || 'homecare',
       customDomain: result.tenant.customDomain || undefined,
+      subdomain: result.tenant.subdomain || undefined,
       primaryColor: result.tenant.primaryColor || undefined,
       secondaryColor: result.tenant.secondaryColor || undefined,
     };
     const updated = [...get().tenants, tenant];
     set({ tenants: updated });
     saveToStorage('tenants', updated);
-    return { tenant, inviteLink: result.inviteLink as string };
+    return { tenant, inviteLink: result.inviteLink as string, tenantUrl: result.tenantUrl as string };
   },
 
   regenerateInvite: async (tenantId, adminEmail) => {

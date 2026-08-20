@@ -7,7 +7,23 @@
   }
 }
 
-# Proxy dinâmico para todos os domínios via On-Demand TLS
+# Wildcard HTTPS for tenant subdomains: <subdomain>.homecare.wootech.com.br
+https://*.homecare.wootech.com.br {
+  tls {
+    on_demand
+  }
+
+  reverse_proxy homecarepro-web:3000
+  encode gzip
+  header {
+    Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+    X-Content-Type-Options "nosniff"
+    X-Frame-Options "DENY"
+    Referrer-Policy "strict-origin-when-cross-origin"
+  }
+}
+
+# Custom domains via On-Demand TLS (e.g., audcare.com.br, app.audcare.com.br)
 https:// {
   tls {
     on_demand
@@ -15,4 +31,10 @@ https:// {
 
   reverse_proxy homecarepro-web:3000
   encode gzip
+  header {
+    Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+    X-Content-Type-Options "nosniff"
+    X-Frame-Options "DENY"
+    Referrer-Policy "strict-origin-when-cross-origin"
+  }
 }

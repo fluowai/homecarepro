@@ -13,8 +13,9 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3000
-      # As variáveis abaixo devem ser preenchidas no Portainer (Environment Variables)
+      # As variáveis abaixo devem sido preenchidas no Portainer (Environment Variables)
       - APP_URL=${APP_URL:-http://localhost:3000}
+      - APP_BASE_DOMAIN=${APP_BASE_DOMAIN:-homecare.wootech.com.br}
       - VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
       - VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
       - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}

@@ -8,6 +8,7 @@ services:
       - NODE_ENV=production
       - PORT=3000
       - APP_URL=https://homecare.wootech.com.br
+      - APP_BASE_DOMAIN=homecare.wootech.com.br
       - VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
       - VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
       - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
@@ -31,6 +32,12 @@ services:
       - "traefik.http.routers.homecarepro_web.tls.certresolver=letsencryptresolver"
       - "traefik.http.routers.homecarepro_web.service=homecarepro_web"
       - "traefik.http.services.homecarepro_web.loadbalancer.server.port=3000"
+      # Wildcard subdomain router: <subdomain>.homecare.wootech.com.br
+      - "traefik.http.routers.homecarepro_wildcard.rule=Host(`*.homecare.wootech.com.br`)"
+      - "traefik.http.routers.homecarepro_wildcard.entrypoints=websecure"
+      - "traefik.http.routers.homecarepro_wildcard.tls.certresolver=letsencryptresolver"
+      - "traefik.http.routers.homecarepro_wildcard.service=homecarepro_wildcard"
+      - "traefik.http.services.homecarepro_wildcard.loadbalancer.server.port=3000"
     deploy:
       mode: replicated
       replicas: 2

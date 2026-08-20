@@ -21,6 +21,7 @@ const SUPABASE_URL = process.env.VITE_SUPABASE_URL || "";
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 const PORT = parseInt(process.env.PORT || "3000", 10);
 const APP_URL = process.env.APP_URL || "http://localhost:3000";
+const APP_BASE_DOMAIN = process.env.APP_BASE_DOMAIN || "localhost";
 const NODE_ENV = process.env.NODE_ENV || "development";
 const isProduction = NODE_ENV === "production";
 
@@ -52,6 +53,7 @@ const app = createApp({
   isProduction,
   asaasWebhookToken: process.env.ASAAS_WEBHOOK_TOKEN,
   appUrl: APP_URL,
+  appBaseDomain: APP_BASE_DOMAIN,
 });
 
 // ── Server Start ────────────────────────────────────────────────

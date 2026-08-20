@@ -13,6 +13,7 @@ export interface Tenant {
   status?: 'active' | 'inactive' | 'blocked';
   tenantType?: 'homecare' | 'cooperativa';
   customDomain?: string;
+  subdomain?: string;
   primaryColor?: string;
   secondaryColor?: string;
 }
