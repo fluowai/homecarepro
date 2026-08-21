@@ -148,6 +148,7 @@ export function createApp(options: CreateAppOptions) {
           ? ["'self'", (req: express.Request, res: express.Response) => `'nonce-${res.locals.cspNonce}'`]
           : ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
         styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+        mediaSrc: ["'self'", "blob:"],
         imgSrc: ["'self'", "data:", "https:"],
         connectSrc: ["'self'", SUPABASE_URL, "ws://localhost:*", "http://localhost:*"].filter(Boolean),
         fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
@@ -312,8 +313,19 @@ export function createApp(options: CreateAppOptions) {
       logEvent("INFO", "Audio transcription completed", { userId: (req as any).userId });
       return res.json({ transcription });
     } catch (error: any) {
-      logEvent("ERROR", "Audio transcription failed", { error: error.message });
-      res.status(500).json({ error: "Falha ao transcrever áudio." });
+      const statusCode = error?.status || error?.statusCode || 500;
+      const apiDetails = error?.response?.data || error?.error?.details || error?.details;
+      logEvent("ERROR", "Audio transcription failed", {
+        error: error.message,
+        stack: error.stack,
+        statusCode,
+        apiDetails,
+        userId: (req as any).userId,
+      });
+      const clientMessage = apiDetails
+        ? `Falha ao transcrever áudio: ${error.message}`
+        : "Falha ao transcrever áudio.";
+      res.status(statusCode).json({ error: clientMessage, ...(apiDetails ? { details: apiDetails } : {}) });
     }
   });
 

@@ -1600,10 +1600,17 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
     try {
       const res = await aiFetch('/api/gemini/transcribe', { audioData, mimeType });
       const data = await res.json();
+      if (!res.ok) {
+        const detail = data.details
+          ? `${data.error}: ${JSON.stringify(data.details)}`
+          : data.error;
+        throw new Error(detail || 'Erro ao transcrever áudio');
+      }
       if (data.transcription !== undefined) return data.transcription;
       throw new Error(data.error || 'Erro ao transcrever');
-    } catch {
-      return 'Falha na transcrição. Verifique a conexão com o servidor de IA e tente novamente.';
+    } catch (err: any) {
+      const msg = err?.message || 'Falha na transcrição. Verifique a conexão com o servidor de IA e tente novamente.';
+      throw new Error(msg);
     }
   },
 
