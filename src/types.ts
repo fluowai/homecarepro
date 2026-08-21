@@ -382,3 +382,19 @@ export interface AssemblyVote {
   vote: 'approve' | 'reject' | 'abstain';
   timestamp: string;
 }
+
+export interface EmailTemplate {
+  id: string;
+  tenantId: string | null;
+  name: string;
+  type: 'system' | 'tenant';
+  description?: string;
+  subject: string;
+  htmlContent: string;
+  textContent?: string;
+  variables: string[];
+  isActive: boolean;
+  isDefault: boolean;
+  createdAt: string;
+  updatedAt: string;
+}

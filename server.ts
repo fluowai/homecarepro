@@ -91,6 +91,7 @@ const startServer = async () => {
           VITE_SUPABASE_URL: process.env.VITE_SUPABASE_URL,
           VITE_SUPABASE_ANON_KEY: process.env.VITE_SUPABASE_ANON_KEY,
           VITE_APP_BASE_DOMAIN: process.env.APP_BASE_DOMAIN || process.env.VITE_APP_BASE_DOMAIN || "homecare.wootech.com.br",
+          VITE_PUBLIC_VAPID_KEY: process.env.VITE_PUBLIC_VAPID_KEY || "",
         })}</script>`;
         indexHtml = indexHtml.replace("</head>", `${envScript}</head>`);
         

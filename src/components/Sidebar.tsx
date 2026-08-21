@@ -23,8 +23,9 @@ import {
   Lock,
   ChevronDown,
   ChevronRight,
-  Server,
-  FileSignature
+   Server,
+   FileSignature,
+   Mail
 } from 'lucide-react';
 import { useHomeCareStore } from '../store';
 
@@ -114,13 +115,14 @@ export default function Sidebar({ currentView, setView, isOpen, onClose }: Sideb
           icon: Server, 
           roles: ['mega_admin'],
           subItems: [
-            { id: 'mega_overview', label: 'Visão Geral' },
-            { id: 'mega_network', label: 'Cadastro & Rede' },
-            { id: 'mega_plans', label: 'Planos' },
-            { id: 'mega_domains', label: 'Validação de Domínios' },
-            { id: 'mega_support', label: 'Suporte' },
-            { id: 'mega_users', label: 'Usuários Globais' },
-            { id: 'mega_team', label: 'Time Interno' }
+         { id: 'mega_overview', label: 'Visão Geral' },
+         { id: 'mega_network', label: 'Cadastro & Rede' },
+         { id: 'mega_plans', label: 'Planos' },
+         { id: 'mega_domains', label: 'Validação de Domínios' },
+         { id: 'mega_emails', label: 'Templates de E-mail' },
+         { id: 'mega_support', label: 'Suporte' },
+         { id: 'mega_users', label: 'Usuários Globais' },
+         { id: 'mega_team', label: 'Time Interno' }
           ]
         },
         { 
@@ -129,13 +131,14 @@ export default function Sidebar({ currentView, setView, isOpen, onClose }: Sideb
           icon: Building2, 
           roles: ['super_admin'],
           subItems: [
-            { id: 'super_overview', label: 'Visão Geral' },
-            { id: 'super_clinics', label: 'Cadastro & Clínicas' },
-            { id: 'super_plans', label: 'Planos' },
-            { id: 'super_domains', label: 'Validação de Domínios' },
-            { id: 'super_users', label: 'Usuários e Equipe' },
-            { id: 'super_whitelabel', label: 'Configuração Whitelabel' },
-            { id: 'super_support', label: 'Suporte' }
+         { id: 'super_overview', label: 'Visão Geral' },
+         { id: 'super_clinics', label: 'Cadastro & Clínicas' },
+         { id: 'super_plans', label: 'Planos' },
+         { id: 'super_domains', label: 'Validação de Domínios' },
+         { id: 'super_users', label: 'Usuários e Equipe' },
+         { id: 'super_whitelabel', label: 'Configuração Whitelabel' },
+         { id: 'super_emails', label: 'Templates de E-mail' },
+         { id: 'super_support', label: 'Suporte' }
           ]
         },
       ]
@@ -154,6 +157,12 @@ export default function Sidebar({ currentView, setView, isOpen, onClose }: Sideb
         { id: 'permissions', label: 'Permissões', icon: Lock, roles: ['admin'] },
         { id: 'integrations', label: 'Integrações', icon: Plug, roles: ['admin'] },
         { id: 'settings', label: 'Configurações', icon: Settings, roles: ['admin'] },
+        {
+          id: 'smtp_settings',
+          label: 'E-mail & Notificações',
+          icon: Mail,
+          roles: ['admin'],
+        },
       ]
     }
   ];

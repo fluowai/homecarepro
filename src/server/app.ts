@@ -3,11 +3,34 @@ import helmet from "helmet";
 import cors from "cors";
 import crypto from "crypto";
 import rateLimit from "express-rate-limit";
+import webpush from "web-push";
 import { GoogleGenAI } from "@google/genai";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { promises as dnsImpl } from "node:dns";
 import { z } from "zod";
 import { sendInviteEmail } from "./utils/mailer";
+
+const PUBLIC_VAPID_KEY = process.env.VITE_PUBLIC_VAPID_KEY || "";
+const PRIVATE_VAPID_KEY = process.env.PRIVATE_VAPID_KEY || "";
+
+let pushConfigured = false;
+if (PUBLIC_VAPID_KEY && PRIVATE_VAPID_KEY) {
+  webpush.setVapidDetails("https://homecare.wootech.com.br", PUBLIC_VAPID_KEY, PRIVATE_VAPID_KEY);
+  pushConfigured = true;
+}
+
+async function sendPushNotification(subscription: { endpoint: string; keys: { p256dh: string; auth: string } }, payload: any) {
+  if (!pushConfigured) return { success: false, error: "VAPID keys not configured" };
+  try {
+    await webpush.sendNotification(subscription, JSON.stringify(payload));
+    return { success: true };
+  } catch (err: any) {
+    if (err.statusCode === 410 || err.statusCode === 404) {
+      return { success: false, error: "Subscription expired", expired: true };
+    }
+    return { success: false, error: err.message };
+  }
+}
 
 // ── Zod validation schemas for AI endpoints ────────────────────────
 
@@ -49,6 +72,27 @@ const triageSchema = z.object({
   description: z.string().min(1),
   patientAge: z.number().int().positive().optional(),
   mainCondition: z.string().min(1).optional(),
+});
+
+const emailTemplateSchema = z.object({
+  name: z.string().min(1),
+  type: z.enum(['system', 'tenant']).optional().default('tenant'),
+  description: z.string().optional(),
+  subject: z.string().min(1),
+  htmlContent: z.string().min(1),
+  textContent: z.string().optional(),
+  variables: z.array(z.string()).optional(),
+  isActive: z.boolean().optional(),
+});
+
+const emailTemplateUpdateSchema = z.object({
+  name: z.string().min(1).optional(),
+  description: z.string().optional(),
+  subject: z.string().min(1).optional(),
+  htmlContent: z.string().min(1).optional(),
+  textContent: z.string().optional(),
+  variables: z.array(z.string()).optional(),
+  isActive: z.boolean().optional(),
 });
 
 // ── App Factory (testable) ───────────────────────────────────────
@@ -129,6 +173,137 @@ export function createApp(options: CreateAppOptions) {
       .replace(/^-+|-+$/g, '')
       .slice(0, 63);
   }
+
+  // ── Default System Email Templates ──────────────────────────────
+  const DEFAULT_TEMPLATES = [
+    {
+      id: 'tpl-system-invite',
+      tenant_id: null,
+      type: 'system',
+      name: 'invite',
+      description: 'E-mail de convite para novo usuário acessar o sistema',
+      subject: '{{role_name}} — Você foi convidado para acessar o HomeCare Pro',
+      html_content: `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 10px;">
+  <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 20px;">
+    <div style="width: 48px; height: 48px; background: #dcfce8; border-radius: 12px; display: flex; align-items: center; justify-content: center;">
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: #16a34a;">
+        <path d="M14.5 2v4h4l-5 5V2z"/>
+        <path d="M4 14l6 6 10-10"/>
+      </svg>
+    </div>
+    <h1 style="color: #0f172a; margin: 0; font-size: 20px;">HomeCare Pro</h1>
+  </div>
+  <h2 style="color: #0f172a;">Bem-vindo ao HomeCare Pro!</h2>
+  <p style="color: #334155; font-size: 16px; line-height: 1.6;">
+    Você foi convidado por <strong>{{inviter_name}}</strong> para acessar o sistema como <strong>{{role_name}}</strong>.
+  </p>
+  <p style="color: #334155; font-size: 16px; line-height: 1.6;">
+    Clique no botão abaixo para aceitar o convite e configurar seu acesso inicial:
+  </p>
+  <div style="text-align: center; margin: 30px 0;">
+    <a href="{{invite_link}}" style="background-color: #16a34a; color: #ffffff; padding: 12px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">
+      Aceitar Convite
+    </a>
+  </div>
+  <p style="color: #64748b; font-size: 14px; line-height: 1.6;">
+    Se o botão não funcionar, copie e cole este link no seu navegador:<br/>
+    <a href="{{invite_link}}" style="color: #2563eb; word-break: break-all;">{{invite_link}}</a>
+  </p>
+  <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
+  <p style="color: #94a3b8; font-size: 12px; text-align: center;">
+    {{inviter_name}}<br/>
+    Este é um e-mail automático, por favor não responda.
+  </p>
+</div>`,
+      variables: ['inviter_name', 'role_name', 'invite_link'],
+      is_default: true,
+    },
+    {
+      id: 'tpl-system-appointment_reminder',
+      tenant_id: null,
+      type: 'system',
+      name: 'appointment_reminder',
+      description: 'Lembrete de visita agendada ao paciente/familiar',
+      subject: 'Lembrete: Visita de hoje com {{professional_name}} às {{appointment_time}}',
+      html_content: `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 10px;">
+  <h2 style="color: #0f172a;">Lembrete de Consulta</h2>
+  <p style="color: #334155; font-size: 16px;">Olá {{patient_name}}, lembramos que sua visita de enfermagem está agendada para hoje.</p>
+  <div style="background: #f1f5f9; padding: 16px; border-radius: 8px; margin: 20px 0;">
+    <p style="margin: 0;"><strong>Data:</strong> {{appointment_date}}</p>
+    <p style="margin: 4px 0;"><strong>Horário:</strong> {{appointment_time}}</p>
+    <p style="margin: 4px 0;"><strong>Profissional:</strong> {{professional_name}}</p>
+    <p style="margin: 4px 0;"><strong>Clínica:</strong> {{clinic_name}}</p>
+  </div>
+  <p style="color: #64748b; font-size: 14px;">Em caso de impossibilidade, favor avisar com antecedência.</p>
+</div>`,
+      variables: ['patient_name', 'professional_name', 'appointment_date', 'appointment_time', 'clinic_name'],
+      is_default: true,
+    },
+    {
+      id: 'tpl-system-visit_confirmation',
+      tenant_id: null,
+      type: 'system',
+      name: 'visit_confirmation',
+      description: 'Confirmação de visita concluída ao paciente/familiar',
+      subject: 'Visita concluída — {{patient_name}} em {{visit_date}}',
+      html_content: `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 10px;">
+  <h2 style="color: #0f172a;">Visita Concluída com Sucesso</h2>
+  <p style="color: #334155; font-size: 16px;">Olá {{patient_name}}, informamos que o atendimento de hoje foi concluído com sucesso.</p>
+  <p style="color: #334155; font-size: 16px;">{{report_summary}}</p>
+  <p style="color: #64748b; font-size: 14px;">Os dados estão atualizados no prontuário digital.</p>
+</div>`,
+      variables: ['patient_name', 'visit_date', 'professional_name', 'report_summary'],
+      is_default: true,
+    },
+    {
+      id: 'tpl-system-survey_request',
+      tenant_id: null,
+      type: 'system',
+      name: 'survey_request',
+      description: 'Solicitação de pesquisa de satisfação após visita',
+      subject: 'Como foi seu atendimento de hoje, {{patient_name}}?',
+      html_content: `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 10px;">
+  <h2 style="color: #0f172a;">Pesquisa de Satisfação</h2>
+  <p style="color: #334155; font-size: 16px;">Olá {{patient_name}}, gostaríamos de saber como foi o atendimento com {{professional_name}}.</p>
+  <div style="text-align: center; margin: 30px 0;">
+    <a href="{{survey_link}}" style="background-color: #16a34a; color: #ffffff; padding: 12px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">
+      Avaliar Atendimento
+    </a>
+  </div>
+  <p style="color: #64748b; font-size: 14px;">Sua opinião ajuda a melhorar nossa qualidade de atendimento.</p>
+</div>`,
+      variables: ['patient_name', 'professional_name', 'survey_link'],
+      is_default: true,
+    },
+  ];
+
+  async function seedDefaultTemplates() {
+    try {
+      const { data: existing } = await supabaseAdmin.from('email_templates').select('id').not('id', 'like', 'tpl-%');
+      if (existing && existing.length > 0) return;
+
+      const now = new Date().toISOString();
+      const rows = DEFAULT_TEMPLATES.map((t) => ({
+        ...t,
+        is_active: true,
+        is_default: true,
+        variables: t.variables || [],
+        created_at: now,
+        updated_at: now,
+      }));
+
+      const { error } = await supabaseAdmin.from('email_templates').upsert(rows, { onConflict: 'id' });
+      if (error) {
+        console.error('[Seed] Failed to seed email templates:', error.message);
+      } else {
+        logEvent('INFO', 'Default email templates seeded', { count: rows.length });
+      }
+    } catch (err: any) {
+      console.error('[Seed] Error seeding templates:', err.message);
+    }
+  }
+
+  void seedDefaultTemplates();
 
   // ── Express App ─────────────────────────────────────────────────
   const app = express();
@@ -737,6 +912,223 @@ Apenas o objeto JSON valido, sem formatacao Markdown adicional nem blocos de cod
     } catch (error: any) {
       res.status(500).json({ error: "Failed to resolve tenant" });
     }
+   });
+
+  // ── Email Templates API ─────────────────────────────────────────────
+  // GET /api/email-templates — list templates visible to the authenticated user
+  //   Mega admin: all system templates
+  //   Super admin: system + their reseller tenant templates
+  //   Admin: system + their clinic tenant templates
+  app.get("/api/email-templates", requireAuth, globalLimiter, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const profile = await getProfile(userId);
+      if (!profile) {
+        return res.status(401).json({ error: "Perfil de usuário não encontrado." });
+      }
+
+      if (profile.role === "mega_admin") {
+        const { data, error } = await supabaseAdmin
+          .from("email_templates")
+          .select("*")
+          .is("tenant_id", null);
+        if (error) throw error;
+        return res.json(data || []);
+      }
+
+      const { data, error } = await supabaseAdmin
+        .from("email_templates")
+        .select("*")
+        .or(`tenant_id.eq.${profile.tenant_id},and(type.eq.system,tenant_id.is.null)`);
+      if (error) throw error;
+      return res.json(data || []);
+    } catch (error: any) {
+      logEvent("ERROR", "Failed to list email templates", { userId: (req as any).userId, error: error.message });
+      res.status(500).json({ error: "Falha ao listar templates de e-mail." });
+    }
+  });
+
+  // POST /api/email-templates — create a new template (mega_admin only for system templates, super_admin for tenant templates)
+  app.post("/api/email-templates", requireAuth, globalLimiter, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const profile = await getProfile(userId);
+      if (!profile || (profile.role !== "mega_admin" && profile.role !== "super_admin")) {
+        return res.status(403).json({ error: "Acesso negado." });
+      }
+
+      const result = emailTemplateSchema.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({ error: "Validation error", details: result.error.errors });
+      }
+
+      const isSystem = profile.role === "mega_admin" && result.data.type === "system";
+      const templateId = `tpl-${Date.now().toString(36)}-${crypto.randomBytes(3).toString("hex")}`;
+      const now = new Date().toISOString();
+
+      const { data, error } = await supabaseAdmin.from("email_templates").insert({
+        id: templateId,
+        tenant_id: isSystem ? null : profile.tenant_id,
+        type: isSystem ? "system" : "tenant",
+        name: result.data.name,
+        description: result.data.description || null,
+        subject: result.data.subject,
+        html_content: result.data.htmlContent,
+        text_content: result.data.textContent || null,
+        variables: result.data.variables || [],
+        is_active: result.data.isActive ?? true,
+        is_default: false,
+        created_at: now,
+        updated_at: now,
+      }).select().single();
+
+      if (error) throw error;
+      logEvent("INFO", "Email template created", { userId, templateId, name: result.data.name });
+      res.status(201).json(data);
+    } catch (error: any) {
+      logEvent("ERROR", "Failed to create email template", { userId: (req as any).userId, error: error.message });
+      res.status(500).json({ error: "Falha ao criar template de e-mail." });
+    }
+  });
+
+  // PUT /api/email-templates/:id — update a template
+  app.put("/api/email-templates/:id", requireAuth, globalLimiter, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const profile = await getProfile(userId);
+      if (!profile || (profile.role !== "mega_admin" && profile.role !== "super_admin")) {
+        return res.status(403).json({ error: "Acesso negado." });
+      }
+
+      const { id } = req.params;
+      const result = emailTemplateUpdateSchema.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({ error: "Validation error", details: result.error.errors });
+      }
+
+      const { data: existing } = await supabaseAdmin
+        .from("email_templates")
+        .select("tenant_id, type")
+        .eq("id", id)
+        .single();
+
+      if (!existing) {
+        return res.status(404).json({ error: "Template não encontrado." });
+      }
+
+      // mega_admin can edit any template; super_admin can only edit their own tenant templates
+      if (profile.role === "super_admin") {
+        if (existing.tenant_id !== profile.tenant_id && existing.type === "system") {
+          return res.status(403).json({ error: "Você não pode editar templates do sistema." });
+        }
+      }
+
+      const update: Record<string, unknown> = {
+        updated_at: new Date().toISOString(),
+      };
+      if (result.data.name !== undefined) update.name = result.data.name;
+      if (result.data.description !== undefined) update.description = result.data.description || null;
+      if (result.data.subject !== undefined) update.subject = result.data.subject;
+      if (result.data.htmlContent !== undefined) update.html_content = result.data.htmlContent;
+      if (result.data.textContent !== undefined) update.text_content = result.data.textContent || null;
+      if (result.data.variables !== undefined) update.variables = result.data.variables;
+      if (result.data.isActive !== undefined) update.is_active = result.data.isActive;
+
+      const { data, error } = await supabaseAdmin
+        .from("email_templates")
+        .update(update)
+        .eq("id", id)
+        .select().single();
+
+      if (error) throw error;
+      logEvent("INFO", "Email template updated", { userId, templateId: id });
+      res.json(data);
+    } catch (error: any) {
+      logEvent("ERROR", "Failed to update email template", { userId: (req as any).userId, error: error.message });
+      res.status(500).json({ error: "Falha ao atualizar template de e-mail." });
+    }
+  });
+
+  // DELETE /api/email-templates/:id — delete a template (mega_admin only, or own tenant templates)
+  app.delete("/api/email-templates/:id", requireAuth, globalLimiter, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const profile = await getProfile(userId);
+      if (!profile || (profile.role !== "mega_admin" && profile.role !== "super_admin")) {
+        return res.status(403).json({ error: "Acesso negado." });
+      }
+
+      const { id } = req.params;
+      const { data: existing } = await supabaseAdmin
+        .from("email_templates")
+        .select("tenant_id, type, is_default")
+        .eq("id", id)
+        .single();
+
+      if (!existing) {
+        return res.status(404).json({ error: "Template não encontrado." });
+      }
+
+      if (existing.is_default) {
+        return res.status(400).json({ error: "Templates padrão não podem ser excluídos." });
+      }
+
+      if (profile.role === "super_admin" && existing.type === "system") {
+        return res.status(403).json({ error: "Você não pode excluir templates do sistema." });
+      }
+
+      const { error } = await supabaseAdmin.from("email_templates").delete().eq("id", id);
+      if (error) throw error;
+      logEvent("INFO", "Email template deleted", { userId, templateId: id });
+      res.json({ success: true });
+    } catch (error: any) {
+      logEvent("ERROR", "Failed to delete email template", { userId: (req as any).userId, error: error.message });
+      res.status(500).json({ error: "Falha ao excluir template de e-mail." });
+    }
+  });
+
+  // POST /api/email-templates/render — render a template with variables (for preview/test)
+  app.post("/api/email-templates/render", requireAuth, globalLimiter, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const profile = await getProfile(userId);
+      if (!profile) {
+        return res.status(401).json({ error: "Perfil de usuário não encontrado." });
+      }
+
+      const { templateId, variables = {} } = req.body as { templateId?: string; variables?: Record<string, string> };
+
+      let query = supabaseAdmin.from("email_templates").select("*", { single: true });
+      if (templateId) {
+        query = query.eq("id", templateId);
+      } else {
+        const { name } = req.body as { name?: string };
+        if (!name) return res.status(400).json({ error: "templateId ou name é obrigatório." });
+        query = query.eq("name", name);
+      }
+
+      const { data: tmpl, error } = await query;
+      if (error || !tmpl) {
+        return res.status(404).json({ error: "Template não encontrado." });
+      }
+
+      const renderVar = (content: string, vars: Record<string, string>): string =>
+        content.replace(/\{\{(\w+)\}\}/g, (_, key: string) => {
+          const k = key.trim();
+          return vars[k] !== undefined ? vars[k] : `{{${key}}}`;
+        });
+
+      const rendered = {
+        subject: renderVar(tmpl.subject, variables),
+        html: renderVar(tmpl.html_content, variables),
+        text: tmpl.text_content ? renderVar(tmpl.text_content, variables) : undefined,
+      };
+
+      res.json(rendered);
+    } catch (error: any) {
+      logEvent("ERROR", "Failed to render email template", { userId: (req as any).userId, error: error.message });
+      res.status(500).json({ error: "Falha ao renderizar template." });
+    }
   });
 
   // ── File Uploads (MinIO) ─────────────────────────────────────────
@@ -874,7 +1266,7 @@ Apenas o objeto JSON valido, sem formatacao Markdown adicional nem blocos de cod
       const inviteLink = `${appUrl}/?invite=${token}`;
       
       // Enviar email transacional (não bloqueia a resposta, dispara em background)
-      sendInviteEmail(adminEmail, inviteLink, inviteRole, "Sistema HomeCare Pro").catch(err => console.error("Async email error", err));
+      sendInviteEmail(supabaseAdmin, adminEmail, inviteLink, inviteRole, "Sistema HomeCare Pro").catch(err => console.error("Async email error", err));
 
       logEvent("INFO", "Tenant created with invitation", { tenantId, role: inviteRole, createdBy: userId, adminName: adminName || "", subdomain: resolvedSubdomain });
       res.status(201).json({
@@ -943,7 +1335,7 @@ Apenas o objeto JSON valido, sem formatacao Markdown adicional nem blocos de cod
       if (inviteError) throw inviteError;
 
       const inviteLink = `${appUrl}/?invite=${token}`;
-      sendInviteEmail(adminEmail, inviteLink, inviteRole, "Sistema HomeCare Pro").catch(err => console.error("Async email error", err));
+      sendInviteEmail(supabaseAdmin, adminEmail, inviteLink, inviteRole, "Sistema HomeCare Pro").catch(err => console.error("Async email error", err));
 
       logEvent("INFO", "Invite regenerated", { tenantId, role: inviteRole, adminName: adminName || "" });
       res.status(201).json({ inviteLink });
@@ -986,7 +1378,7 @@ Apenas o objeto JSON valido, sem formatacao Markdown adicional nem blocos de cod
       if (error) throw error;
 
       const inviteLink = `${appUrl}/?invite=${token}`;
-      sendInviteEmail(String(email).toLowerCase(), inviteLink, targetRole, "Administração do Sistema").catch(err => console.error("Async email error", err));
+      sendInviteEmail(supabaseAdmin, String(email).toLowerCase(), inviteLink, targetRole, "Administração do Sistema").catch(err => console.error("Async email error", err));
 
       logEvent("INFO", "System team invite created", { email, role: targetRole, createdBy: userId });
       res.status(201).json({ inviteLink, email, role: targetRole });
@@ -1115,7 +1507,7 @@ Apenas o objeto JSON valido, sem formatacao Markdown adicional nem blocos de cod
       const token = (req.params as any).token;
       const { data: invite, error } = await supabaseAdmin
         .from("tenant_invitations")
-        .select("id, tenant_id, email, role, status, expires_at")
+        .select("id, tenant_id, email, role, status, expires_at, patient_id")
         .eq("token", token)
         .maybeSingle();
       if (error) throw error;
@@ -1136,6 +1528,7 @@ Apenas o objeto JSON valido, sem formatacao Markdown adicional nem blocos de cod
         id: invite.id,
         email: invite.email,
         role: invite.role,
+        patientId: invite.patient_id || undefined,
         tenant: tenant
           ? { id: tenant.id, name: tenant.name, logo: tenant.logo, primaryColor: tenant.primary_color, secondaryColor: tenant.secondary_color }
           : { id: invite.tenant_id, name: "Instância", logo: "" },
@@ -1159,7 +1552,7 @@ Apenas o objeto JSON valido, sem formatacao Markdown adicional nem blocos de cod
 
       const { data: invite, error } = await supabaseAdmin
         .from("tenant_invitations")
-        .select("id, tenant_id, email, role, status, expires_at")
+        .select("id, tenant_id, email, role, status, expires_at, patient_id")
         .eq("token", token)
         .maybeSingle();
       if (error) throw error;
@@ -1188,6 +1581,17 @@ Apenas o objeto JSON valido, sem formatacao Markdown adicional nem blocos de cod
       }
 
       await supabaseAdmin.from("tenant_invitations").update({ status: "accepted", accepted_at: new Date().toISOString() }).eq("id", invite.id);
+
+      // If this is a family invite, create the patient-family link
+      if (invite.role === 'family' && invite.patient_id && created?.user?.id) {
+        await supabaseAdmin.from("patient_family_links").insert({
+          tenant_id: invite.tenant_id,
+          patient_id: invite.patient_id,
+          family_user_id: created.user.id,
+          relationship: 'responsável legal',
+          is_primary: true,
+        });
+      }
 
       logEvent("INFO", "Invite accepted, account created", { userId: created?.user?.id, tenantId: invite.tenant_id, role: invite.role });
       res.status(201).json({ success: true, email: invite.email, role: invite.role });
@@ -1240,7 +1644,7 @@ Apenas o objeto JSON valido, sem formatacao Markdown adicional nem blocos de cod
 
       const { data: invite, error } = await supabaseAdmin
         .from("tenant_invitations")
-        .select("id, tenant_id, role, status, expires_at")
+        .select("id, tenant_id, role, status, expires_at, patient_id")
         .eq("email", normalizedEmail)
         .eq("status", "pending")
         .maybeSingle();
@@ -1271,6 +1675,17 @@ Apenas o objeto JSON valido, sem formatacao Markdown adicional nem blocos de cod
       }
 
       await supabaseAdmin.from("tenant_invitations").update({ status: "accepted", accepted_at: new Date().toISOString() }).eq("id", invite.id);
+
+      // If this is a family invite, create the patient-family link
+      if (invite.role === 'family' && invite.patient_id && created?.user?.id) {
+        await supabaseAdmin.from("patient_family_links").insert({
+          tenant_id: invite.tenant_id,
+          patient_id: invite.patient_id,
+          family_user_id: created.user.id,
+          relationship: 'responsável legal',
+          is_primary: true,
+        });
+      }
 
       logEvent("INFO", "Invite accepted by email (First Access)", { userId: created?.user?.id, tenantId: invite.tenant_id, role: invite.role });
       res.status(201).json({ success: true, email: normalizedEmail, role: invite.role });
@@ -1469,6 +1884,414 @@ Apenas o objeto JSON valido, sem formatacao Markdown adicional nem blocos de cod
       ],
       internationalTransfers: "Dados podem ser transferidos para servidores nos EUA (Supabase, Google Cloud) com garantias contratuais de protecao.",
     });
+  });
+
+  // ── Family Role & Patient-Family Links ───────────────────────────────
+
+  // Invite a family member to a specific patient (admin/operator/professional only)
+  app.post("/api/patient-family-links", requireAuth, globalLimiter, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const profile = await getProfile(userId);
+      if (!profile || !['admin', 'operator', 'professional'].includes(profile.role)) {
+        return res.status(403).json({ error: "Acesso negado." });
+      }
+
+      const { patientId, familyEmail, relationship, isPrimary } = req.body;
+      if (!patientId || !familyEmail) {
+        return res.status(400).json({ error: "patientId and familyEmail are required." });
+      }
+
+      const { data: patient } = await supabaseAdmin
+        .from("patients")
+        .select("id, name, tenant_id")
+        .eq("id", patientId)
+        .maybeSingle();
+
+      if (!patient) {
+        return res.status(404).json({ error: "Paciente não encontrado." });
+      }
+
+      // Check the user has tenant access to this patient's tenant
+      const hasAccess = await checkTenantAccess(supabaseAdmin, profile, patient.tenant_id);
+      if (!hasAccess) {
+        return res.status(403).json({ error: "Acesso negado ao paciente." });
+      }
+
+      // Create invitation with role 'family'
+      const token = newInviteToken();
+      const expiry = new Date(Date.now() + INVITE_TTL_MS).toISOString();
+
+      const { error: inviteError } = await supabaseAdmin.from("tenant_invitations").insert({
+        tenant_id: patient.tenant_id,
+        email: String(familyEmail).toLowerCase().trim(),
+        role: 'family',
+        token,
+        status: "pending",
+        expires_at: expiry,
+        created_by: userId,
+        patient_id: patientId,
+      });
+
+      if (inviteError) throw inviteError;
+
+      const inviteLink = `${appUrl}/?invite=${token}`;
+
+      logEvent("INFO", "Family member invited", { tenantId: patient.tenant_id, patientId, familyEmail, createdBy: userId });
+
+      // Send email with invite link (async)
+      sendInviteEmail(String(familyEmail).toLowerCase(), inviteLink, 'family', `HomeCare Pro — convite para ${patient.name}`).catch(err => console.error("Async email error", err));
+
+      res.status(201).json({ inviteLink, role: 'family' });
+    } catch (error: any) {
+      logEvent("ERROR", "Family invite failed", { error: error.message });
+      res.status(500).json({ error: "Falha ao convidar familiar." });
+    }
+  });
+
+  // List patients linked to the current family user (family role only)
+  app.get("/api/patient-family-links/mine", requireAuth, globalLimiter, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const profile = await getProfile(userId);
+
+      if (!profile || profile.role !== 'family') {
+        return res.status(403).json({ error: "Acesso negado. Apenas familiares podem listar seus pacientes." });
+      }
+
+      const { data: links, error } = await supabaseAdmin
+        .from("patient_family_links")
+        .select("*, patients(*)")
+        .eq("family_user_id", userId);
+
+      if (error) throw error;
+
+      res.json({ links: links || [] });
+    } catch (error: any) {
+      logEvent("ERROR", "Family link fetch failed", { error: error.message });
+      res.status(500).json({ error: "Falha ao buscar vínculos." });
+    }
+  });
+
+  // Helper: check tenant access using has_tenant_access function
+  async function checkTenantAccess(supabaseAdmin: SupabaseClient, profile: { role: string; tenant_id: string }, targetTenantId: string): Promise<boolean> {
+    if (profile.role === 'mega_admin') return true;
+    if (profile.tenant_id === targetTenantId) return true;
+    if (profile.role === 'super_admin') {
+      const { data: t, error } = await supabaseAdmin
+        .from("tenants")
+        .select("id")
+        .eq("id", targetTenantId)
+        .eq("parent_id", profile.tenant_id)
+        .maybeSingle();
+      return !error && !!t;
+    }
+    return false;
+  }
+
+  // ── Push Subscription ────────────────────────────────────────────────
+
+  // Save or update the user's push subscription (called by frontend after grant)
+  app.post("/api/push-subscription", requireAuth, globalLimiter, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const { endpoint, keys } = req.body;
+      if (!endpoint || !keys?.p256dh || !keys?.auth) {
+        return res.status(400).json({ error: "Invalid subscription payload." });
+      }
+
+      const profile = await getProfile(userId);
+
+      const { data: existing } = await supabaseAdmin
+        .from("push_subscriptions")
+        .select("id")
+        .eq("user_id", userId)
+        .maybeSingle();
+
+      const row = {
+        user_id: userId,
+        tenant_id: profile?.tenant_id || "",
+        endpoint,
+        p256dh_key: keys.p256dh,
+        auth_key: keys.auth,
+        last_seen: new Date().toISOString(),
+      };
+
+      let error;
+      if (existing) {
+        ({ error } = await supabaseAdmin.from("push_subscriptions").update(row).eq("id", existing.id));
+      } else {
+        ({ error } = await supabaseAdmin.from("push_subscriptions").insert(row));
+      }
+
+      if (error) throw error;
+
+      logEvent("INFO", "Push subscription saved", { userId });
+      res.json({ success: true });
+    } catch (error: any) {
+      logEvent("ERROR", "Push subscription save failed", { error: error.message });
+      res.status(500).json({ error: "Falha ao salvar subscription." });
+    }
+  });
+
+  // ── Notifications ────────────────────────────────────────────────────
+
+  // Send a notification + push to a specific user (tenant staff only)
+  app.post("/api/notifications/send", requireAuth, globalLimiter, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const profile = await getProfile(userId);
+      if (!profile || !['admin', 'operator', 'professional', 'family'].includes(profile.role)) {
+        return res.status(403).json({ error: "Acesso negado." });
+      }
+
+      const { targetUserId, title, body, type, severity, patientId } = req.body;
+      if (!targetUserId || !title || !body) {
+        return res.status(400).json({ error: "targetUserId, title and body are required." });
+      }
+
+      const targetProfile = await getProfile(targetUserId);
+      if (!targetProfile || !checkTenantAccessForProfile(supabaseAdmin, profile, targetProfile.tenant_id)) {
+        return res.status(403).json({ error: "Não autorizado a notificar este usuário." });
+      }
+
+      // Persist notification
+      const { data: notif, error: notifError } = await supabaseAdmin
+        .from("notifications")
+        .insert({
+          tenant_id: targetProfile.tenant_id,
+          user_id: targetUserId,
+          patient_id: patientId || null,
+          title,
+          body,
+          type: type || 'system',
+          severity: severity || 'info',
+          is_read: false,
+          is_delivered: false,
+        })
+        .select()
+        .single();
+
+      if (notifError) throw notifError;
+
+      // Fetch push subscriptions for the target user and send push
+      const { data: subs } = await supabaseAdmin
+        .from("push_subscriptions")
+        .select("endpoint, p256dh_key, auth_key")
+        .eq("user_id", targetUserId);
+
+      const expiredSubs: string[] = [];
+
+      if (subs && subs.length > 0) {
+        for (const sub of subs) {
+          const result = await sendPushNotification(
+            { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh_key, auth: sub.auth_key } },
+            { title, body, type, severity, patientId, url: `/${type === 'visit' ? 'checkin' : type === 'message' ? 'communication' : 'alerts'}` }
+          );
+          if (result.success) {
+            // mark delivered
+            await supabaseAdmin.from("notifications").update({ is_delivered: true }).eq("id", notif.id);
+          } else if (result.expired) {
+            expiredSubs.push(sub.endpoint);
+          }
+        }
+      }
+
+      // Clean up expired subscriptions
+      if (expiredSubs.length > 0) {
+        await supabaseAdmin.from("push_subscriptions").delete().in('endpoint', expiredSubs);
+      }
+
+      logEvent("INFO", "Notification sent", { targetUserId, tenantId: targetProfile.tenant_id, type, severity });
+      res.json({ success: true, notificationId: notif.id, pushSent: (subs?.length || 0) > 0 });
+    } catch (error: any) {
+      logEvent("ERROR", "Notification send failed", { error: error.message });
+      res.status(500).json({ error: "Falha ao enviar notificação." });
+    }
+  });
+
+  // Mark notification as read
+  app.patch("/api/notifications/:id/read", requireAuth, globalLimiter, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const notifId = (req.params as any).id;
+      const { error } = await supabaseAdmin
+        .from("notifications")
+        .update({ is_read: true })
+        .eq("id", notifId)
+        .eq("user_id", userId);
+
+      if (error) throw error;
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: "Falha ao marcar como lida." });
+    }
+  });
+
+  // Get unread notifications for current user
+  app.get("/api/notifications/unread", requireAuth, globalLimiter, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const { data, error } = await supabaseAdmin
+        .from("notifications")
+        .select("*")
+        .eq("user_id", userId)
+        .eq("is_read", false)
+        .order("created_at", { ascending: false })
+        .limit(50);
+
+      if (error) throw error;
+      res.json({ notifications: data || [] });
+    } catch (error: any) {
+      res.status(500).json({ error: "Falha ao buscar notificações." });
+    }
+  });
+
+  // Expose VAPID public key for frontend
+  app.get("/api/notifications/vapid-key", globalLimiter, (_req, res) => {
+    res.json({ publicKey: PUBLIC_VAPID_KEY });
+  });
+
+  // ── Internal: Send notification to family members of a patient ──────
+  // Called by other endpoints (e.g., check-in, alerts) to fan-out
+  async function notifyFamilyMembers(patientId: string, payload: { title: string; body: string; type: string; severity: string }, originTenantId: string) {
+    if (!pushConfigured) {
+      logEvent("WARN", "Push not configured, skipping family notification", { patientId });
+      return;
+    }
+
+    try {
+      const { data: links } = await supabaseAdmin
+        .from("patient_family_links")
+        .select("family_user_id")
+        .eq("patient_id", patientId)
+        .eq("tenant_id", originTenantId);
+
+      if (!links || links.length === 0) return;
+
+      for (const link of links) {
+        const { data: notif, error: notifError } = await supabaseAdmin
+          .from("notifications")
+          .insert({
+            tenant_id: originTenantId,
+            user_id: link.family_user_id,
+            patient_id: patientId,
+            title: payload.title,
+            body: payload.body,
+            type: payload.type as any,
+            severity: payload.severity as any,
+            is_read: false,
+            is_delivered: false,
+          })
+          .select()
+          .single();
+
+        if (notifError) {
+          logEvent("ERROR", "Notification persist failed", { error: notifError.message, patientId, familyUserId: link.family_user_id });
+          continue;
+        }
+
+        const { data: subs } = await supabaseAdmin
+          .from("push_subscriptions")
+          .select("endpoint, p256dh_key, auth_key")
+          .eq("user_id", link.family_user_id);
+
+        if (subs && subs.length > 0) {
+          for (const sub of subs) {
+            const result = await sendPushNotification(
+              { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh_key, auth: sub.auth_key } },
+              { title: payload.title, body: payload.body, type: payload.type, severity: payload.severity, patientId, url: '/alerts' }
+            );
+            if (result.success) {
+              await supabaseAdmin.from("notifications").update({ is_delivered: true }).eq("id", notif.id);
+            } else if (result.expired) {
+              await supabaseAdmin.from("push_subscriptions").delete().eq("endpoint", sub.endpoint);
+            }
+          }
+        }
+      }
+
+      logEvent("INFO", "Family notifications sent", { patientId, count: links.length });
+    } catch (error: any) {
+      logEvent("ERROR", "Family notification fan-out failed", { error: error.message, patientId });
+    }
+  }
+
+  // Expose notifyFamilyMembers via module-level (for use in other endpoints within createApp)
+  app.locals.notifyFamilyMembers = notifyFamilyMembers;
+
+  function checkTenantAccessForProfile(supabaseAdmin: SupabaseClient, profile: { role: string; tenant_id: string }, targetTenantId: string): boolean {
+    if (profile.role === 'mega_admin') return true;
+    if (profile.tenant_id === targetTenantId) return true;
+    if (profile.role === 'super_admin') return true;
+    return false;
+  }
+
+  // ── Auto notification triggers ──────────────────────────────────────
+  // Called by frontend when key events happen to fan out to family members
+
+  app.post("/api/notifications/trigger", requireAuth, globalLimiter, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const { eventType, patientId, message } = req.body;
+      if (!eventType || !patientId) {
+        return res.status(400).json({ error: "eventType and patientId are required." });
+      }
+
+      const { data: patient } = await supabaseAdmin
+        .from("patients")
+        .select("id, name, tenant_id")
+        .eq("id", patientId)
+        .maybeSingle();
+
+      if (!patient) {
+        return res.status(404).json({ error: "Paciente não encontrado." });
+      }
+
+      let title: string;
+      let body: string;
+      let type: string;
+      let severity: string;
+
+      switch (eventType) {
+        case 'visit_checkin':
+          title = 'Profissional em Visita';
+          body = message || `O profissional iniciou o atendimento em domicílio.`;
+          type = 'visit';
+          severity = 'info';
+          break;
+        case 'visit_checkout':
+          title = 'Visita Concluída';
+          body = message || `O atendimento foi finalizado com sucesso. Veja o relatório no sistema.`;
+          type = 'visit';
+          severity = 'info';
+          break;
+        case 'clinical_alert':
+          title = 'Alerta Clínico';
+          body = message || `Nova solicitação de atenção para o paciente.`;
+          type = 'clinical';
+          severity = severity || 'warning';
+          break;
+        case 'new_message':
+          title = 'Nova Mensagem';
+          body = message || `Você recebeu uma nova mensagem da equipe.`;
+          type = 'message';
+          severity = 'info';
+          break;
+        default:
+          return res.status(400).json({ error: "Unknown eventType." });
+      }
+
+      severity = req.body.severity || severity;
+
+      const payload = { title, body, type, severity };
+      await notifyFamilyMembers(patientId, payload, patient.tenant_id);
+
+      res.json({ success: true, sentTo: 'family_members' });
+    } catch (error: any) {
+      logEvent("ERROR", "Auto notification trigger failed", { error: error.message });
+      res.status(500).json({ error: "Falha ao disparar notificação." });
+    }
   });
 
   return app;

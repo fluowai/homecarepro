@@ -22,6 +22,7 @@ const ProfessionalsView = lazy(() => import('./components/ProfessionalsView'));
 const InsurancesView = lazy(() => import('./components/InsurancesView'));
 const CheckInView = lazy(() => import('./components/CheckInView'));
 const CommunicationView = lazy(() => import('./components/CommunicationView'));
+const EmailTemplatesManager = lazy(() => import('./components/EmailTemplatesManager'));
 const FinanceView = lazy(() => import('./components/FinanceView'));
 const CrmView = lazy(() => import('./components/CrmView'));
 const MedicinesView = lazy(() => import('./components/MedicinesView'));
@@ -177,13 +178,16 @@ export default function App() {
         return <CoopFinanceView />;
       case 'assemblies':
         return <AssembliesView />;
-      case 'users':
+       case 'users':
         return <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto"><TenantUserManager /></div>;
+      case 'smtp_settings':
+        return <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto"><EmailTemplatesManager scope="tenant" title="E-mail & Notificações" subtitle="Gerencie os templates de e-mail que são enviados aos pacientes e familiares." /></div>;
       case 'mega_overview':
       case 'mega_network':
       case 'mega_plans':
-      case 'mega_domains':
-      case 'mega_support':
+       case 'mega_domains':
+       case 'mega_emails':
+       case 'mega_support':
       case 'mega_users':
       case 'mega_team':
         return <SystemAdminView activeSection={currentView.replace('mega_', '')} onExit={handleSetView} />;
@@ -193,6 +197,7 @@ export default function App() {
       case 'super_domains':
       case 'super_users':
       case 'super_whitelabel':
+      case 'super_emails':
       case 'super_support':
         return <ResellerView activeSection={currentView.replace('super_', '')} onExit={handleSetView} />;
       default:

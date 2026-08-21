@@ -21,7 +21,8 @@ import {
   Assembly,
   AssemblyVote,
   Contract,
-  Invoice
+  Invoice,
+  EmailTemplate
 } from './types';
 
 // ── AI API helper (authenticated fetch) ─────────────────────────
@@ -438,6 +439,47 @@ function invoiceFromRow(r: Record<string, unknown>): Invoice {
   };
 }
 
+function emailTemplateToRow(t: EmailTemplate) {
+  return {
+    id: t.id,
+    tenant_id: t.tenantId ?? null,
+    name: t.name,
+    type: t.type,
+    description: t.description ?? null,
+    subject: t.subject,
+    html_content: t.htmlContent,
+    text_content: t.textContent ?? null,
+    variables: t.variables,
+    is_active: t.isActive,
+    is_default: t.isDefault,
+  };
+}
+
+function emailTemplateFromRow(r: Record<string, unknown>): EmailTemplate {
+  return {
+    id: r.id as string,
+    tenantId: (r.tenant_id as string) || null,
+    name: r.name as string,
+    type: (r.type as EmailTemplate['type']) || 'tenant',
+    description: (r.description as string) || '',
+    subject: r.subject as string,
+    htmlContent: r.html_content as string,
+    textContent: (r.text_content as string) || '',
+    variables: (r.variables as string[]) || [],
+    isActive: r.is_active === false ? false : true,
+    isDefault: r.is_default === true,
+    createdAt: (r.created_at as string) || new Date().toISOString(),
+    updatedAt: (r.updated_at as string) || new Date().toISOString(),
+  };
+}
+
+function renderTemplate(template: string, vars: Record<string, string>): string {
+  return template.replace(/\{\{(\w+)\}\}/g, (_, key) => {
+    const k = key.trim();
+    return vars[k] !== undefined ? vars[k] : `{{${key}}}`;
+  });
+}
+
 // ── Store interface ─────────────────────────────────────────────
 
 interface HomeCareState {
@@ -468,6 +510,7 @@ interface HomeCareState {
   assemblyVotes: AssemblyVote[];
   contracts: Contract[];
   invoices: Invoice[];
+  emailTemplates: EmailTemplate[];
 
   // RBAC
   currentUserRole: 'mega_admin' | 'super_admin' | 'admin' | 'auditor' | 'professional' | 'patient' | 'system_support';
@@ -572,6 +615,12 @@ interface HomeCareState {
   addInvoice: (invoice: Omit<Invoice, 'id' | 'tenantId' | 'createdAt' | 'updatedAt'>) => Promise<Invoice | null>;
   updateInvoice: (id: string, data: Partial<Invoice>) => Promise<void>;
   deleteInvoice: (id: string) => Promise<void>;
+
+  // Email Template Actions
+  addEmailTemplate: (template: Omit<EmailTemplate, 'id' | 'createdAt' | 'updatedAt'>) => Promise<EmailTemplate | null>;
+  updateEmailTemplate: (id: string, data: Partial<EmailTemplate>) => Promise<void>;
+  deleteEmailTemplate: (id: string) => Promise<void>;
+  renderEmailTemplate: (template: EmailTemplate, variables: Record<string, string>) => string;
 }
 
 // ── Helpers ─────────────────────────────────────────────────────
@@ -710,6 +759,7 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
   assemblyVotes: loadFromStorage('assemblyVotes', []),
   contracts: loadFromStorage('contracts', []),
   invoices: loadFromStorage('invoices', []),
+  emailTemplates: loadFromStorage('emailTemplates', []),
 
   // RBAC
   currentUserRole: 'admin',
@@ -806,7 +856,7 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
       }
 
       // Load all tenant data from Supabase
-      const [tenantsRes, patientsRes, profsRes, visitsRes, leadsRes, msgsRes, medsRes, surveysRes, surveyCfgRes, alertCfgRes, insurancesRes, assembliesRes, assemblyVotesRes, contractsRes, invoicesRes] = await Promise.all([
+      const [tenantsRes, patientsRes, profsRes, visitsRes, leadsRes, msgsRes, medsRes, surveysRes, surveyCfgRes, alertCfgRes, insurancesRes, assembliesRes, assemblyVotesRes, contractsRes, invoicesRes, templatesRes] = await Promise.all([
         supabase.from('tenants').select('*'),
         supabase.from('patients').select('*'),
         supabase.from('professionals').select('*'),
@@ -822,6 +872,7 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
         supabase.from('assembly_votes').select('*'),
         supabase.from('contracts').select('*'),
         supabase.from('invoices').select('*'),
+        supabase.from('email_templates').select('*'),
       ]);
 
       const tenants: Tenant[] = (tenantsRes.data ?? []).map((r) => ({
@@ -848,6 +899,7 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
       const medicines = (medsRes.data ?? []).map(medicineFromRow);
       const surveys = (surveysRes.data ?? []).map(surveyFromRow);
       const insurances = (insurancesRes.data ?? []).map(insuranceFromRow);
+      const emailTemplates = (templatesRes.data ?? []).map(emailTemplateFromRow);
       const assemblies = (assembliesRes.data ?? []).map(assemblyFromRow);
       const assemblyVotes = (assemblyVotesRes.data ?? []).map(assemblyVoteFromRow);
       const contracts = (contractsRes.data ?? []).map(contractFromRow);
@@ -911,6 +963,7 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
       saveToStorage('assemblyVotes', assemblyVotes);
       saveToStorage('contracts', contracts);
       saveToStorage('invoices', invoices);
+      saveToStorage('emailTemplates', emailTemplates);
       saveToStorage('surveyConfig', surveyConfig);
       saveToStorage('alertConfig', alertConfig);
       saveToStorage('activeTenantId', resolvedTenantId);
@@ -935,6 +988,7 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
         assemblyVotes,
         contracts,
         invoices,
+        emailTemplates,
         surveyConfig,
         alertConfig,
       });
@@ -1737,5 +1791,53 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
     saveToStorage('invoices', updated);
     const { error } = await supabase.from('invoices').delete().eq('id', id);
     if (error) console.error('[Store] deleteInvoice failed', error);
-  }
+  },
+
+  // ── Email Templates ──────────────────────────────────────────
+
+  addEmailTemplate: async (template) => {
+    const now = new Date().toISOString();
+    const newTemplate: EmailTemplate = {
+      ...template,
+      id: `tpl-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      createdAt: now,
+      updatedAt: now,
+    };
+    const updated = [...get().emailTemplates, newTemplate];
+    set({ emailTemplates: updated });
+    saveToStorage('emailTemplates', updated);
+    if (isSupabaseConfigured) {
+      const { error } = await supabase.from('email_templates').insert(emailTemplateToRow(newTemplate) as any);
+      if (error) console.error('[Store] addEmailTemplate failed', error);
+    }
+    return newTemplate;
+  },
+
+  updateEmailTemplate: async (id, data) => {
+    const current = get().emailTemplates.find((t) => t.id === id);
+    if (!current) return;
+    const now = new Date().toISOString();
+    const next: EmailTemplate = { ...current, ...data, updatedAt: now };
+    const updated = get().emailTemplates.map((t) => (t.id === id ? next : t));
+    set({ emailTemplates: updated });
+    saveToStorage('emailTemplates', updated);
+    if (isSupabaseConfigured) {
+      const { error } = await supabase.from('email_templates').update(emailTemplateToRow(next) as any).eq('id', id);
+      if (error) console.error('[Store] updateEmailTemplate failed', error);
+    }
+  },
+
+  deleteEmailTemplate: async (id) => {
+    const updated = get().emailTemplates.filter((t) => t.id !== id);
+    set({ emailTemplates: updated });
+    saveToStorage('emailTemplates', updated);
+    if (isSupabaseConfigured) {
+      const { error } = await supabase.from('email_templates').delete().eq('id', id);
+      if (error) console.error('[Store] deleteEmailTemplate failed', error);
+    }
+  },
+
+  renderEmailTemplate: (template, variables) => {
+    return renderTemplate(template.htmlContent, variables);
+  },
 }));

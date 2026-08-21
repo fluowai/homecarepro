@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Building2, Users, CreditCard, Activity, Search, Filter, Plus, Shield, Server, Package, LifeBuoy, Link2, LayoutDashboard, Globe, UserCog, Wrench, Settings } from 'lucide-react';
+import { Building2, Users, CreditCard, Activity, Search, Filter, Plus, Shield, Server, Package, LifeBuoy, Link2, LayoutDashboard, Globe, UserCog, Wrench, Settings, Mail } from 'lucide-react';
 import { useHomeCareStore } from '../store';
 import { PlanManager } from './PlanManager';
 import { SupportDesk } from './SupportDesk';
@@ -8,6 +8,7 @@ import { InternalTeamManager } from './InternalTeamManager';
 import { TenantEditorModal } from './TenantEditorModal';
 import { InviteLinkModal } from './InviteLinkModal';
 import { DomainValidator } from './DomainValidator';
+import EmailTemplatesManager from './EmailTemplatesManager';
 import { Tenant } from '../types';
 import { toast } from 'sonner';
 
@@ -29,6 +30,7 @@ const MENU_GROUPS = [
       { id: 'network', label: 'Cadastro & Rede', icon: Server },
       { id: 'plans', label: 'Planos', icon: Package },
       { id: 'domains', label: 'Validação de Domínios', icon: Globe },
+      { id: 'emails', label: 'Templates de E-mail', icon: Mail },
     ],
   },
   {
@@ -267,6 +269,8 @@ export default function SystemAdminView({ onExit, activeSection = 'overview' }: 
         return <div className="p-6 bg-gray-50/30"><InternalTeamManager /></div>;
       case 'domains':
         return <DomainValidator scope="all" />;
+      case 'emails':
+        return <EmailTemplatesManager scope="system" />;
       default:
         return renderOverview();
     }
