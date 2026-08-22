@@ -18,7 +18,7 @@ SaaS multi-tenant de gestão de Home Care em fase **pré-produção com hardenin
 3. localStorage de dados clínicos (migrar para sessionStorage com expiração).
 4. Features incompletas: upload de arquivos, Evolution API WhatsApp, GPS check-in.
 5. Testes: RLS (opt-in), E2E, componentes, zod validation em endpoints de IA.
-6. Supabase email confirmation + password reset flow.
+
 
 ## Corrigido em 2026-08-09
 - Dados mockados/simulados corrigidos: faturas persistidas no banco (migration `20260809120000_fix_invoices_schema.sql` aplicada), Dashboard/Finance/Admin/Cooperativa com métricas reais, IA sem conteúdo clínico simulado (503 honesto sem `GEMINI_API_KEY`), "Resolver" de alertas persistido, convites/planos/usuários internos reais. Typecheck, 64 testes e build verdes.
