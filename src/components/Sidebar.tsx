@@ -23,6 +23,8 @@ import {
   Lock,
   ChevronDown,
   ChevronRight,
+  Smartphone,
+  CheckCircle,
    Server,
    FileSignature,
    Mail
@@ -56,6 +58,7 @@ export default function Sidebar({ currentView, setView, isOpen, onClose }: Sideb
     auditor: 'Auditor (Leitura/Alertas)',
     professional: 'Profissional (Operação)',
     patient: 'Paciente/Familiar',
+    family: 'Família (Responsável)',
     viewer: 'Visualizador',
     system_support: 'Suporte (Sistema)',
     operator: 'Operador',
@@ -71,12 +74,23 @@ export default function Sidebar({ currentView, setView, isOpen, onClose }: Sideb
 
   const menuGroups: { title: string; items: MenuItem[] }[] = [
     {
+      title: 'MINHA SAÚDE',
+      items: [
+        { id: 'dashboard', label: 'Painel do Paciente', icon: Activity, roles: ['family', 'patient'] },
+        { id: 'family_messages', label: 'Mensagens', icon: MessageSquare, roles: ['family', 'patient'] },
+        { id: 'family_medicines', label: 'Medicamentos', icon: Pill, roles: ['family', 'patient'] },
+        { id: 'family_alerts', label: 'Alertas', icon: Bell, roles: ['family', 'patient'] },
+      ]
+    },
+    {
       title: 'OPERAÇÃO',
       items: [
         { id: 'dashboard', label: 'Painel Geral', icon: Activity, roles: ['admin', 'auditor', 'professional'] },
         { id: 'patients', label: 'Pacientes', icon: Users, roles: ['admin', 'auditor', 'professional'] },
         { id: 'schedules', label: 'Agenda', icon: Calendar, roles: ['admin', 'auditor', 'professional'] },
         { id: 'checkin', label: 'Check-ins', icon: MapPin, roles: ['admin', 'professional'] },
+        { id: 'approvals', label: 'Aprovar Plantões', icon: CheckCircle, roles: ['admin', 'auditor'] },
+        { id: 'professional_app', label: 'Meu App (Profissional)', icon: Smartphone, roles: ['professional'] },
         { id: 'professionals', label: 'Profissionais', icon: UserSquare2, roles: ['admin', 'auditor'] },
       ]
     },
@@ -97,6 +111,13 @@ export default function Sidebar({ currentView, setView, isOpen, onClose }: Sideb
         { id: 'contracts', label: 'Contratos', icon: FileSignature, roles: ['admin'] },
         { id: 'finance', label: 'Financeiro / NF-e', icon: DollarSign, roles: ['admin'] },
         { id: 'reports', label: 'Relatórios', icon: LineChart, roles: ['admin', 'auditor'] },
+      ]
+    },
+    {
+      title: 'COMUNICAÇÃO (WHATSAPP)',
+      items: [
+        { id: 'whatsapp_attendances', label: 'Atendimentos', icon: MessageSquare, roles: ['admin', 'professional', 'auditor'] },
+        { id: 'whatsapp_connections', label: 'Conexões', icon: Smartphone, roles: ['admin'] },
       ]
     },
     {

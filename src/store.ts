@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { User } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured } from './lib/supabase';
 import { extractSubdomain } from './lib/subdomain';
+import { triggerFamilyNotification } from './lib/notifications';
 import {
   Patient,
   Professional,
@@ -22,7 +23,8 @@ import {
   AssemblyVote,
   Contract,
   Invoice,
-  EmailTemplate
+  EmailTemplate,
+  PatientFamilyLink
 } from './types';
 
 // ── AI API helper (authenticated fetch) ─────────────────────────
@@ -512,9 +514,19 @@ interface HomeCareState {
   invoices: Invoice[];
   emailTemplates: EmailTemplate[];
 
+  // Family Links (for 'family' role)
+  familyPatientLinks: PatientFamilyLink[];
+
+  // Notification preferences
+  notificationAudioEnabled: boolean;
+  setNotificationAudioEnabled: (enabled: boolean) => void;
+
   // RBAC
-  currentUserRole: 'mega_admin' | 'super_admin' | 'admin' | 'auditor' | 'professional' | 'patient' | 'system_support';
-  setCurrentUserRole: (role: 'mega_admin' | 'super_admin' | 'admin' | 'auditor' | 'professional' | 'patient' | 'system_support') => void;
+  currentUserRole: 'mega_admin' | 'super_admin' | 'admin' | 'auditor' | 'professional' | 'patient' | 'family' | 'system_support';
+  setCurrentUserRole: (role: 'mega_admin' | 'super_admin' | 'admin' | 'auditor' | 'professional' | 'patient' | 'family' | 'system_support') => void;
+
+  // Family actions
+  fetchFamilyPatientLinks: () => Promise<void>;
 
   // Impersonation (Suporte)
   isImpersonating: boolean;
@@ -526,6 +538,7 @@ interface HomeCareState {
   // Auth actions
   init: () => Promise<void>;
   signOut: () => Promise<void>;
+  updateProfile: (updates: Partial<UserProfile>) => Promise<void>;
 
   // Actions
   setActiveTenant: (id: string) => void;
@@ -761,10 +774,38 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
   invoices: loadFromStorage('invoices', []),
   emailTemplates: loadFromStorage('emailTemplates', []),
 
+  // Family links (for 'family' role)
+  familyPatientLinks: [],
+
+  // Notification preferences
+  notificationAudioEnabled: loadFromStorage('notificationAudioEnabled', true),
+  setNotificationAudioEnabled: (enabled) => {
+    set({ notificationAudioEnabled: enabled });
+    saveToStorage('notificationAudioEnabled', enabled);
+  },
+
   // RBAC
   currentUserRole: 'admin',
   setCurrentUserRole: (role) => {
     set({ currentUserRole: role });
+  },
+
+  // Family actions
+  fetchFamilyPatientLinks: async () => {
+    if (!isSupabaseConfigured) return;
+    try {
+      const { data: session } = await supabase.auth.getSession();
+      const token = session?.session?.access_token;
+      if (!token) return;
+      const res = await fetch('/api/patient-family-links/mine', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return;
+      const result = await res.json();
+      set({ familyPatientLinks: result.links || [] });
+    } catch (err) {
+      console.error('[Store] Failed to fetch family links', err);
+    }
   },
 
   // Impersonation
@@ -992,6 +1033,11 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
         surveyConfig,
         alertConfig,
       });
+
+      // For family role, fetch linked patients
+      if (profile.role === 'family') {
+        get().fetchFamilyPatientLinks();
+      }
     } catch (err) {
       console.error('[Store] init failed', err);
       set({ isLoading: false, isAuthenticated: false, user: null, profile: null, initError: (err as Error).message });
@@ -1003,6 +1049,31 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
       await supabase.auth.signOut();
     }
     set({ user: null, profile: null, isAuthenticated: false });
+    window.location.href = '/login';
+  },
+
+  updateProfile: async (updates: Partial<UserProfile>) => {
+    const { profile } = get();
+    if (!profile) return;
+    
+    try {
+      const { error } = await supabase
+        .from('user_profiles')
+        .update({
+          full_name: updates.full_name,
+          avatar_url: updates.avatar_url,
+        })
+        .eq('id', profile.id);
+
+      if (error) throw error;
+
+      set({
+        profile: { ...profile, ...updates },
+      });
+    } catch (err) {
+      console.error('Error updating profile:', err);
+      throw err;
+    }
   },
 
   setActiveTenant: (id) => {
@@ -1357,6 +1428,16 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
         type: 'visit',
         author: prof?.name || 'Sistema',
       });
+
+      // Trigger family notification (non-blocking)
+      if (!isOff) {
+        triggerFamilyNotification(
+          'visit_checkin',
+          visit.patientId,
+          `O profissional ${prof?.name || 'técnico'} iniciou o atendimento às ${timeString}.`,
+          'info'
+        ).catch(() => {});
+      }
     }
 
     if (get().isOffline) {
@@ -1398,6 +1479,14 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
           const messageText = config.messageTemplate.replace('{professional_name}', prof?.name || 'técnico').replace('{survey_link}', `https://homecare.pro/survey/${surveyId}`);
           get().sendMessage(visit.patientId, messageText, 'system');
         }
+
+        // Trigger family notification (non-blocking)
+        triggerFamilyNotification(
+          'visit_checkout',
+          visit.patientId,
+          `O atendimento foi finalizado com sucesso. Veja o relatório no sistema.`,
+          'info'
+        ).catch(() => {});
       }
     }
 

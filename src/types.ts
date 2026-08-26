@@ -18,7 +18,7 @@ export interface Tenant {
   secondaryColor?: string;
 }
 
-export type UserRole = 'mega_admin' | 'super_admin' | 'admin' | 'operator' | 'professional' | 'patient' | 'viewer';
+export type UserRole = 'mega_admin' | 'super_admin' | 'admin' | 'operator' | 'professional' | 'patient' | 'viewer' | 'family' | 'system_support' | 'auditor';
 
 export interface UserProfile {
   id: string;
@@ -26,6 +26,17 @@ export interface UserProfile {
   fullName: string;
   role: UserRole;
   avatarUrl?: string;
+}
+
+export interface PatientFamilyLink {
+  id: string;
+  tenantId: string;
+  patientId: string;
+  familyUserId: string;
+  relationship: string;
+  isPrimary: boolean;
+  createdAt: string;
+  patient?: Patient;
 }
 
 export interface UserTenant {

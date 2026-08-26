@@ -32,3 +32,16 @@ export const getUploadPresignedUrl = async (fileName: string, mimeType: string) 
 
   return { uploadUrl, publicUrl };
 };
+
+export const uploadBuffer = async (fileName: string, buffer: Buffer, mimeType: string) => {
+  const command = new PutObjectCommand({
+    Bucket: bucketName,
+    Key: fileName,
+    Body: buffer,
+    ContentType: mimeType,
+  });
+
+  await s3Client.send(command);
+  
+  return `${endpoint}/${bucketName}/${fileName}`;
+};

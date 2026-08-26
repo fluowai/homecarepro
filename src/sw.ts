@@ -62,11 +62,11 @@ setCatchHandler(async ({ event }) => {
 // ── Push Notifications ───────────────────────────────────────────────
 
 const AUDIO_FILES: Record<string, string> = {
-  critical: '/audio/alert-critical.mp3',
-  warning: '/audio/alert-warning.mp3',
-  message: '/audio/message.mp3',
-  visit: '/audio/visit-start.mp3',
-  default: '/audio/alert-info.mp3',
+  critical: '/audio/alert-critical.wav',
+  warning: '/audio/alert-warning.wav',
+  message: '/audio/message.wav',
+  visit: '/audio/visit-start.wav',
+  default: '/audio/alert-info.wav',
 };
 
 self.addEventListener('push', (event: PushEvent) => {

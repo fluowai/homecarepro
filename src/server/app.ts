@@ -451,6 +451,44 @@ export function createApp(options: CreateAppOptions) {
     }
   });
 
+  app.post("/api/auth/reset-password", requireAuth, globalLimiter, async (req, res) => {
+    try {
+      const requesterId = (req as any).userId;
+      const { targetUserId, newPassword } = req.body;
+      
+      if (!targetUserId || !newPassword) {
+        return res.status(400).json({ error: "Missing required fields" });
+      }
+
+      // Check if requester is super_admin or mega_admin
+      const { data: requesterProfile } = await supabaseAdmin
+        .from("user_profiles")
+        .select("role, tenant_id")
+        .eq("id", requesterId)
+        .single();
+        
+      if (!requesterProfile || !['mega_admin', 'super_admin'].includes(requesterProfile.role)) {
+        return res.status(403).json({ error: "Unauthorized. Only admins can reset passwords." });
+      }
+
+      // Perform password update using Admin API
+      const { data, error } = await supabaseAdmin.auth.admin.updateUserById(targetUserId, {
+        password: newPassword,
+      });
+
+      if (error) {
+        logEvent("ERROR", "Password reset failed", { error: error.message, targetUserId });
+        return res.status(500).json({ error: "Falha ao resetar a senha." });
+      }
+
+      logEvent("INFO", "Password reset successfully", { targetUserId, requesterId });
+      res.json({ success: true });
+    } catch (error: any) {
+      logEvent("ERROR", "Password reset exception", { error: error.message });
+      res.status(500).json({ error: "Erro interno no servidor." });
+    }
+  });
+
   // ── AI Endpoints (authenticated) ────────────────────────────────
 
   // 1. Transcrição de Áudio

@@ -1,6 +1,7 @@
-import React from 'react';
-import { ArrowLeft, LogOut, Shield, X, ChevronDown } from 'lucide-react';
+import React, { useState } from 'react';
+import { ArrowLeft, LogOut, Shield, X, ChevronDown, Menu } from 'lucide-react';
 import { useHomeCareStore } from '../store';
+import { UserProfileModal } from './UserProfileModal';
 
 export interface AdminMenuItem {
   id: string;
@@ -61,7 +62,8 @@ export function AdminLayout({
   children,
 }: AdminLayoutProps) {
   const { profile, signOut, currentUserRole } = useHomeCareStore();
-  const [sidebarOpen, setSidebarOpen] = React.useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
   const accentCfg = ACCENTS[accent];
 
   const roleLabels: Record<string, string> = {
@@ -210,13 +212,22 @@ export function AdminLayout({
             {actions}
             <div className="h-8 w-px bg-gray-200 hidden md:block" />
             <div className="hidden md:flex items-center gap-3">
-              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm">
-                {profile?.full_name?.charAt(0).toUpperCase() || 'A'}
-              </div>
-              <div className="hidden lg:block text-right">
-                <p className="text-sm font-semibold text-gray-800 leading-none">{profile?.full_name || 'Administrador'}</p>
-                <p className="text-xs text-gray-500 mt-1">{brand}</p>
-              </div>
+              <button 
+                onClick={() => setShowProfileModal(true)}
+                className="flex items-center gap-3 text-left hover:bg-gray-50 p-1.5 rounded-xl transition-colors"
+              >
+                {profile?.avatar_url ? (
+                  <img src={profile.avatar_url} alt="Avatar" className="w-9 h-9 rounded-full object-cover border border-gray-200" />
+                ) : (
+                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm">
+                    {profile?.full_name?.charAt(0).toUpperCase() || 'A'}
+                  </div>
+                )}
+                <div className="hidden lg:block text-right">
+                  <p className="text-sm font-semibold text-gray-800 leading-none">{profile?.full_name || 'Administrador'}</p>
+                  <p className="text-xs text-gray-500 mt-1">{brand}</p>
+                </div>
+              </button>
             </div>
           </div>
         </header>
@@ -225,6 +236,9 @@ export function AdminLayout({
           {children}
         </main>
       </div>
+      {showProfileModal && (
+        <UserProfileModal onClose={() => setShowProfileModal(false)} />
+      )}
     </div>
   );
 }

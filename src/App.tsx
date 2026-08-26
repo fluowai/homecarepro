@@ -14,6 +14,13 @@ import { supabase } from './lib/supabase';
 import { useHomeCareStore } from './store';
 import { extractSubdomain, getAppBaseDomain, buildTenantUrl } from './lib/subdomain';
 import { Toaster } from 'sonner';
+import {
+  registerPushNotifications,
+  setupInstallPrompt,
+  isPWAInstalled,
+  getVapidPublicKey,
+  setAudioEnabled,
+} from './lib/notifications';
 
 const DashboardView = lazy(() => import('./components/DashboardView'));
 const PatientsView = lazy(() => import('./components/PatientsView'));
@@ -32,10 +39,17 @@ const ContractsView = lazy(() => import('./components/ContractsView'));
 const SystemAdminView = lazy(() => import('./components/SystemAdminView'));
 const ResellerView = lazy(() => import('./components/ResellerView'));
 const FamilyDashboardView = lazy(() => import('./components/FamilyDashboardView'));
+const FamilyMessagesView = lazy(() => import('./components/FamilyMessagesView'));
+const FamilyMedicinesView = lazy(() => import('./components/FamilyMedicinesView'));
+const FamilyAlertsView = lazy(() => import('./components/FamilyAlertsView'));
 const CoopFinanceView = lazy(() => import('./components/CoopFinanceView'));
 const AssembliesView = lazy(() => import('./components/AssembliesView'));
-const TenantUserManager = lazy(() => import('./components/TenantUserManager').then(m => ({ default: m.default || m.TenantUserManager })));
+const TenantUserManager = lazy(() => import('./components/TenantUserManager'));
 const WelcomeTour = lazy(() => import('./components/WelcomeTour'));
+const WhatsAppConnectionsView = lazy(() => import('./components/WhatsAppConnectionsView').then(m => ({ default: m.WhatsAppConnectionsView })));
+const AttendancesView = lazy(() => import('./components/AttendancesView').then(m => ({ default: m.AttendancesView })));
+const ApprovalDashboard = lazy(() => import('./components/ApprovalDashboard').then(m => ({ default: m.ApprovalDashboard })));
+const ProfessionalApp = lazy(() => import('./components/ProfessionalApp').then(m => ({ default: m.ProfessionalApp })));
 
 function LoadingScreen() {
   return (
@@ -76,10 +90,41 @@ export default function App() {
   const activeTenantId = useHomeCareStore((s) => s.activeTenantId);
   const currentUserRole = useHomeCareStore((s) => s.currentUserRole);
   const profile = useHomeCareStore((s) => s.profile);
+  const notificationAudioEnabled = useHomeCareStore((s) => s.notificationAudioEnabled);
 
   useEffect(() => {
     init();
   }, [init]);
+
+  // Sync audio preference to notification lib
+  useEffect(() => {
+    setAudioEnabled(notificationAudioEnabled);
+  }, [notificationAudioEnabled]);
+
+  // Setup push notifications + PWA install prompt after auth
+  useEffect(() => {
+    if (!isAuthenticated || !profile) return;
+
+    // Setup install prompt UI
+    setupInstallPrompt();
+
+    // Register push notifications (only if not already installed)
+    if (!isPWAInstalled()) {
+      (async () => {
+        try {
+          const vapidKey = await getVapidPublicKey();
+          if (vapidKey) {
+            const permission = await registerPushNotifications(vapidKey);
+            if (permission) {
+              console.log('[App] Push notifications registered');
+            }
+          }
+        } catch (err) {
+          console.error('[App] Push registration failed', err);
+        }
+      })();
+    }
+  }, [isAuthenticated, profile]);
 
   // Redirect to tenant subdomain after login if on main domain
   useEffect(() => {
@@ -146,10 +191,25 @@ export default function App() {
   const renderActiveView = () => {
     switch (currentView) {
       case 'dashboard':
-        if (currentUserRole === 'patient') {
+        if (currentUserRole === 'patient' || currentUserRole === 'family') {
           return <FamilyDashboardView />;
         }
         return <DashboardView setView={handleSetView} searchQuery={searchQuery} />;
+      case 'family_messages':
+        if (currentUserRole === 'family' || currentUserRole === 'patient') {
+          return <FamilyMessagesView />;
+        }
+        return <CommunicationView />;
+      case 'family_medicines':
+        if (currentUserRole === 'family' || currentUserRole === 'patient') {
+          return <FamilyMedicinesView />;
+        }
+        return <MedicinesView />;
+      case 'family_alerts':
+        if (currentUserRole === 'family' || currentUserRole === 'patient') {
+          return <FamilyAlertsView />;
+        }
+        return <AlertsView />;
       case 'patients':
         return <PatientsView searchQuery={searchQuery} />;
       case 'schedules':
@@ -178,6 +238,14 @@ export default function App() {
         return <CoopFinanceView />;
       case 'assemblies':
         return <AssembliesView />;
+      case 'whatsapp_connections':
+        return <WhatsAppConnectionsView />;
+      case 'whatsapp_attendances':
+        return <AttendancesView />;
+      case 'approvals':
+        return <ApprovalDashboard />;
+      case 'professional_app':
+        return <ProfessionalApp />;
        case 'users':
         return <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto"><TenantUserManager /></div>;
       case 'smtp_settings':

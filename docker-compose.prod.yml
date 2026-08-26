@@ -16,6 +16,7 @@ services:
       - ASAAS_API_KEY=${ASAAS_API_KEY}
       - ASAAS_WEBHOOK_TOKEN=${ASAAS_WEBHOOK_TOKEN}
       - RESEND_API_KEY=${RESEND_API_KEY}
+      - RESEND_FROM_EMAIL=${RESEND_FROM_EMAIL}
       - MINIO_ENDPOINT=${MINIO_ENDPOINT}
       - MINIO_REGION=${MINIO_REGION}
       - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY}
@@ -65,8 +66,48 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  evolution-api:
+    image: atendai/evolution-api:v2.2.1
+    restart: unless-stopped
+    environment:
+      - SERVER_URL=https://${APP_BASE_DOMAIN}/evolution
+      - AUTHENTICATION_TYPE=apikey
+      - AUTHENTICATION_API_KEY=${EVOLUTION_API_KEY}
+      - DATABASE_PROVIDER=sqlite
+      - DATABASE_CONNECTION_URI=sqlite://./db.sqlite
+    volumes:
+      - evolution_instances:/evolution/instances
+      - evolution_db:/evolution/db
+    networks:
+      - wootech1
+      - homecarepro_swarm_internal
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=wootech1"
+      - "traefik.http.routers.evolution_api.rule=Host(`${APP_BASE_DOMAIN}`) && PathPrefix(`/evolution`)"
+      - "traefik.http.routers.evolution_api.entrypoints=websecure"
+      - "traefik.http.routers.evolution_api.tls.certresolver=letsencryptresolver"
+      - "traefik.http.services.evolution_api.loadbalancer.server.port=8080"
+    deploy:
+      mode: replicated
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+      resources:
+        limits:
+          memory: 1G
+          cpus: "1.0"
+        reservations:
+          memory: 512M
+          cpus: "0.5"
+
 networks:
   wootech1:
     external: true
   homecarepro_swarm_internal:
     driver: overlay
+
+volumes:
+  evolution_instances:
+  evolution_db:
+
