@@ -23,8 +23,11 @@ import {
   Lock,
   ChevronDown,
   ChevronRight,
-  Server,
-  FileSignature
+  Smartphone,
+  CheckCircle,
+   Server,
+   FileSignature,
+   Mail
 } from 'lucide-react';
 import { useHomeCareStore } from '../store';
 
@@ -55,6 +58,7 @@ export default function Sidebar({ currentView, setView, isOpen, onClose }: Sideb
     auditor: 'Auditor (Leitura/Alertas)',
     professional: 'Profissional (Operação)',
     patient: 'Paciente/Familiar',
+    family: 'Família (Responsável)',
     viewer: 'Visualizador',
     system_support: 'Suporte (Sistema)',
     operator: 'Operador',
@@ -70,12 +74,23 @@ export default function Sidebar({ currentView, setView, isOpen, onClose }: Sideb
 
   const menuGroups: { title: string; items: MenuItem[] }[] = [
     {
+      title: 'MINHA SAÚDE',
+      items: [
+        { id: 'dashboard', label: 'Painel do Paciente', icon: Activity, roles: ['family', 'patient'] },
+        { id: 'family_messages', label: 'Mensagens', icon: MessageSquare, roles: ['family', 'patient'] },
+        { id: 'family_medicines', label: 'Medicamentos', icon: Pill, roles: ['family', 'patient'] },
+        { id: 'family_alerts', label: 'Alertas', icon: Bell, roles: ['family', 'patient'] },
+      ]
+    },
+    {
       title: 'OPERAÇÃO',
       items: [
         { id: 'dashboard', label: 'Painel Geral', icon: Activity, roles: ['admin', 'auditor', 'professional'] },
         { id: 'patients', label: 'Pacientes', icon: Users, roles: ['admin', 'auditor', 'professional'] },
         { id: 'schedules', label: 'Agenda', icon: Calendar, roles: ['admin', 'auditor', 'professional'] },
         { id: 'checkin', label: 'Check-ins', icon: MapPin, roles: ['admin', 'professional'] },
+        { id: 'approvals', label: 'Aprovar Plantões', icon: CheckCircle, roles: ['admin', 'auditor'] },
+        { id: 'professional_app', label: 'Meu App (Profissional)', icon: Smartphone, roles: ['professional'] },
         { id: 'professionals', label: 'Profissionais', icon: UserSquare2, roles: ['admin', 'auditor'] },
       ]
     },
@@ -99,6 +114,13 @@ export default function Sidebar({ currentView, setView, isOpen, onClose }: Sideb
       ]
     },
     {
+      title: 'COMUNICAÇÃO (WHATSAPP)',
+      items: [
+        { id: 'whatsapp_attendances', label: 'Atendimentos', icon: MessageSquare, roles: ['admin', 'professional', 'auditor'] },
+        { id: 'whatsapp_connections', label: 'Conexões', icon: Smartphone, roles: ['admin'] },
+      ]
+    },
+    {
       title: 'INTELIGÊNCIA',
       items: [
         { id: 'ai', label: 'IA Clínica', icon: Heart, roles: ['admin', 'auditor', 'professional', 'super_admin'] },
@@ -114,13 +136,14 @@ export default function Sidebar({ currentView, setView, isOpen, onClose }: Sideb
           icon: Server, 
           roles: ['mega_admin'],
           subItems: [
-            { id: 'mega_overview', label: 'Visão Geral' },
-            { id: 'mega_network', label: 'Cadastro & Rede' },
-            { id: 'mega_plans', label: 'Planos' },
-            { id: 'mega_domains', label: 'Validação de Domínios' },
-            { id: 'mega_support', label: 'Suporte' },
-            { id: 'mega_users', label: 'Usuários Globais' },
-            { id: 'mega_team', label: 'Time Interno' }
+         { id: 'mega_overview', label: 'Visão Geral' },
+         { id: 'mega_network', label: 'Cadastro & Rede' },
+         { id: 'mega_plans', label: 'Planos' },
+         { id: 'mega_domains', label: 'Validação de Domínios' },
+         { id: 'mega_emails', label: 'Templates de E-mail' },
+         { id: 'mega_support', label: 'Suporte' },
+         { id: 'mega_users', label: 'Usuários Globais' },
+         { id: 'mega_team', label: 'Time Interno' }
           ]
         },
         { 
@@ -129,13 +152,14 @@ export default function Sidebar({ currentView, setView, isOpen, onClose }: Sideb
           icon: Building2, 
           roles: ['super_admin'],
           subItems: [
-            { id: 'super_overview', label: 'Visão Geral' },
-            { id: 'super_clinics', label: 'Cadastro & Clínicas' },
-            { id: 'super_plans', label: 'Planos' },
-            { id: 'super_domains', label: 'Validação de Domínios' },
-            { id: 'super_users', label: 'Usuários e Equipe' },
-            { id: 'super_whitelabel', label: 'Configuração Whitelabel' },
-            { id: 'super_support', label: 'Suporte' }
+         { id: 'super_overview', label: 'Visão Geral' },
+         { id: 'super_clinics', label: 'Cadastro & Clínicas' },
+         { id: 'super_plans', label: 'Planos' },
+         { id: 'super_domains', label: 'Validação de Domínios' },
+         { id: 'super_users', label: 'Usuários e Equipe' },
+         { id: 'super_whitelabel', label: 'Configuração Whitelabel' },
+         { id: 'super_emails', label: 'Templates de E-mail' },
+         { id: 'super_support', label: 'Suporte' }
           ]
         },
       ]
@@ -154,6 +178,12 @@ export default function Sidebar({ currentView, setView, isOpen, onClose }: Sideb
         { id: 'permissions', label: 'Permissões', icon: Lock, roles: ['admin'] },
         { id: 'integrations', label: 'Integrações', icon: Plug, roles: ['admin'] },
         { id: 'settings', label: 'Configurações', icon: Settings, roles: ['admin'] },
+        {
+          id: 'smtp_settings',
+          label: 'E-mail & Notificações',
+          icon: Mail,
+          roles: ['admin'],
+        },
       ]
     }
   ];

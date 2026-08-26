@@ -18,6 +18,7 @@ interface MockOptions {
   adminDeleteUser?: () => { error?: unknown };
   adminCreateUser?: () => { data?: unknown; error?: unknown };
   dns?: { resolveCname: (h: string) => Promise<string[]>; resolve4: (h: string) => Promise<string[]> };
+  appBaseDomain?: string;
 }
 
 function createMockSupabase(opts: MockOptions) {
@@ -96,6 +97,7 @@ function makeApp(opts: MockOptions = {}) {
     isProduction: false,
     enableRateLimit: false,
     dns: opts.dns,
+    appBaseDomain: opts.appBaseDomain || "homecare.wootech.com.br",
   });
   return { app, calls, supabase };
 }
@@ -189,10 +191,46 @@ describe("GET /api/tenant/resolve", () => {
     expect(res.status).toBe(403);
   });
 
-  it("retorna 404 quando nem custom nem system existem", async () => {
-    const { app } = makeApp({ tableResult: () => ({ data: null, error: null }) });
-    const res = await request(app).get("/api/tenant/resolve").query({ domain: "ghost.com" });
-    expect(res.status).toBe(404);
+   it("retorna 404 quando nem custom nem system existem", async () => {
+     const { app } = makeApp({ tableResult: () => ({ data: null, error: null }) });
+     const res = await request(app).get("/api/tenant/resolve").query({ domain: "ghost.com" });
+     expect(res.status).toBe(404);
+   });
+
+  it("resolve tenant por subdomain", async () => {
+    const { app } = makeApp({
+      appBaseDomain: "homecare.wootech.com.br",
+      tableResult: (table, method, eqPairs) => {
+        if (table === "tenants") {
+          const hasCustomDomain = eqPairs.some(([col]) => col === "custom_domain");
+          const hasSubdomain = eqPairs.some(([col]) => col === "subdomain");
+          if (hasCustomDomain) return { data: null, error: null };
+          if (hasSubdomain) return { data: { id: "t-sub", name: "Clínica Sub", status: "active", custom_domain: null, subdomain: "clinicasub" }, error: null };
+        }
+        return { data: null, error: null };
+      },
+    });
+    const res = await request(app).get("/api/tenant/resolve").query({ domain: "clinicasub.homecare.wootech.com.br" });
+    expect(res.status).toBe(200);
+    expect(res.body.id).toBe("t-sub");
+    expect(res.body.subdomain).toBe("clinicasub");
+  });
+
+  it("retorna 403 para tenant inativo resolvido por subdomain", async () => {
+    const { app } = makeApp({
+      appBaseDomain: "homecare.wootech.com.br",
+      tableResult: (table, method, eqPairs) => {
+        if (table === "tenants") {
+          const hasSubdomain = eqPairs.some(([col]) => col === "subdomain");
+          if (hasSubdomain) return { data: { id: "t-sub", status: "inactive" }, error: null };
+          const isSystem = eqPairs.some(([col, val]) => col === "id" && val === "system");
+          if (isSystem) return { data: null, error: null };
+        }
+        return { data: null, error: null };
+      },
+    });
+    const res = await request(app).get("/api/tenant/resolve").query({ domain: "inactiva.homecare.wootech.com.br" });
+    expect(res.status).toBe(403);
   });
 });
 
@@ -415,6 +453,34 @@ describe("PUT /api/tenant/config", () => {
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
   });
+
+  it("atualiza subdomain no PUT /api/tenant/config", async () => {
+    const { app, calls } = makeApp({
+      tableResult: (table, method, eqPairs) => {
+        if (table === "user_profiles") return { data: { role: "mega_admin", tenant_id: "sp" }, error: null };
+        if (table === "tenants" && method === "maybeSingle") return { data: null, error: null };
+        if (table === "tenants") return { data: { id: "sp" }, error: null };
+        return { data: null, error: null };
+      },
+    });
+    const res = await request(app)
+      .put("/api/tenant/config")
+      .set(AUTH)
+      .send({ subdomain: "novo-sub" });
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.subdomain).toBe("novo-sub");
+  });
+
+  it("rejeita subdomain reservado no PUT /api/tenant/config", async () => {
+    const { app } = makeApp(adminProfile("mega_admin", "sp"));
+    const res = await request(app)
+      .put("/api/tenant/config")
+      .set(AUTH)
+      .send({ subdomain: "admin" });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain("inválido");
+  });
 });
 
 describe("GET /api/internal/caddy-ask", () => {
@@ -425,8 +491,8 @@ describe("GET /api/internal/caddy-ask", () => {
   });
 
   it("autoriza localhost e domínios principais", async () => {
-    const { app } = makeApp();
-    for (const domain of ["localhost", "api.homecarepro.com.br", "homecarepro.com.br"]) {
+    const { app } = makeApp({ appBaseDomain: "homecare.wootech.com.br" });
+    for (const domain of ["localhost", "homecare.wootech.com.br"]) {
       const res = await request(app).get("/api/internal/caddy-ask").query({ domain });
       expect(res.status).toBe(200);
     }
@@ -444,6 +510,40 @@ describe("GET /api/internal/caddy-ask", () => {
   it("nega domínio desconhecido", async () => {
     const { app } = makeApp();
     const res = await request(app).get("/api/internal/caddy-ask").query({ domain: "estranho.com.br" });
+    expect(res.status).toBe(404);
+  });
+
+  it("autoriza subdomain válido de tenant ativo", async () => {
+    const { app } = makeApp({
+      appBaseDomain: "homecare.wootech.com.br",
+      tableResult: (table, method, eqPairs) => {
+        if (table === "tenants") {
+          const hasCustomDomain = eqPairs.some(([col]) => col === "custom_domain");
+          const hasSubdomain = eqPairs.some(([col]) => col === "subdomain");
+          if (hasCustomDomain) return { data: null, error: null };
+          if (hasSubdomain) return { data: { id: "t1", status: "active" }, error: null };
+        }
+        return { data: null, error: null };
+      },
+    });
+    const res = await request(app).get("/api/internal/caddy-ask").query({ domain: "clinicasub.homecare.wootech.com.br" });
+    expect(res.status).toBe(200);
+  });
+
+  it("nega subdomain de tenant inativo", async () => {
+    const { app } = makeApp({
+      appBaseDomain: "homecare.wootech.com.br",
+      tableResult: (table, method, eqPairs) => {
+        if (table === "tenants") {
+          const hasCustomDomain = eqPairs.some(([col]) => col === "custom_domain");
+          const hasSubdomain = eqPairs.some(([col]) => col === "subdomain");
+          if (hasCustomDomain) return { data: null, error: null };
+          if (hasSubdomain) return { data: { id: "t1", status: "inactive" }, error: null };
+        }
+        return { data: null, error: null };
+      },
+    });
+    const res = await request(app).get("/api/internal/caddy-ask").query({ domain: "inactiva.homecare.wootech.com.br" });
     expect(res.status).toBe(404);
   });
 });
@@ -488,6 +588,40 @@ describe("POST /api/admin/tenants", () => {
     expect(res.status).toBe(201);
     expect(res.body.tenant.parentId).toBe("rev-1");
     expect(res.body.inviteLink).toContain("/?invite=");
+  });
+
+  it("garante subdomain único no create (auto-generated)", async () => {
+    const { app } = makeApp({
+      tableResult: (table, method, eqPairs) => {
+        if (table === "user_profiles") return { data: { role: "mega_admin", tenant_id: "sp" }, error: null };
+        if (table === "tenants" && eqPairs.some(([col]) => col === "subdomain")) return { data: null, error: null };
+        return { data: null, error: null };
+      },
+    });
+    const res = await request(app)
+      .post("/api/admin/tenants")
+      .set(AUTH)
+      .send({ name: "Clínica Teste", adminEmail: "teste@cli.com" });
+    expect(res.status).toBe(201);
+    expect(res.body.tenant.subdomain).toBe("clinica-teste");
+    expect(res.body.tenantUrl).toContain("clinica-teste.homecare.wootech.com.br");
+  });
+
+  it("usa subdomain fornecido no create e rejeita subdomain reservado", async () => {
+    const { app } = makeApp({
+      tableResult: (table, method, eqPairs) => {
+        if (table === "user_profiles") return { data: { role: "mega_admin", tenant_id: "sp" }, error: null };
+        if (table === "tenants" && eqPairs.some(([col]) => col === "subdomain")) return { data: null, error: null };
+        if (table === "tenant_invitations") return { data: null, error: null };
+        return { data: null, error: null };
+      },
+    });
+    const res = await request(app)
+      .post("/api/admin/tenants")
+      .set(AUTH)
+      .send({ name: "Clínica X", adminEmail: "x@cli.com", subdomain: "api" });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain("Subdomínio inválido");
   });
 });
 

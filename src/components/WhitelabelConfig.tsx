@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Settings, Globe, Palette, Upload, Loader2, Save } from 'lucide-react';
 import { useHomeCareStore } from '../store';
 import { supabase } from '../lib/supabase';
+import { getAppBaseDomain } from '../lib/subdomain';
 
 export function WhitelabelConfig() {
   const profile = useHomeCareStore((s) => s.profile);
@@ -11,6 +12,7 @@ export function WhitelabelConfig() {
   
   const [config, setConfig] = useState({
     customDomain: '',
+    subdomain: '',
     primaryColor: '#0066FF',
     secondaryColor: '#E6F0FF',
     logo: ''
@@ -25,7 +27,7 @@ export function WhitelabelConfig() {
       setLoading(true);
       const { data, error } = await supabase
         .from('tenants')
-        .select('custom_domain, primary_color, secondary_color, logo')
+        .select('custom_domain, subdomain, primary_color, secondary_color, logo')
         .eq('id', profile?.tenant_id)
         .single();
         
@@ -34,6 +36,7 @@ export function WhitelabelConfig() {
       if (data) {
         setConfig({
           customDomain: data.custom_domain || '',
+          subdomain: data.subdomain || '',
           primaryColor: data.primary_color || '#0066FF',
           secondaryColor: data.secondary_color || '#E6F0FF',
           logo: data.logo || ''
@@ -108,12 +111,32 @@ export function WhitelabelConfig() {
           <div className="space-y-4">
             <div className="flex items-center space-x-2 border-b pb-2">
               <Globe className="h-5 w-5 text-gray-400" />
-              <h3 className="text-lg font-medium text-gray-900">Domínio Personalizado</h3>
+              <h3 className="text-lg font-medium text-gray-900">Domínio e Subdomínio</h3>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Seu Domínio
+                  Seu Subdomínio
+                </label>
+                <div className="flex items-center">
+                  <input
+                    type="text"
+                    placeholder="minhaclinica"
+                    value={config.subdomain}
+                    onChange={(e) => setConfig({ ...config, subdomain: e.target.value })}
+                    className="flex-1 rounded-l-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  />
+                  <span className={`px-3 py-2 bg-gray-100 border border-l-0 border-gray-300 rounded-r-lg text-sm text-gray-600`}>
+                    .{getAppBaseDomain()}
+                  </span>
+                </div>
+                <p className="mt-2 text-sm text-gray-500">
+                  Acesso direto pelo subdomínio: <strong>{config.subdomain ? `${config.subdomain}.${getAppBaseDomain()}` : '...'}</strong>
+                </p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Seu Domínio Personalizado
                 </label>
                 <input
                   type="text"

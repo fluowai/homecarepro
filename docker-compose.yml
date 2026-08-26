@@ -13,8 +13,9 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3000
-      # As variáveis abaixo devem ser preenchidas no Portainer (Environment Variables)
+      # As variáveis abaixo devem sido preenchidas no Portainer (Environment Variables)
       - APP_URL=${APP_URL:-http://localhost:3000}
+      - APP_BASE_DOMAIN=${APP_BASE_DOMAIN:-homecare.wootech.com.br}
       - VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
       - VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
       - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
@@ -35,7 +36,29 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  evolution-api:
+    image: atendai/evolution-api:v2.2.1
+    container_name: evolution-api
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - SERVER_URL=${APP_URL:-http://localhost:3000}/evolution
+      - AUTHENTICATION_TYPE=apikey
+      - AUTHENTICATION_API_KEY=${EVOLUTION_API_KEY:-homecare-evo-secret-123}
+      - DATABASE_PROVIDER=sqlite
+      - DATABASE_CONNECTION_URI=sqlite://./db.sqlite
+    volumes:
+      - evolution_instances:/evolution/instances
+      - evolution_db:/evolution/db
+    networks:
+      - homecarepro-network
+
 networks:
   homecarepro-network:
     name: homecarepro-network
     driver: bridge
+
+volumes:
+  evolution_instances:
+  evolution_db:

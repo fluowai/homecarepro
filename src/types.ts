@@ -13,11 +13,12 @@ export interface Tenant {
   status?: 'active' | 'inactive' | 'blocked';
   tenantType?: 'homecare' | 'cooperativa';
   customDomain?: string;
+  subdomain?: string;
   primaryColor?: string;
   secondaryColor?: string;
 }
 
-export type UserRole = 'mega_admin' | 'super_admin' | 'admin' | 'operator' | 'professional' | 'patient' | 'viewer';
+export type UserRole = 'mega_admin' | 'super_admin' | 'admin' | 'operator' | 'professional' | 'patient' | 'viewer' | 'family' | 'system_support' | 'auditor';
 
 export interface UserProfile {
   id: string;
@@ -25,6 +26,17 @@ export interface UserProfile {
   fullName: string;
   role: UserRole;
   avatarUrl?: string;
+}
+
+export interface PatientFamilyLink {
+  id: string;
+  tenantId: string;
+  patientId: string;
+  familyUserId: string;
+  relationship: string;
+  isPrimary: boolean;
+  createdAt: string;
+  patient?: Patient;
 }
 
 export interface UserTenant {
@@ -380,4 +392,20 @@ export interface AssemblyVote {
   professionalId: string;
   vote: 'approve' | 'reject' | 'abstain';
   timestamp: string;
+}
+
+export interface EmailTemplate {
+  id: string;
+  tenantId: string | null;
+  name: string;
+  type: 'system' | 'tenant';
+  description?: string;
+  subject: string;
+  htmlContent: string;
+  textContent?: string;
+  variables: string[];
+  isActive: boolean;
+  isDefault: boolean;
+  createdAt: string;
+  updatedAt: string;
 }

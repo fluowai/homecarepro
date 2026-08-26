@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { User } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured } from './lib/supabase';
+import { extractSubdomain } from './lib/subdomain';
+import { triggerFamilyNotification } from './lib/notifications';
 import {
   Patient,
   Professional,
@@ -20,7 +22,9 @@ import {
   Assembly,
   AssemblyVote,
   Contract,
-  Invoice
+  Invoice,
+  EmailTemplate,
+  PatientFamilyLink
 } from './types';
 
 // ── AI API helper (authenticated fetch) ─────────────────────────
@@ -437,6 +441,47 @@ function invoiceFromRow(r: Record<string, unknown>): Invoice {
   };
 }
 
+function emailTemplateToRow(t: EmailTemplate) {
+  return {
+    id: t.id,
+    tenant_id: t.tenantId ?? null,
+    name: t.name,
+    type: t.type,
+    description: t.description ?? null,
+    subject: t.subject,
+    html_content: t.htmlContent,
+    text_content: t.textContent ?? null,
+    variables: t.variables,
+    is_active: t.isActive,
+    is_default: t.isDefault,
+  };
+}
+
+function emailTemplateFromRow(r: Record<string, unknown>): EmailTemplate {
+  return {
+    id: r.id as string,
+    tenantId: (r.tenant_id as string) || null,
+    name: r.name as string,
+    type: (r.type as EmailTemplate['type']) || 'tenant',
+    description: (r.description as string) || '',
+    subject: r.subject as string,
+    htmlContent: r.html_content as string,
+    textContent: (r.text_content as string) || '',
+    variables: (r.variables as string[]) || [],
+    isActive: r.is_active === false ? false : true,
+    isDefault: r.is_default === true,
+    createdAt: (r.created_at as string) || new Date().toISOString(),
+    updatedAt: (r.updated_at as string) || new Date().toISOString(),
+  };
+}
+
+function renderTemplate(template: string, vars: Record<string, string>): string {
+  return template.replace(/\{\{(\w+)\}\}/g, (_, key) => {
+    const k = key.trim();
+    return vars[k] !== undefined ? vars[k] : `{{${key}}}`;
+  });
+}
+
 // ── Store interface ─────────────────────────────────────────────
 
 interface HomeCareState {
@@ -467,10 +512,21 @@ interface HomeCareState {
   assemblyVotes: AssemblyVote[];
   contracts: Contract[];
   invoices: Invoice[];
+  emailTemplates: EmailTemplate[];
+
+  // Family Links (for 'family' role)
+  familyPatientLinks: PatientFamilyLink[];
+
+  // Notification preferences
+  notificationAudioEnabled: boolean;
+  setNotificationAudioEnabled: (enabled: boolean) => void;
 
   // RBAC
-  currentUserRole: 'mega_admin' | 'super_admin' | 'admin' | 'auditor' | 'professional' | 'patient' | 'system_support';
-  setCurrentUserRole: (role: 'mega_admin' | 'super_admin' | 'admin' | 'auditor' | 'professional' | 'patient' | 'system_support') => void;
+  currentUserRole: 'mega_admin' | 'super_admin' | 'admin' | 'auditor' | 'professional' | 'patient' | 'family' | 'system_support';
+  setCurrentUserRole: (role: 'mega_admin' | 'super_admin' | 'admin' | 'auditor' | 'professional' | 'patient' | 'family' | 'system_support') => void;
+
+  // Family actions
+  fetchFamilyPatientLinks: () => Promise<void>;
 
   // Impersonation (Suporte)
   isImpersonating: boolean;
@@ -482,13 +538,14 @@ interface HomeCareState {
   // Auth actions
   init: () => Promise<void>;
   signOut: () => Promise<void>;
+  updateProfile: (updates: Partial<UserProfile>) => Promise<void>;
 
   // Actions
   setActiveTenant: (id: string) => void;
   addTenant: (tenant: Omit<Tenant, 'id'> & { id?: string }) => void;
   updateTenant: (id: string, updates: Partial<Tenant>) => void;
   refreshTenants: () => Promise<void>;
-  createTenantWithInvite: (input: { name: string; cnpj?: string; plan?: string; logo?: string; customDomain?: string; primaryColor?: string; secondaryColor?: string; adminEmail: string; parentId?: string; tenantType?: 'homecare' | 'cooperativa' }) => Promise<{ tenant: Tenant; inviteLink: string }>;
+  createTenantWithInvite: (input: { name: string; cnpj?: string; plan?: string; logo?: string; customDomain?: string; subdomain?: string; primaryColor?: string; secondaryColor?: string; adminEmail: string; parentId?: string; tenantType?: 'homecare' | 'cooperativa' }) => Promise<{ tenant: Tenant; inviteLink: string; tenantUrl?: string }>;
   regenerateInvite: (tenantId: string, adminEmail: string) => Promise<string>;
 
   // Offline/Sync Actions
@@ -571,6 +628,12 @@ interface HomeCareState {
   addInvoice: (invoice: Omit<Invoice, 'id' | 'tenantId' | 'createdAt' | 'updatedAt'>) => Promise<Invoice | null>;
   updateInvoice: (id: string, data: Partial<Invoice>) => Promise<void>;
   deleteInvoice: (id: string) => Promise<void>;
+
+  // Email Template Actions
+  addEmailTemplate: (template: Omit<EmailTemplate, 'id' | 'createdAt' | 'updatedAt'>) => Promise<EmailTemplate | null>;
+  updateEmailTemplate: (id: string, data: Partial<EmailTemplate>) => Promise<void>;
+  deleteEmailTemplate: (id: string) => Promise<void>;
+  renderEmailTemplate: (template: EmailTemplate, variables: Record<string, string>) => string;
 }
 
 // ── Helpers ─────────────────────────────────────────────────────
@@ -709,11 +772,40 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
   assemblyVotes: loadFromStorage('assemblyVotes', []),
   contracts: loadFromStorage('contracts', []),
   invoices: loadFromStorage('invoices', []),
+  emailTemplates: loadFromStorage('emailTemplates', []),
+
+  // Family links (for 'family' role)
+  familyPatientLinks: [],
+
+  // Notification preferences
+  notificationAudioEnabled: loadFromStorage('notificationAudioEnabled', true),
+  setNotificationAudioEnabled: (enabled) => {
+    set({ notificationAudioEnabled: enabled });
+    saveToStorage('notificationAudioEnabled', enabled);
+  },
 
   // RBAC
   currentUserRole: 'admin',
   setCurrentUserRole: (role) => {
     set({ currentUserRole: role });
+  },
+
+  // Family actions
+  fetchFamilyPatientLinks: async () => {
+    if (!isSupabaseConfigured) return;
+    try {
+      const { data: session } = await supabase.auth.getSession();
+      const token = session?.session?.access_token;
+      if (!token) return;
+      const res = await fetch('/api/patient-family-links/mine', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return;
+      const result = await res.json();
+      set({ familyPatientLinks: result.links || [] });
+    } catch (err) {
+      console.error('[Store] Failed to fetch family links', err);
+    }
   },
 
   // Impersonation
@@ -791,10 +883,21 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
 
       if (profileError) throw profileError;
 
-      const tenantId = profile.tenant_id;
+      const profileTenantId = profile.tenant_id;
+
+      // Determine the active tenant: prioritize subdomain context over profile
+      const currentHostname = typeof window !== 'undefined' ? window.location.hostname : '';
+      const subdomain = extractSubdomain(currentHostname);
+      let activeTenantId = profileTenantId;
+
+      if (subdomain) {
+        // After tenants are loaded, check if the subdomain matches an accessible tenant
+        // This is set AFTER the tenants array is built below
+        (window as any)._pendingSubdomain = subdomain;
+      }
 
       // Load all tenant data from Supabase
-      const [tenantsRes, patientsRes, profsRes, visitsRes, leadsRes, msgsRes, medsRes, surveysRes, surveyCfgRes, alertCfgRes, insurancesRes, assembliesRes, assemblyVotesRes, contractsRes, invoicesRes] = await Promise.all([
+      const [tenantsRes, patientsRes, profsRes, visitsRes, leadsRes, msgsRes, medsRes, surveysRes, surveyCfgRes, alertCfgRes, insurancesRes, assembliesRes, assemblyVotesRes, contractsRes, invoicesRes, templatesRes] = await Promise.all([
         supabase.from('tenants').select('*'),
         supabase.from('patients').select('*'),
         supabase.from('professionals').select('*'),
@@ -803,13 +906,14 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
         supabase.from('messages').select('*'),
         supabase.from('medicines').select('*'),
         supabase.from('surveys').select('*'),
-        supabase.from('survey_config').select('*').eq('tenant_id', tenantId).maybeSingle(),
-        supabase.from('alert_config').select('*').eq('tenant_id', tenantId).maybeSingle(),
+        supabase.from('survey_config').select('*').eq('tenant_id', profileTenantId).maybeSingle(),
+        supabase.from('alert_config').select('*').eq('tenant_id', profileTenantId).maybeSingle(),
         supabase.from('health_insurances').select('*'),
         supabase.from('assemblies').select('*'),
         supabase.from('assembly_votes').select('*'),
         supabase.from('contracts').select('*'),
         supabase.from('invoices').select('*'),
+        supabase.from('email_templates').select('*'),
       ]);
 
       const tenants: Tenant[] = (tenantsRes.data ?? []).map((r) => ({
@@ -822,6 +926,7 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
         status: (r.status as Tenant['status']) || 'active',
         tenantType: (r.tenant_type as Tenant['tenantType']) || 'homecare',
         customDomain: (r.custom_domain as string) || undefined,
+        subdomain: (r.subdomain as string) || undefined,
         primaryColor: (r.primary_color as string) || undefined,
         secondaryColor: (r.secondary_color as string) || undefined,
       }));
@@ -835,6 +940,7 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
       const medicines = (medsRes.data ?? []).map(medicineFromRow);
       const surveys = (surveysRes.data ?? []).map(surveyFromRow);
       const insurances = (insurancesRes.data ?? []).map(insuranceFromRow);
+      const emailTemplates = (templatesRes.data ?? []).map(emailTemplateFromRow);
       const assemblies = (assembliesRes.data ?? []).map(assemblyFromRow);
       const assemblyVotes = (assemblyVotesRes.data ?? []).map(assemblyVoteFromRow);
       const contracts = (contractsRes.data ?? []).map(contractFromRow);
@@ -853,7 +959,39 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
           }
         : DEFAULT_ALERT_CONFIG;
 
-      // Persist to localStorage as cache
+      // Resolve tenant by subdomain: if the current hostname has a subdomain that matches
+      // an accessible tenant, use that tenant as the active one
+      let resolvedTenantId = profileTenantId;
+      if (subdomain) {
+        const subdomainTenant = tenants.find(t => t.subdomain === subdomain && t.id !== 'system');
+        if (subdomainTenant) {
+          resolvedTenantId = subdomainTenant.id;
+          // If the subdomain tenant differs from profile tenant, re-fetch tenant configs
+          if (resolvedTenantId !== profileTenantId) {
+            const [subSurveyCfgRes, subAlertCfgRes] = await Promise.all([
+              supabase.from('survey_config').select('*').eq('tenant_id', resolvedTenantId).maybeSingle(),
+              supabase.from('alert_config').select('*').eq('tenant_id', resolvedTenantId).maybeSingle(),
+            ]);
+            if (subSurveyCfgRes.data) {
+              Object.assign(surveyConfig, {
+                channel: subSurveyCfgRes.data.channel,
+                autoSend: subSurveyCfgRes.data.auto_send,
+                messageTemplate: subSurveyCfgRes.data.message_template,
+              });
+            }
+            if (subAlertCfgRes.data) {
+              Object.assign(alertConfig, {
+                maxDaysWithoutVisit: subAlertCfgRes.data.max_days_without_visit,
+                expiryWarningDays: subAlertCfgRes.data.expiry_warning_days,
+                lowStockThreshold: subAlertCfgRes.data.low_stock_threshold,
+                enableSystemNotifications: subAlertCfgRes.data.enable_system_notifications,
+              });
+            }
+          }
+        }
+      }
+
+      // Persist to sessionStorage as cache
       saveToStorage('patients', patients);
       saveToStorage('professionals', professionals);
       saveToStorage('visits', visits);
@@ -866,9 +1004,10 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
       saveToStorage('assemblyVotes', assemblyVotes);
       saveToStorage('contracts', contracts);
       saveToStorage('invoices', invoices);
+      saveToStorage('emailTemplates', emailTemplates);
       saveToStorage('surveyConfig', surveyConfig);
       saveToStorage('alertConfig', alertConfig);
-      saveToStorage('activeTenantId', tenantId);
+      saveToStorage('activeTenantId', resolvedTenantId);
 
       set({
         user,
@@ -876,7 +1015,7 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
         currentUserRole: profile.role as any,
         isAuthenticated: true,
         isLoading: false,
-        activeTenantId: tenantId,
+        activeTenantId: resolvedTenantId,
         tenants,
         patients,
         professionals,
@@ -890,9 +1029,15 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
         assemblyVotes,
         contracts,
         invoices,
+        emailTemplates,
         surveyConfig,
         alertConfig,
       });
+
+      // For family role, fetch linked patients
+      if (profile.role === 'family') {
+        get().fetchFamilyPatientLinks();
+      }
     } catch (err) {
       console.error('[Store] init failed', err);
       set({ isLoading: false, isAuthenticated: false, user: null, profile: null, initError: (err as Error).message });
@@ -904,6 +1049,31 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
       await supabase.auth.signOut();
     }
     set({ user: null, profile: null, isAuthenticated: false });
+    window.location.href = '/login';
+  },
+
+  updateProfile: async (updates: Partial<UserProfile>) => {
+    const { profile } = get();
+    if (!profile) return;
+    
+    try {
+      const { error } = await supabase
+        .from('user_profiles')
+        .update({
+          full_name: updates.full_name,
+          avatar_url: updates.avatar_url,
+        })
+        .eq('id', profile.id);
+
+      if (error) throw error;
+
+      set({
+        profile: { ...profile, ...updates },
+      });
+    } catch (err) {
+      console.error('Error updating profile:', err);
+      throw err;
+    }
   },
 
   setActiveTenant: (id) => {
@@ -929,6 +1099,7 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
       status: newTenant.status || 'active',
       tenant_type: newTenant.tenantType || 'homecare',
       custom_domain: newTenant.customDomain || null,
+      subdomain: newTenant.subdomain || null,
       primary_color: newTenant.primaryColor || null,
       secondary_color: newTenant.secondaryColor || null,
     });
@@ -938,7 +1109,7 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
     const current = get().tenants;
     const next = current.map(t => t.id === id ? { ...t, ...updates } : t);
     set({ tenants: next });
-    
+
     // update backend
     const updated = next.find(t => t.id === id);
     if (updated) {
@@ -952,6 +1123,7 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
         status: updated.status || 'active',
         tenant_type: updated.tenantType || 'homecare',
         custom_domain: updated.customDomain || null,
+        subdomain: updated.subdomain || null,
         primary_color: updated.primaryColor || null,
         secondary_color: updated.secondaryColor || null
       });
@@ -973,6 +1145,7 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
         status: (r.status as Tenant['status']) || 'active',
         tenantType: (r.tenant_type as Tenant['tenantType']) || 'homecare',
         customDomain: (r.custom_domain as string) || undefined,
+        subdomain: (r.subdomain as string) || undefined,
         primaryColor: (r.primary_color as string) || undefined,
         secondaryColor: (r.secondary_color as string) || undefined,
       }));
@@ -1008,13 +1181,14 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
       status: result.tenant.status || 'active',
       tenantType: result.tenant.tenantType || 'homecare',
       customDomain: result.tenant.customDomain || undefined,
+      subdomain: result.tenant.subdomain || undefined,
       primaryColor: result.tenant.primaryColor || undefined,
       secondaryColor: result.tenant.secondaryColor || undefined,
     };
     const updated = [...get().tenants, tenant];
     set({ tenants: updated });
     saveToStorage('tenants', updated);
-    return { tenant, inviteLink: result.inviteLink as string };
+    return { tenant, inviteLink: result.inviteLink as string, tenantUrl: result.tenantUrl as string };
   },
 
   regenerateInvite: async (tenantId, adminEmail) => {
@@ -1254,6 +1428,16 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
         type: 'visit',
         author: prof?.name || 'Sistema',
       });
+
+      // Trigger family notification (non-blocking)
+      if (!isOff) {
+        triggerFamilyNotification(
+          'visit_checkin',
+          visit.patientId,
+          `O profissional ${prof?.name || 'técnico'} iniciou o atendimento às ${timeString}.`,
+          'info'
+        ).catch(() => {});
+      }
     }
 
     if (get().isOffline) {
@@ -1295,6 +1479,14 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
           const messageText = config.messageTemplate.replace('{professional_name}', prof?.name || 'técnico').replace('{survey_link}', `https://homecare.pro/survey/${surveyId}`);
           get().sendMessage(visit.patientId, messageText, 'system');
         }
+
+        // Trigger family notification (non-blocking)
+        triggerFamilyNotification(
+          'visit_checkout',
+          visit.patientId,
+          `O atendimento foi finalizado com sucesso. Veja o relatório no sistema.`,
+          'info'
+        ).catch(() => {});
       }
     }
 
@@ -1551,10 +1743,17 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
     try {
       const res = await aiFetch('/api/gemini/transcribe', { audioData, mimeType });
       const data = await res.json();
+      if (!res.ok) {
+        const detail = data.details
+          ? `${data.error}: ${JSON.stringify(data.details)}`
+          : data.error;
+        throw new Error(detail || 'Erro ao transcrever áudio');
+      }
       if (data.transcription !== undefined) return data.transcription;
       throw new Error(data.error || 'Erro ao transcrever');
-    } catch {
-      return 'Falha na transcrição. Verifique a conexão com o servidor de IA e tente novamente.';
+    } catch (err: any) {
+      const msg = err?.message || 'Falha na transcrição. Verifique a conexão com o servidor de IA e tente novamente.';
+      throw new Error(msg);
     }
   },
 
@@ -1681,5 +1880,53 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
     saveToStorage('invoices', updated);
     const { error } = await supabase.from('invoices').delete().eq('id', id);
     if (error) console.error('[Store] deleteInvoice failed', error);
-  }
+  },
+
+  // ── Email Templates ──────────────────────────────────────────
+
+  addEmailTemplate: async (template) => {
+    const now = new Date().toISOString();
+    const newTemplate: EmailTemplate = {
+      ...template,
+      id: `tpl-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      createdAt: now,
+      updatedAt: now,
+    };
+    const updated = [...get().emailTemplates, newTemplate];
+    set({ emailTemplates: updated });
+    saveToStorage('emailTemplates', updated);
+    if (isSupabaseConfigured) {
+      const { error } = await supabase.from('email_templates').insert(emailTemplateToRow(newTemplate) as any);
+      if (error) console.error('[Store] addEmailTemplate failed', error);
+    }
+    return newTemplate;
+  },
+
+  updateEmailTemplate: async (id, data) => {
+    const current = get().emailTemplates.find((t) => t.id === id);
+    if (!current) return;
+    const now = new Date().toISOString();
+    const next: EmailTemplate = { ...current, ...data, updatedAt: now };
+    const updated = get().emailTemplates.map((t) => (t.id === id ? next : t));
+    set({ emailTemplates: updated });
+    saveToStorage('emailTemplates', updated);
+    if (isSupabaseConfigured) {
+      const { error } = await supabase.from('email_templates').update(emailTemplateToRow(next) as any).eq('id', id);
+      if (error) console.error('[Store] updateEmailTemplate failed', error);
+    }
+  },
+
+  deleteEmailTemplate: async (id) => {
+    const updated = get().emailTemplates.filter((t) => t.id !== id);
+    set({ emailTemplates: updated });
+    saveToStorage('emailTemplates', updated);
+    if (isSupabaseConfigured) {
+      const { error } = await supabase.from('email_templates').delete().eq('id', id);
+      if (error) console.error('[Store] deleteEmailTemplate failed', error);
+    }
+  },
+
+  renderEmailTemplate: (template, variables) => {
+    return renderTemplate(template.htmlContent, variables);
+  },
 }));

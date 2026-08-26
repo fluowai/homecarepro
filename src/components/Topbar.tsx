@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Search, Bell, User, LogOut, CheckCircle2, ShieldAlert, Menu, X } from 'lucide-react';
 import { useHomeCareStore } from '../store';
+import { UserProfileModal } from './UserProfileModal';
 
 interface TopbarProps {
   onSearch: (query: string) => void;
@@ -11,6 +12,7 @@ export default function Topbar({ onSearch, onMenuClick }: TopbarProps) {
   const { patients, visits, messages, activeTenantId, tenants, profile, signOut, getCalculatedAlerts, isImpersonating, stopImpersonation } = useHomeCareStore();
   const [showNotifications, setShowNotifications] = useState(false);
   const [isSearchExpanded, setIsSearchExpanded] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
   
   const activeTenant = tenants.find(t => t.id === activeTenantId);
   
@@ -144,15 +146,20 @@ export default function Topbar({ onSearch, onMenuClick }: TopbarProps) {
 
         {/* User Info / Profile */}
         <div className="flex items-center gap-3">
-          <div className="text-right hidden md:block">
-            <p className="text-sm font-semibold text-gray-800 leading-none">{profile?.full_name || 'Operador'}</p>
-            <p className="text-xs text-gray-500 mt-1">{profile?.role === 'admin' ? 'Administrador' : 'Operador'}</p>
-          </div>
-          <img 
-            src={profile?.avatar_url || "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=120"} 
-            className="w-10 h-10 rounded-full border border-gray-200 object-cover" 
-            alt="Avatar"
-          />
+          <button 
+            onClick={() => setShowProfileModal(true)}
+            className="flex items-center gap-3 text-left hover:bg-gray-50 p-1.5 rounded-xl transition-colors"
+          >
+            <div className="hidden md:block">
+              <p className="text-sm font-semibold text-gray-800 leading-none">{profile?.full_name || 'Operador'}</p>
+              <p className="text-xs text-gray-500 mt-1">{profile?.role === 'admin' ? 'Administrador' : 'Operador'}</p>
+            </div>
+            <img 
+              src={profile?.avatar_url || "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=120"} 
+              className="w-10 h-10 rounded-full border border-gray-200 object-cover" 
+              alt="Avatar"
+            />
+          </button>
           <button
             onClick={() => signOut()}
             className="p-2 text-gray-400 hover:text-red-500 transition-colors"
@@ -163,6 +170,9 @@ export default function Topbar({ onSearch, onMenuClick }: TopbarProps) {
         </div>
       </div>
       </header>
+      {showProfileModal && (
+        <UserProfileModal onClose={() => setShowProfileModal(false)} />
+      )}
     </>
   );
 }

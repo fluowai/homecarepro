@@ -71,10 +71,12 @@ export default function AudioDictationModal({
 
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       
-      const mimeType = MediaRecorder.isTypeSupported('audio/webm') 
-        ? 'audio/webm' 
-        : MediaRecorder.isTypeSupported('audio/ogg')
-        ? 'audio/ogg'
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') 
+        ? 'audio/webm;codecs=opus' 
+        : MediaRecorder.isTypeSupported('audio/webm')
+        ? 'audio/webm'
+        : MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')
+        ? 'audio/ogg;codecs=opus'
         : 'audio/mp4';
 
       const mediaRecorder = new MediaRecorder(stream, { mimeType });
@@ -100,10 +102,16 @@ export default function AudioDictationModal({
           const reader = new FileReader();
           reader.readAsDataURL(audioBlob);
           reader.onloadend = async () => {
-            const base64String = reader.result as string;
-            const text = await transcribeAudioAi(base64String, mimeType);
-            setTranscribedText(text);
-            setIsProcessing(false);
+            try {
+              const base64String = reader.result as string;
+              const text = await transcribeAudioAi(base64String, mimeType);
+              setTranscribedText(text);
+            } catch (err: any) {
+              console.error("Transcription error:", err);
+              setErrorMsg(err.message || "Erro ao transcrever áudio. Tente novamente.");
+            } finally {
+              setIsProcessing(false);
+            }
           };
         } catch (err: any) {
           console.error(err);

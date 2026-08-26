@@ -3,6 +3,7 @@ import { X, Globe, Palette, Save, AlertTriangle, CheckCircle, ShieldAlert, Edit3
 import { useHomeCareStore } from '../store';
 import { Tenant } from '../types';
 import { InviteLinkModal } from './InviteLinkModal';
+import { getAppBaseDomain } from '../lib/subdomain';
 import { toast } from 'sonner';
 
 interface TenantEditorModalProps {
@@ -21,6 +22,7 @@ export function TenantEditorModal({ tenant, isCreating = false, onClose }: Tenan
   const [logo, setLogo] = useState(tenant.logo || '\u{1F3EC}');
   const [cnpj, setCnpj] = useState(tenant.cnpj || '');
   const [customDomain, setCustomDomain] = useState(tenant.customDomain || '');
+  const [subdomain, setSubdomain] = useState(tenant.subdomain || '');
   const [primaryColor, setPrimaryColor] = useState(tenant.primaryColor || '#16a34a');
   const [status, setStatus] = useState(tenant.status || 'active');
   const [plan, setPlan] = useState(tenant.plan || 'Free');
@@ -32,6 +34,7 @@ export function TenantEditorModal({ tenant, isCreating = false, onClose }: Tenan
     setLogo(tenant.logo || '\u{1F3EC}');
     setCnpj(tenant.cnpj || '');
     setCustomDomain(tenant.customDomain || '');
+    setSubdomain(tenant.subdomain || '');
     setPrimaryColor(tenant.primaryColor || '#16a34a');
     setStatus(tenant.status || 'active');
     setPlan(tenant.plan || 'Free');
@@ -57,6 +60,7 @@ export function TenantEditorModal({ tenant, isCreating = false, onClose }: Tenan
           cnpj,
           plan,
           customDomain: customDomain || undefined,
+          subdomain: subdomain || undefined,
           primaryColor,
           adminEmail,
           tenantType,
@@ -70,6 +74,7 @@ export function TenantEditorModal({ tenant, isCreating = false, onClose }: Tenan
         logo,
         cnpj,
         customDomain: customDomain || undefined,
+        subdomain: subdomain || undefined,
         primaryColor,
         status,
         plan,
@@ -185,8 +190,28 @@ export function TenantEditorModal({ tenant, isCreating = false, onClose }: Tenan
           <div className="space-y-4">
             <h4 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
               <Globe className="w-4 h-4 text-indigo-500" />
-              Domínio Personalizado
+              Subdomínio e Domínio Personalizado
             </h4>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Subdomínio</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  placeholder="ex: clinicaabc"
+                  value={subdomain}
+                  onChange={(e) => setSubdomain(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+                  className="flex-1 px-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors"
+                />
+                <span className="px-3 py-2 bg-gray-100 border border-gray-200 rounded-lg text-sm text-gray-600">
+                  .{getAppBaseDomain()}
+                </span>
+              </div>
+              {subdomain && (
+                <p className="text-xs text-gray-500 mt-1">
+                  Acesso: <strong>https://{subdomain}.{getAppBaseDomain()}</strong>
+                </p>
+              )}
+            </div>
             <div>
               <input
                 type="text"

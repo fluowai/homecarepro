@@ -10,6 +10,7 @@ Mapa da documentação operacional. Leia na ordem abaixo.
 
 ## Detalhe
 - `PRODUCTION_READINESS.md` — análise completa de prontidão para produção (2026-08-04)
+- `SUBDOMAIN_ANALYSIS.md` — análise de gaps para acesso por subdomínio (multi-tenant via subdomain)
 - `WORKLOG.md` — histórico compacto de trabalho
 - `create-admin.ts` — script auxiliar de criação de admin (quebrado: TS error)
 - `apply.js` — script auxiliar

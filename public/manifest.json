@@ -1,17 +1,39 @@
 {
   "short_name": "HomeCare 360",
-  "name": "HomeCare Pro 360",
+  "name": "HomeCare Pro 360 — Gestão Home Care",
   "icons": [
     {
-      "src": "/vite.svg",
-      "type": "image/svg+xml",
+      "src": "/pwa-192x192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "/pwa-512x512.png",
+      "type": "image/png",
       "sizes": "512x512"
+    },
+    {
+      "src": "/pwa-maskable-192x192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/pwa-maskable-512x512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "maskable"
     }
   ],
   "start_url": "/",
-  "background_color": "#ffffff",
   "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone"],
   "scope": "/",
   "theme_color": "#ffffff",
-  "description": "Plataforma de Home Care e Cooperativas"
+  "background_color": "#ffffff",
+  "description": "Plataforma de Home Care e Cooperativas. Gestão de atendimento domiciliar, prontuários, agenda e notificações.",
+  "orientation": "portrait-primary-preference",
+  "category": ["health", "medical", "productivity"],
+  "prefer_related_applications": false,
+  "lang": "pt-BR"
 }

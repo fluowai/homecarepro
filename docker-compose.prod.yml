@@ -8,6 +8,7 @@ services:
       - NODE_ENV=production
       - PORT=3000
       - APP_URL=https://homecare.wootech.com.br
+      - APP_BASE_DOMAIN=homecare.wootech.com.br
       - VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
       - VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
       - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
@@ -15,6 +16,7 @@ services:
       - ASAAS_API_KEY=${ASAAS_API_KEY}
       - ASAAS_WEBHOOK_TOKEN=${ASAAS_WEBHOOK_TOKEN}
       - RESEND_API_KEY=${RESEND_API_KEY}
+      - RESEND_FROM_EMAIL=${RESEND_FROM_EMAIL}
       - MINIO_ENDPOINT=${MINIO_ENDPOINT}
       - MINIO_REGION=${MINIO_REGION}
       - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY}
@@ -31,6 +33,12 @@ services:
       - "traefik.http.routers.homecarepro_web.tls.certresolver=letsencryptresolver"
       - "traefik.http.routers.homecarepro_web.service=homecarepro_web"
       - "traefik.http.services.homecarepro_web.loadbalancer.server.port=3000"
+      # Wildcard subdomain router: <subdomain>.homecare.wootech.com.br
+      - "traefik.http.routers.homecarepro_wildcard.rule=Host(`*.homecare.wootech.com.br`)"
+      - "traefik.http.routers.homecarepro_wildcard.entrypoints=websecure"
+      - "traefik.http.routers.homecarepro_wildcard.tls.certresolver=letsencryptresolver"
+      - "traefik.http.routers.homecarepro_wildcard.service=homecarepro_wildcard"
+      - "traefik.http.services.homecarepro_wildcard.loadbalancer.server.port=3000"
     deploy:
       mode: replicated
       replicas: 2
@@ -58,8 +66,48 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  evolution-api:
+    image: atendai/evolution-api:v2.2.1
+    restart: unless-stopped
+    environment:
+      - SERVER_URL=https://${APP_BASE_DOMAIN}/evolution
+      - AUTHENTICATION_TYPE=apikey
+      - AUTHENTICATION_API_KEY=${EVOLUTION_API_KEY}
+      - DATABASE_PROVIDER=sqlite
+      - DATABASE_CONNECTION_URI=sqlite://./db.sqlite
+    volumes:
+      - evolution_instances:/evolution/instances
+      - evolution_db:/evolution/db
+    networks:
+      - wootech1
+      - homecarepro_swarm_internal
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=wootech1"
+      - "traefik.http.routers.evolution_api.rule=Host(`${APP_BASE_DOMAIN}`) && PathPrefix(`/evolution`)"
+      - "traefik.http.routers.evolution_api.entrypoints=websecure"
+      - "traefik.http.routers.evolution_api.tls.certresolver=letsencryptresolver"
+      - "traefik.http.services.evolution_api.loadbalancer.server.port=8080"
+    deploy:
+      mode: replicated
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+      resources:
+        limits:
+          memory: 1G
+          cpus: "1.0"
+        reservations:
+          memory: 512M
+          cpus: "0.5"
+
 networks:
   wootech1:
     external: true
   homecarepro_swarm_internal:
     driver: overlay
+
+volumes:
+  evolution_instances:
+  evolution_db:
+
