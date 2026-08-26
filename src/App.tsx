@@ -39,9 +39,6 @@ const ContractsView = lazy(() => import('./components/ContractsView'));
 const SystemAdminView = lazy(() => import('./components/SystemAdminView'));
 const ResellerView = lazy(() => import('./components/ResellerView'));
 const FamilyDashboardView = lazy(() => import('./components/FamilyDashboardView'));
-const FamilyMessagesView = lazy(() => import('./components/FamilyMessagesView'));
-const FamilyMedicinesView = lazy(() => import('./components/FamilyMedicinesView'));
-const FamilyAlertsView = lazy(() => import('./components/FamilyAlertsView'));
 const CoopFinanceView = lazy(() => import('./components/CoopFinanceView'));
 const AssembliesView = lazy(() => import('./components/AssembliesView'));
 const TenantUserManager = lazy(() => import('./components/TenantUserManager'));
@@ -197,17 +194,17 @@ export default function App() {
         return <DashboardView setView={handleSetView} searchQuery={searchQuery} />;
       case 'family_messages':
         if (currentUserRole === 'family' || currentUserRole === 'patient') {
-          return <FamilyMessagesView />;
+          return <div className="p-8 text-center text-gray-500">Mensagens em breve.</div>;
         }
         return <CommunicationView />;
       case 'family_medicines':
         if (currentUserRole === 'family' || currentUserRole === 'patient') {
-          return <FamilyMedicinesView />;
+          return <div className="p-8 text-center text-gray-500">Medicamentos em breve.</div>;
         }
         return <MedicinesView />;
       case 'family_alerts':
         if (currentUserRole === 'family' || currentUserRole === 'patient') {
-          return <FamilyAlertsView />;
+          return <div className="p-8 text-center text-gray-500">Alertas em breve.</div>;
         }
         return <AlertsView />;
       case 'patients':
