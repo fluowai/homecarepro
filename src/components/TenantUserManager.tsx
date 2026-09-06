@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Shield, Mail, Building2, AlertCircle, Loader2, Users } from 'lucide-react';
+import { Search, Shield, Mail, Building2, AlertCircle, Loader2, Users, Lock } from 'lucide-react';
+import { toast } from 'sonner';
 import { supabase } from '../lib/supabase';
 import { useHomeCareStore } from '../store';
 
@@ -15,12 +16,42 @@ export default function TenantUserManager() {
   const [users, setUsers] = useState<GlobalUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [resetPasswordUser, setResetPasswordUser] = useState<GlobalUser | null>(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [isResetting, setIsResetting] = useState(false);
   
   const { tenants, activeTenantId, currentUserRole } = useHomeCareStore();
 
   useEffect(() => {
     fetchUsers();
   }, [activeTenantId, currentUserRole]);
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resetPasswordUser || !newPassword) return;
+    setIsResetting(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const apiUrl = typeof import.meta.env.VITE_API_URL !== 'undefined' ? import.meta.env.VITE_API_URL : window.location.origin;
+      const res = await fetch(`${apiUrl}/api/auth/reset-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`
+        },
+        body: JSON.stringify({ targetUserId: resetPasswordUser.id, newPassword })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Falha ao resetar senha');
+      toast.success('Senha atualizada com sucesso!');
+      setResetPasswordUser(null);
+      setNewPassword('');
+    } catch (err: any) {
+      toast.error(err.message || 'Erro ao alterar senha');
+    } finally {
+      setIsResetting(false);
+    }
+  };
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -108,7 +139,8 @@ export default function TenantUserManager() {
                   <th className="p-4 pl-6">Usuário</th>
                   <th className="p-4">Instância / Empresa</th>
                   <th className="p-4">Nível de Acesso</th>
-                  <th className="p-4 text-right pr-6">Status</th>
+                  <th className="p-4">Status</th>
+                  <th className="p-4 text-right pr-6">Ações</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -137,8 +169,13 @@ export default function TenantUserManager() {
                     <td className="p-4">
                       {getRoleBadge(user.role)}
                     </td>
-                    <td className="p-4 text-right pr-6">
+                    <td className="p-4">
                       <span className="text-xs text-emerald-600 bg-emerald-50 px-2 py-1 rounded font-medium">Ativo</span>
+                    </td>
+                    <td className="p-4 text-right pr-6">
+                      <button onClick={() => setResetPasswordUser(user)} className="text-gray-400 hover:text-indigo-600 p-1 rounded-full hover:bg-indigo-50 transition-colors" title="Mudar Senha">
+                        <Lock className="w-4 h-4" />
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -155,6 +192,42 @@ export default function TenantUserManager() {
           </div>
         )}
       </div>
+
+      {resetPasswordUser && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
+            <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+              <h3 className="font-bold text-gray-900 flex items-center gap-2">
+                <Lock className="w-5 h-5 text-indigo-600" />
+                Redefinir Senha
+              </h3>
+              <button onClick={() => setResetPasswordUser(null)} className="text-gray-400 hover:text-gray-600">&times;</button>
+            </div>
+            <form onSubmit={handleResetPassword} className="p-6">
+              <p className="text-sm text-gray-600 mb-4">
+                Redefinindo a senha de <strong>{resetPasswordUser.full_name}</strong>.
+              </p>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nova Senha</label>
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="w-full border-gray-200 rounded-xl focus:ring-indigo-500 focus:border-indigo-500 p-2 border"
+                  required
+                  minLength={6}
+                />
+              </div>
+              <div className="mt-6 flex justify-end gap-3">
+                <button type="button" onClick={() => setResetPasswordUser(null)} className="px-4 py-2 text-gray-700 font-medium hover:bg-gray-100 rounded-lg">Cancelar</button>
+                <button type="submit" disabled={isResetting} className="px-4 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50">
+                  {isResetting ? 'Salvando...' : 'Salvar Senha'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Globe, Palette, Upload, Loader2, Save } from 'lucide-react';
+import { Settings, Globe, Palette, Upload, Loader2, Save, Mail } from 'lucide-react';
 import { useHomeCareStore } from '../store';
 import { supabase } from '../lib/supabase';
 import { getAppBaseDomain } from '../lib/subdomain';
@@ -15,7 +15,10 @@ export function WhitelabelConfig() {
     subdomain: '',
     primaryColor: '#0066FF',
     secondaryColor: '#E6F0FF',
-    logo: ''
+    logo: '',
+    emailFromName: '',
+    emailFromAddress: '',
+    supportEmail: ''
   });
 
   useEffect(() => {
@@ -27,7 +30,7 @@ export function WhitelabelConfig() {
       setLoading(true);
       const { data, error } = await supabase
         .from('tenants')
-        .select('custom_domain, subdomain, primary_color, secondary_color, logo')
+        .select('custom_domain, subdomain, primary_color, secondary_color, logo, email_from_name, email_from_address, support_email')
         .eq('id', profile?.tenant_id)
         .single();
         
@@ -39,7 +42,10 @@ export function WhitelabelConfig() {
           subdomain: data.subdomain || '',
           primaryColor: data.primary_color || '#0066FF',
           secondaryColor: data.secondary_color || '#E6F0FF',
-          logo: data.logo || ''
+          logo: data.logo || '',
+          emailFromName: data.email_from_name || '',
+          emailFromAddress: data.email_from_address || '',
+          supportEmail: data.support_email || ''
         });
       }
     } catch (err) {
@@ -146,8 +152,57 @@ export function WhitelabelConfig() {
                   className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                 />
                 <p className="mt-2 text-sm text-gray-500">
-                  Para que o domínio funcione, configure no seu painel de DNS um apontamento tipo <strong>A</strong> ou <strong>CNAME</strong> para o IP ou domínio do nosso servidor.
+                  No seu painel de DNS, crie um registro <strong>CNAME</strong> apontando para <strong>{getAppBaseDomain()}</strong> (ou um registro <strong>A</strong> para o IP do servidor). O certificado HTTPS (Let's Encrypt) é emitido automaticamente.
                 </p>
+              </div>
+            </div>
+          </div>
+
+          {/* E-mail da marca */}
+          <div className="space-y-4">
+            <div className="flex items-center space-x-2 border-b pb-2">
+              <Mail className="h-5 w-5 text-gray-400" />
+              <h3 className="text-lg font-medium text-gray-900">E-mail da Marca</h3>
+            </div>
+            <p className="text-sm text-gray-500">
+              Convites e notificações sairão com o nome e o remetente da sua marca. Para enviar pelo seu domínio, verifique o domínio no Resend (SPF/DKIM) e use um remetente como <code className="text-xs bg-gray-100 px-1.5 py-0.5 rounded">no-reply@seudominio.com.br</code>.
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Nome de Exibição
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ex: Minha Marca Home Care"
+                  value={config.emailFromName}
+                  onChange={(e) => setConfig({ ...config, emailFromName: e.target.value })}
+                  className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  E-mail Remetente
+                </label>
+                <input
+                  type="email"
+                  placeholder="no-reply@seudominio.com.br"
+                  value={config.emailFromAddress}
+                  onChange={(e) => setConfig({ ...config, emailFromAddress: e.target.value })}
+                  className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  E-mail de Suporte (resposta)
+                </label>
+                <input
+                  type="email"
+                  placeholder="suporte@seudominio.com.br"
+                  value={config.supportEmail}
+                  onChange={(e) => setConfig({ ...config, supportEmail: e.target.value })}
+                  className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                />
               </div>
             </div>
           </div>

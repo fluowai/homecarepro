@@ -9,6 +9,7 @@ Mapa da documentação operacional. Leia na ordem abaixo.
 - `VERIFY.md` — evidência de verificação da última entrega
 
 ## Detalhe
+- `DOCUMENTATION/ANALYSIS.md` — análise + implementação Super Admin por árvore e Whitelabel de e-mail (2026-09-06)
 - `PRODUCTION_READINESS.md` — análise completa de prontidão para produção (2026-08-04)
 - `SUBDOMAIN_ANALYSIS.md` — análise de gaps para acesso por subdomínio (multi-tenant via subdomain)
 - `WORKLOG.md` — histórico compacto de trabalho

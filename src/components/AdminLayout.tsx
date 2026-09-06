@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowLeft, LogOut, Shield, X, ChevronDown, Menu } from 'lucide-react';
+import { ArrowLeft, LogOut, Shield, X, ChevronDown } from 'lucide-react';
 import { useHomeCareStore } from '../store';
 import { UserProfileModal } from './UserProfileModal';
 

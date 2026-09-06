@@ -53,6 +53,65 @@ export async function sendEmail(opts: SendOptions) {
   return { success: true as const, id: data?.id };
 }
 
+export interface BrandSender {
+  name: string;
+  address: string;
+  brandName?: string;
+}
+
+// Resolve o remetente de e-mail pela árvore do tenant:
+//   clínica -> revenda -> sistema
+// Usa as colunas email_from_name/email_from_address quando a revenda
+// verificou o domínio no Resend; caso contrário, volta ao remetente global.
+export async function resolveBrandSender(
+  supabaseAdmin: SupabaseClient,
+  tenantId?: string
+): Promise<BrandSender> {
+  const fallback: BrandSender = {
+    name: process.env.RESEND_FROM_NAME || 'HomeCare Pro',
+    address: DEFAULT_FROM,
+    brandName: process.env.RESEND_FROM_NAME || 'HomeCare Pro',
+  };
+
+  if (!tenantId || !resend) return fallback;
+
+  const candidates: Array<{
+    email_from_name?: string | null;
+    email_from_address?: string | null;
+    name?: string | null;
+  } | null> = [];
+
+  const { data: tenant } = await supabaseAdmin
+    .from('tenants')
+    .select('id, parent_id, name, email_from_name, email_from_address')
+    .eq('id', tenantId)
+    .maybeSingle();
+
+  if (tenant) candidates.push(tenant);
+
+  if (tenant?.parent_id) {
+    const { data: parent } = await supabaseAdmin
+      .from('tenants')
+      .select('name, email_from_name, email_from_address')
+      .eq('id', tenant.parent_id)
+      .maybeSingle();
+    if (parent) candidates.push(parent);
+  }
+
+  candidates.push(null); // remetente global do sistema
+
+  for (const c of candidates) {
+    if (!c) return fallback;
+    const address = (c.email_from_address || '').trim();
+    if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address)) {
+      const brandName = c.email_from_name || c.name || fallback.name;
+      return { name: brandName, address, brandName };
+    }
+  }
+
+  return fallback;
+}
+
 export async function sendTemplatedEmail(
   supabaseAdmin: SupabaseClient,
   templateName: string,
@@ -60,7 +119,7 @@ export async function sendTemplatedEmail(
   variables: Record<string, string>,
   options?: { tenantId?: string; from?: string }
 ) {
-  let templates = await supabaseAdmin
+  let templates = supabaseAdmin
     .from('email_templates')
     .select('*')
     .eq('name', templateName)
@@ -103,19 +162,25 @@ export async function sendInviteEmail(
   email: string,
   inviteLink: string,
   role: string,
-  inviterName: string = 'Equipe HomeCare Pro'
+  inviterName: string = 'Equipe HomeCare Pro',
+  options?: { tenantId?: string; brandName?: string }
 ) {
   const roleName = ROLE_LABELS[role] || 'Usuário';
+
+  const sender = await resolveBrandSender(supabaseAdmin, options?.tenantId);
+  const finalInviter = options?.brandName || inviterName || sender.brandName || sender.name;
+  const from = `${sender.name} <${sender.address}>`;
 
   const result = await sendTemplatedEmail(
     supabaseAdmin,
     'invite',
     email,
     {
-      inviter_name: inviterName,
+      inviter_name: finalInviter,
       role_name: roleName,
       invite_link: inviteLink,
     },
+    { from },
   );
 
   if (result.success) return;
@@ -129,14 +194,14 @@ export async function sendInviteEmail(
 
   try {
     const { data, error } = await resend.emails.send({
-      from: `HomeCare Pro <${DEFAULT_FROM}>`,
+      from,
       to: [email],
       subject: 'Você foi convidado para acessar o HomeCare Pro',
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 10px;">
           <h2 style="color: #0f172a;">Bem-vindo ao HomeCare Pro!</h2>
           <p style="color: #334155; font-size: 16px;">
-            Você foi convidado por <strong>${inviterName}</strong> para acessar o sistema como <strong>${roleName}</strong>.
+            Você foi convidado por <strong>${finalInviter}</strong> para acessar o sistema como <strong>${roleName}</strong>.
           </p>
           <p style="color: #334155; font-size: 16px;">
             Clique no botão abaixo para aceitar o convite e configurar seu acesso inicial:
@@ -152,7 +217,7 @@ export async function sendInviteEmail(
           </p>
           <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
           <p style="color: #94a3b8; font-size: 12px; text-align: center;">
-            Equipe HomeCare Pro<br/>
+            ${finalInviter}<br/>
             Este é um e-mail automático, por favor não responda.
           </p>
         </div>

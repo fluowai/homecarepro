@@ -1,5 +1,20 @@
 # Handoff
 
+## Próximo contexto (2026-09-06 final — migrations aplicadas, RLS 14/14, typecheck limpo)
+1. **Validar no browser** o fluxo ponta a ponta: mega cria revenda → convite → aceite → login Super Admin → cria clínica → "E-mails da Rede" mostra apenas a própria árvore.
+2. Configurar domínio de envio no Resend por revenda (seção "E-mail da Marca" no WhitelabelConfig) — CNAME `send.<marca>` → `getAppBaseDomain()`.
+3. Migrar `localStorage` de dados clínicos → `sessionStorage` com expiração (LGPD) — pendências antigas do CONTEXT.
+4. Refatorar `sendTemplatedEmail`/render com escopo por tipo+tenant se necessário; validar envio real de convite com marca (mock de testes não tem `.or()/.is()`).
+5. Confirmar convite com remetente da marca em produção (Resend) e backfill de e-mail em `user_profiles` (já aplicado pela 20260905).
+
+## Próximo contexto (2026-09-06 — Super Admin árvore + Whitelabel e-mail)
+1. **Aplicar no Supabase** a migration `20260906000000_tree_scoped_superadmin.sql` (e confirmar/ó aplicar a `20260905000000_superadmin_and_email.sql` antes). Depois rodar `tests/rls.integration.test.ts` (RLS opt-in) validando isolamento positivo/negativo. → **FEITO**: migrações aplicadas (20/20), RLS 14/14.
+2. Configurar domínio de envio no Resend por revenda (ver seção "E-mail da Marca" no WhitelabelConfig) — CNAME `send.marcadarevenda.com` → `getAppBaseDomain()`.
+3. Validar no browser: mega cria revenda → convite → aceite → login Super Admin → cria clínica → "E-mails da Rede" mostra apenas a própria árvore.
+4. Migrar `localStorage` de dados clínicos → `sessionStorage` com expiração (LGPD).
+5. Corrigir erros de typecheck **pré-existentes** (`mailer.ts` sendTemplatedEmail `.or/.is/.order/.single`, `app.ts` email-templates/render, `sw.ts`, `AdminLayout` `Menu` conflict, `upload.ts` token, `vite.config.ts` orientation) — não foram introduzidos por esta entrega.
+6. Confirmar trigger `handle_new_user` da 20260905 + backfill de e-mail em `user_profiles`.
+
 ## 🔴 Imediato — ação external (bloqueia produção)
 1. **Rotacionar `SUPABASE_SERVICE_ROLE_KEY`** no painel Supabase. A chave antiga foi commitada em `docker-compose.prod.yml` e ainda está no histórico git.
 2. **Purgar histórico git** com `git filter-repo` para remover a chave e o anon key do histórico. O CI secret scan só verifica working tree, não history.

@@ -264,6 +264,7 @@ export default function App() {
       case 'super_whitelabel':
       case 'super_emails':
       case 'super_support':
+      case 'super_contacts':
         return <ResellerView activeSection={currentView.replace('super_', '')} onExit={handleSetView} />;
       default:
         return <DashboardView setView={handleSetView} searchQuery={searchQuery} />;

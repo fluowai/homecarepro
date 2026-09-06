@@ -1,37 +1,83 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Shield, Mail, Building2, AlertCircle, Loader2, Users } from 'lucide-react';
+import { Search, Shield, Mail, Building2, AlertCircle, Loader2, Users, Lock } from 'lucide-react';
+import { toast } from 'sonner';
 import { supabase } from '../lib/supabase';
-import { useHomeCareStore } from '../store';
 
 interface GlobalUser {
   id: string;
   tenant_id: string;
   full_name: string;
   role: string;
-  email: string | null; // user_profiles não possui coluna de email; o email real fica em auth.users (protegido)
+  email: string | null;
+  created_at?: string;
+}
+
+interface DirectoryTenant {
+  id: string;
+  name: string;
+  parent_id: string | null;
+  tenant_type?: string;
+  status?: string;
 }
 
 export function GlobalUserManager() {
   const [users, setUsers] = useState<GlobalUser[]>([]);
+  const [tenantMap, setTenantMap] = useState<Record<string, DirectoryTenant>>({});
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const { tenants } = useHomeCareStore();
+  const [resetPasswordUser, setResetPasswordUser] = useState<GlobalUser | null>(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [isResetting, setIsResetting] = useState(false);
 
   useEffect(() => {
     fetchUsers();
   }, []);
 
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resetPasswordUser || !newPassword) return;
+    setIsResetting(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const apiUrl = typeof import.meta.env.VITE_API_URL !== 'undefined' ? import.meta.env.VITE_API_URL : window.location.origin;
+      const res = await fetch(`${apiUrl}/api/auth/reset-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`
+        },
+        body: JSON.stringify({ targetUserId: resetPasswordUser.id, newPassword })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Falha ao resetar senha');
+      toast.success('Senha atualizada com sucesso!');
+      setResetPasswordUser(null);
+      setNewPassword('');
+    } catch (err: any) {
+      toast.error(err.message || 'Erro ao alterar senha');
+    } finally {
+      setIsResetting(false);
+    }
+  };
+
   const fetchUsers = async () => {
     setLoading(true);
     try {
-      // The RLS policy for mega_admin allows reading all user_profiles
-      const { data, error } = await supabase
-        .from('user_profiles')
-        .select('*')
-        .order('created_at', { ascending: false });
+      const { data: { session } } = await supabase.auth.getSession();
+      const apiUrl = typeof import.meta.env.VITE_API_URL !== 'undefined' ? import.meta.env.VITE_API_URL : window.location.origin;
+      const res = await fetch(`${apiUrl}/api/admin/user-directory`, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`
+        }
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Falha ao carregar usuários');
 
-      if (error) throw error;
-      setUsers(data as any || []);
+      setUsers((data.users || []) as GlobalUser[]);
+      const map: Record<string, DirectoryTenant> = {};
+      for (const t of (data.tenants || [])) map[t.id] = t;
+      setTenantMap(map);
     } catch (err) {
       console.error('Error fetching global users:', err);
     } finally {
@@ -41,7 +87,11 @@ export function GlobalUserManager() {
 
   const getTenantName = (tenantId: string) => {
     if (tenantId === 'system') return 'Mega Admin (Sistema)';
-    return tenants.find(t => t.id === tenantId)?.name || tenantId;
+    if (tenantMap[tenantId]) {
+      const t = tenantMap[tenantId];
+      return `${t.name}${t.tenant_type === 'cooperativa' ? ' (Cooperativa)' : ''}`;
+    }
+    return tenantId;
   };
 
   const getRoleBadge = (role: string) => {
@@ -56,7 +106,9 @@ export function GlobalUserManager() {
 
   const filteredUsers = users.filter(u => 
     u.full_name?.toLowerCase().includes(search.toLowerCase()) || 
+    u.email?.toLowerCase().includes(search.toLowerCase()) ||
     u.tenant_id?.toLowerCase().includes(search.toLowerCase()) ||
+    getTenantName(u.tenant_id).toLowerCase().includes(search.toLowerCase()) ||
     u.role?.toLowerCase().includes(search.toLowerCase())
   );
 
@@ -68,7 +120,7 @@ export function GlobalUserManager() {
             <Users className="w-5 h-5 text-indigo-600" />
             Gestão Global de Usuários
           </h3>
-          <p className="text-sm text-gray-500 mt-1">Visualize todos os usuários de todas as revendas e clientes.</p>
+          <p className="text-sm text-gray-500 mt-1">Visualize usuários e e-mails de todos os níveis da rede (mega admin vê todas as revendas; revenda só vê a própria árvore).</p>
         </div>
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -111,7 +163,7 @@ export function GlobalUserManager() {
                           <div className="font-semibold text-gray-900 text-sm">{user.full_name}</div>
                           <div className="text-xs text-gray-500 flex items-center gap-1">
                             <Mail className="w-3 h-3" />
-                            {user.email || 'E-mail protegido (auth)'}
+                            {user.email || 'E-mail não informado'}
                           </div>
                         </div>
                       </div>
@@ -143,6 +195,42 @@ export function GlobalUserManager() {
           </div>
         )}
       </div>
+
+      {resetPasswordUser && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
+            <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+              <h3 className="font-bold text-gray-900 flex items-center gap-2">
+                <Lock className="w-5 h-5 text-indigo-600" />
+                Redefinir Senha
+              </h3>
+              <button onClick={() => setResetPasswordUser(null)} className="text-gray-400 hover:text-gray-600">&times;</button>
+            </div>
+            <form onSubmit={handleResetPassword} className="p-6">
+              <p className="text-sm text-gray-600 mb-4">
+                Redefinindo a senha de <strong>{resetPasswordUser.full_name}</strong>.
+              </p>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nova Senha</label>
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="w-full border-gray-200 rounded-xl focus:ring-indigo-500 focus:border-indigo-500 p-2 border"
+                  required
+                  minLength={6}
+                />
+              </div>
+              <div className="mt-6 flex justify-end gap-3">
+                <button type="button" onClick={() => setResetPasswordUser(null)} className="px-4 py-2 text-gray-700 font-medium hover:bg-gray-100 rounded-lg">Cancelar</button>
+                <button type="submit" disabled={isResetting} className="px-4 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50">
+                  {isResetting ? 'Salvando...' : 'Salvar Senha'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

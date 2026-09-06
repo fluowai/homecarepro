@@ -1,7 +1,8 @@
-import { useHomeCareStore } from '../store';
+import { supabase } from './supabase';
 
 export async function uploadFileToMinio(file: File): Promise<string> {
-  const token = useHomeCareStore.getState().token;
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token;
   if (!token) throw new Error("Não autenticado");
 
   // 1. Get presigned URL

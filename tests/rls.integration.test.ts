@@ -263,11 +263,16 @@ describe.skipIf(!dbEnabled)("RLS: isolamento por tenant", () => {
     expect(result).not.toContain(TENANT_B);
   });
 
-  it("usuário lê apenas o próprio perfil", async () => {
+  it("usuário lê perfis do próprio tenant (e-mails da equipe), nunca de outro tenant", async () => {
     const rows = await selectAs("authenticated", USER_A, "SELECT id FROM public.user_profiles");
     const result = ids(rows);
-    expect(result).toEqual([USER_A]);
+    // Mesmo tenant (rt-a): colegas visíveis para diretório/gestão de equipe
+    expect(result).toContain(USER_A);
+    expect(result).toContain(USER_C);
+    expect(result).toContain(USER_D);
+    // Cross-tenant: nunca (rt-b e system/mega fora da árvore)
     expect(result).not.toContain(USER_B);
+    expect(result).not.toContain(USER_MEGA);
   });
 
   it("operador não consegue atualizar perfil de outro usuário", async () => {

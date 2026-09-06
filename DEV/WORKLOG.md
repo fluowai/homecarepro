@@ -2,6 +2,24 @@
 
 # Worklog
 
+## 2026-09-06 (2ª parte) — Aplicação no banco + RLS verde + typecheck limpo
+- **Migrations aplicadas** (`node run-sql.js`): 20/20. Confirmação: o vazamento global da 20260905 **estava ATIVO** (policy de patients com `get_user_role() IN ('super_admin','mega_admin')`; a 20260905 tinha sido aplicada manualmente sem tracker).
+- **Fix de migration**: `20260822000000_add_whatsapp_tables.sql` usava `tenant_id uuid REFERENCES tenants(id)` mas `tenants.id` é `text` → falhava; corrigido para `text` (nunca tinha sido aplicada).
+- **Nova migration** `20260906000001_harden_get_user_role_search_path.sql`: 20260905 redefiniu `get_user_role()` (SECURITY DEFINER) sem `search_path` → `ALTER FUNCTION ... SET search_path = public`.
+- **RLS test**: `RUN_DB_TESTS=1 vitest tests/rls.integration.test.ts` → **14/14 passed**. Ajustada a expectativa "usuário lê perfis do próprio tenant" (policy intencional: diretório de equipe/e-mails; cross-tenant segue bloqueado).
+- **Typecheck limpo (exit 0)**: corrigidos erros pré-existentes — `mailer.ts` (await antes do builder em sendTemplatedEmail → era bug de runtime), `app.ts` (`select("*",{single:true})` v1 → `maybeSingle()`), `sw.ts` (`declare self: ServiceWorkerGlobalScope`, `NotificationEvent`, actions/Response seguros, `setCatchHandler` cast), `AdminLayout` (import `Menu` do lucide conflitante), `upload.ts` (token via `supabase.auth.getSession()`, não `store.token`), `vite.config.ts` (`orientation: 'portrait-primary'`, `includeAssets` no lugar do typo, remoção de `category`).
+- **Gates**: typecheck ✅, build ✅, `npm test` 90 passed (14 RLS skipped default), RLS 14/14 com RUN_DB_TESTS=1.
+
+## 2026-09-06 — Super Admin por árvore + Whitelabel de e-mail (análise + implementação)
+
+- **🔴 Crítico**: a migration `20260905000000_superadmin_and_email.sql` liberou `get_user_role() IN ('super_admin','mega_admin')` no RLS das 9 tabelas de negócio → todo super_admin via dados clínicos e e-mails de TODAS as revendas (LGPD). Corrigido.
+- **Migration nova**: `supabase/migrations/20260906000000_tree_scoped_superadmin.sql` — colunas `email_from_name/email_from_address/support_email` em tenants; índices `idx_tenants_parent_id`/`idx_user_profiles_tenant_id`; funções `get_tenant_tree_ids()` (CTE recursiva) e `has_tenant_tree_access()` (SECURITY DEFINER, mega=global, super=própria árvore); RLS "Tenant isolation" reescrito por árvore nas 9 tabelas; políticas de `tenants`/`user_profiles` por árvore.
+- **Backend** (`src/server/app.ts`): helpers `normalizeCustomDomain`/`isValidCustomDomain`/`assertCustomDomainUsable`; `PUT /api/tenant/config` com campos de e-mail da marca; `POST /api/admin/tenants` com `tenantType` + validação + convite com marca; `GET/PUT /api/admin/tenants/:id` (mega qualquer; super via RPC); `GET /api/admin/user-directory` (árvore); reenvio de convite com marca.
+- **Mailer**: `resolveBrandSender()` (clínica → revenda → global) aplicado em `sendInviteEmail`.
+- **UI**: `WhitelabelConfig` (E-mail da Marca), `TenantEditorModal` (secondaryColor + `updateAdminTenant`), `GlobalUserManager` reescrito (user-directory), novo `NetworkDirectory` ("E-mails da Rede" em ResellerView - seção `contacts`; rota/menu `super_contacts`).
+- **Verificação**: `npm test` ✅ 90 passed / 14 skipped (RLS opt-in). Typecheck: nenhum erro novo nos arquivos alterados; baseline já tinha erros pré-existentes em `mailer.ts` (`sendTemplatedEmail` .or/.is), `app.ts` (`/api/email-templates/render`), `sw.ts`, `AdminLayout`, `upload.ts` (confirmado via lint no árvore limpa).
+- **Pendente**: aplicar migrations no Supabase + rodar RLS opt-in; persistir localStorage→sessionStorage (LGPD); validar fluxo de convite end-to-end no browser.
+
 ## 2026-08-13 — Hardening de produção (análise + fixes)
 
 ### Executado
