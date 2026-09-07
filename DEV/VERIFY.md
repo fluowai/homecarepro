@@ -1,5 +1,15 @@
 # Verificação
 
+## Verificação 2026-09-07 — Security Scan CI verde (simulação local dos passos do job)
+| Check | Resultado |
+|---|---|
+| `npm audit --audit-level=high` (sem xlsx) | ✅ exit 0 (3 moderate restantes, fix exigiria major do express) |
+| grep JWT em ts/tsx/js/mjs/yml/yaml/json (exceto node_modules/dist/.git/.github) | ✅ 0 matches |
+| grep `SUPABASE_SERVICE_ROLE_KEY=` (aspas incluídas) | ✅ 0 matches |
+| grep `postgres(ql)://user:pass@` em yml/json | ✅ 0 matches |
+| `.env` não trackeado | ✅ |
+| typecheck / 90 testes / build | ✅ exit 0 |
+
 ## Última verificação (2026-09-06) — Aplicação de migrations + RLS + typecheck limpo
 
 | Item | Comando | Resultado |

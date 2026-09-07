@@ -2,6 +2,11 @@
 
 # Worklog
 
+## 2026-09-07 — Security Scan do CI (PR #2) → causa raiz dupla
+- **`npm audit --audit-level=high`**: highs do `xlsx` (GHSA-4r6h-8v6p-xvw6, GHSA-5pgg-2g8v-p4x9, sem fix). `xlsx` era usado só por scripts pontuais da raiz (`create_mock_excel.js`, `import_sc_saude.ts`) — **removido das dependencies** + stub `xlsx.d.ts` (typecheck segue 0). Restam 3 moderate (express/body-parser/qs) — nível `high` passa (exit 0); fix delas exigiria major bump do express.
+- **Grep "hardcoded secrets"** : auto-match do próprio `ci.yml` (`*.yml`, linha do padrão JWT) + **segredos reais commitados** — service role JWT em `create_sc_saude.js` e `portainer-stack-homecare-filled.yml`, anon key e **senha do postgres** (`SUPABASE_DB_URL`) no stack do Portainer. Ação: `create_sc_saude.js` agora lê `SUPABASE_SERVICE_ROLE_KEY`/`SC_SAUDE_INITIAL_PASSWORD` do env; stack redigido para `${...}`; novo check de connection string com senha; `.github` excluído do scan (elimina auto-match); regex do SR_KEY corrigida (não pegava valor entre aspas).
+- **Gates locais**: greps CI 0 matches · `npm audit --audit-level=high` exit 0 · typecheck exit 0 · 90 testes · build ok.
+
 ## 2026-09-06 (2ª parte) — Aplicação no banco + RLS verde + typecheck limpo
 - **Migrations aplicadas** (`node run-sql.js`): 20/20. Confirmação: o vazamento global da 20260905 **estava ATIVO** (policy de patients com `get_user_role() IN ('super_admin','mega_admin')`; a 20260905 tinha sido aplicada manualmente sem tracker).
 - **Fix de migration**: `20260822000000_add_whatsapp_tables.sql` usava `tenant_id uuid REFERENCES tenants(id)` mas `tenants.id` é `text` → falhava; corrigido para `text` (nunca tinha sido aplicada).
