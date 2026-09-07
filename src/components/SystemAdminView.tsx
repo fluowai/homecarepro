@@ -153,101 +153,196 @@ export default function SystemAdminView({ onExit, activeSection = 'overview' }: 
         </div>
       </div>
 
-      <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-gray-50/50 border-b border-gray-100 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                <th className="p-4 pl-6">ID / Nome da Instância</th>
-                <th className="p-4">Tipo</th>
-                <th className="p-4">Plano</th>
-                <th className="p-4">Status</th>
-                <th className="p-4">Domínio / Cor Primária</th>
-                <th className="p-4 text-right pr-6">Ações</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {filteredTenants.map((tenant) => (
-                <tr key={tenant.id} className="hover:bg-gray-50/50 transition-colors">
-                  <td className="p-4 pl-6">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded bg-gray-100 flex items-center justify-center text-lg shadow-sm border border-gray-200">
-                        {tenant.logo || '🏢'}
-                      </div>
-                      <div>
-                        <div className="font-semibold text-gray-900 text-sm">{tenant.name}</div>
-                        <div className="text-xs text-gray-500">ID: {tenant.id} • CNPJ: {tenant.cnpj}</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="p-4">
-                    <span className={`inline-flex px-2 py-1 text-[10px] font-bold rounded-full ${!tenant.parentId ? 'bg-indigo-50 text-indigo-700' : 'bg-green-50 text-green-700'}`}>
-                      {!tenant.parentId ? 'Revenda' : 'Clínica Cliente'}
-                    </span>
-                  </td>
-                  <td className="p-4">
-                    <span className="text-sm font-medium text-gray-700">{tenant.plan}</span>
-                  </td>
-                  <td className="p-4">
-                    <div className="flex items-center gap-1.5">
-                      <span className={`w-2 h-2 rounded-full ${tenant.status === 'blocked' ? 'bg-red-500' : 'bg-emerald-500'}`} />
-                      <span className="text-sm text-gray-600 capitalize">{tenant.status || 'ativo'}</span>
-                    </div>
-                  </td>
-                  <td className="p-4">
-                    <div className="text-xs text-gray-500 flex items-center gap-2">
-                      {tenant.customDomain || 'Padrão'}
-                      {tenant.primaryColor && (
-                        <span className="w-3 h-3 rounded-full border border-gray-200" style={{ backgroundColor: tenant.primaryColor }} title={tenant.primaryColor} />
-                      )}
-                    </div>
-                  </td>
-                  <td className="p-4 text-right pr-6">
-                    <div className="flex items-center justify-end gap-1">
-                      <button
-                        onClick={() => {
-                          useHomeCareStore.getState().startImpersonation(tenant.id);
-                          onExit('dashboard');
-                        }}
-                        className="text-gray-400 hover:text-blue-600 p-1.5 rounded-lg hover:bg-blue-50 transition-colors"
-                        title="Acessar como"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
-                      </button>
-                      {!tenant.parentId && (
-                        <button
-                          onClick={() => {
-                            setReinviteTenant(tenant);
-                            setReinviteEmail('');
-                            setReinviteLink(null);
-                            setReinviteError('');
-                          }}
-                          className="text-gray-400 hover:text-emerald-600 p-1.5 rounded-lg hover:bg-emerald-50 transition-colors"
-                          title="Gerar link de convite da revenda"
-                        >
-                          <Link2 className="w-4 h-4" />
-                        </button>
-                      )}
-                      <button
-                        onClick={() => setEditingTenant(tenant)}
-                        className="text-gray-400 hover:text-indigo-600 p-1.5 rounded-lg hover:bg-indigo-50 transition-colors"
-                        title="Editar Tenant"
-                      >
-                        <Settings className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {filteredTenants.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="p-8 text-center text-gray-500">
-                    Nenhuma instância localizada.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+      <div className="space-y-8">
+        {/* Revendas Table */}
+        <div>
+          <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
+            <Building2 className="w-5 h-5 text-indigo-600" />
+            Revendas (Tenants Principais)
+          </h3>
+          <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-gray-50/50 border-b border-gray-100 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                    <th className="p-4 pl-6">ID / Nome da Instância</th>
+                    <th className="p-4">Plano</th>
+                    <th className="p-4">Status</th>
+                    <th className="p-4">Domínio / Cor Primária</th>
+                    <th className="p-4 text-right pr-6">Ações</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {resellers.map((tenant) => (
+                    <tr key={tenant.id} className="hover:bg-gray-50/50 transition-colors">
+                      <td className="p-4 pl-6">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded bg-gray-100 flex items-center justify-center text-lg shadow-sm border border-gray-200">
+                            {tenant.logo || '🏢'}
+                          </div>
+                          <div>
+                            <div className="font-semibold text-gray-900 text-sm">{tenant.name}</div>
+                            <div className="text-xs text-gray-500">ID: {tenant.id} • CNPJ: {tenant.cnpj}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="p-4">
+                        <span className="text-sm font-medium text-gray-700">{tenant.plan}</span>
+                      </td>
+                      <td className="p-4">
+                        <div className="flex items-center gap-1.5">
+                          <span className={`w-2 h-2 rounded-full ${tenant.status === 'blocked' ? 'bg-red-500' : 'bg-emerald-500'}`} />
+                          <span className="text-sm text-gray-600 capitalize">{tenant.status || 'ativo'}</span>
+                        </div>
+                      </td>
+                      <td className="p-4">
+                        <div className="text-xs text-gray-500 flex items-center gap-2">
+                          {tenant.customDomain || 'Padrão'}
+                          {tenant.primaryColor && (
+                            <span className="w-3 h-3 rounded-full border border-gray-200" style={{ backgroundColor: tenant.primaryColor }} title={tenant.primaryColor} />
+                          )}
+                        </div>
+                      </td>
+                      <td className="p-4 text-right pr-6">
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            onClick={() => {
+                              useHomeCareStore.getState().startImpersonation(tenant.id);
+                              onExit('dashboard');
+                            }}
+                            className="text-gray-400 hover:text-blue-600 p-1.5 rounded-lg hover:bg-blue-50 transition-colors"
+                            title="Acessar como"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+                          </button>
+                          <button
+                            onClick={() => {
+                              setReinviteTenant(tenant);
+                              setReinviteEmail('');
+                              setReinviteLink(null);
+                              setReinviteError('');
+                            }}
+                            className="text-gray-400 hover:text-emerald-600 p-1.5 rounded-lg hover:bg-emerald-50 transition-colors"
+                            title="Gerar link de convite da revenda"
+                          >
+                            <Link2 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => setEditingTenant(tenant)}
+                            className="text-gray-400 hover:text-indigo-600 p-1.5 rounded-lg hover:bg-indigo-50 transition-colors"
+                            title="Editar Tenant"
+                          >
+                            <Settings className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                  {resellers.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="p-8 text-center text-gray-500">
+                        Nenhuma revenda localizada.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        {/* Clínicas Clientes Table */}
+        <div>
+          <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
+            <Users className="w-5 h-5 text-green-600" />
+            Clínicas Clientes (Sub-tenants)
+          </h3>
+          <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-gray-50/50 border-b border-gray-100 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                    <th className="p-4 pl-6">ID / Nome da Instância</th>
+                    <th className="p-4">Revenda Vinculada</th>
+                    <th className="p-4">Plano</th>
+                    <th className="p-4">Status</th>
+                    <th className="p-4">Domínio / Cor Primária</th>
+                    <th className="p-4 text-right pr-6">Ações</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {clinics.map((tenant) => {
+                    const parent = tenants.find((t) => t.id === tenant.parentId);
+                    return (
+                      <tr key={tenant.id} className="hover:bg-gray-50/50 transition-colors">
+                        <td className="p-4 pl-6">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded bg-gray-100 flex items-center justify-center text-lg shadow-sm border border-gray-200">
+                              {tenant.logo || '🏥'}
+                            </div>
+                            <div>
+                              <div className="font-semibold text-gray-900 text-sm">{tenant.name}</div>
+                              <div className="text-xs text-gray-500">ID: {tenant.id} • CNPJ: {tenant.cnpj}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="p-4">
+                          <span className="text-sm font-medium text-gray-700">
+                            {parent ? parent.name : 'Desconhecida'}
+                          </span>
+                        </td>
+                        <td className="p-4">
+                          <span className="text-sm font-medium text-gray-700">{tenant.plan}</span>
+                        </td>
+                        <td className="p-4">
+                          <div className="flex items-center gap-1.5">
+                            <span className={`w-2 h-2 rounded-full ${tenant.status === 'blocked' ? 'bg-red-500' : 'bg-emerald-500'}`} />
+                            <span className="text-sm text-gray-600 capitalize">{tenant.status || 'ativo'}</span>
+                          </div>
+                        </td>
+                        <td className="p-4">
+                          <div className="text-xs text-gray-500 flex items-center gap-2">
+                            {tenant.customDomain || 'Padrão'}
+                            {tenant.primaryColor && (
+                              <span className="w-3 h-3 rounded-full border border-gray-200" style={{ backgroundColor: tenant.primaryColor }} title={tenant.primaryColor} />
+                            )}
+                          </div>
+                        </td>
+                        <td className="p-4 text-right pr-6">
+                          <div className="flex items-center justify-end gap-1">
+                            <button
+                              onClick={() => {
+                                useHomeCareStore.getState().startImpersonation(tenant.id);
+                                onExit('dashboard');
+                              }}
+                              className="text-gray-400 hover:text-blue-600 p-1.5 rounded-lg hover:bg-blue-50 transition-colors"
+                              title="Acessar como"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+                            </button>
+                            <button
+                              onClick={() => setEditingTenant(tenant)}
+                              className="text-gray-400 hover:text-indigo-600 p-1.5 rounded-lg hover:bg-indigo-50 transition-colors"
+                              title="Editar Tenant"
+                            >
+                              <Settings className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {clinics.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="p-8 text-center text-gray-500">
+                        Nenhuma clínica cliente localizada.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </div>
     </div>
