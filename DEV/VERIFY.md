@@ -1,5 +1,46 @@
 # Verificação
 
+## Verificação 2026-09-07 — Security Scan CI verde (simulação local dos passos do job)
+| Check | Resultado |
+|---|---|
+| `npm audit --audit-level=high` (sem xlsx) | ✅ exit 0 (3 moderate restantes, fix exigiria major do express) |
+| grep JWT em ts/tsx/js/mjs/yml/yaml/json (exceto node_modules/dist/.git/.github) | ✅ 0 matches |
+| grep `SUPABASE_SERVICE_ROLE_KEY=` (aspas incluídas) | ✅ 0 matches |
+| grep `postgres(ql)://user:pass@` em yml/json | ✅ 0 matches |
+| `.env` não trackeado | ✅ |
+| typecheck / 90 testes / build | ✅ exit 0 |
+
+## Última verificação (2026-09-06) — Aplicação de migrations + RLS + typecheck limpo
+
+| Item | Comando | Resultado |
+|---|---|---|
+| Migrations aplicadas | `node run-sql.js` | ✅ 20/20 rastreadas (4 novas: whatsapp, homecare_improvements, 20260905, 20260906 + hardening 20260906000001) |
+| RLS por árvore no banco | query pg_policies | ✅ `patients` = `tenant_id = get_user_tenant_id() OR has_tenant_tree_access(tenant_id)`; `user_profiles` por árvore; funções `get_tenant_tree_ids`/`has_tenant_tree_access` presentes |
+| Colunas de marca | query information_schema | ✅ `tenants.email_from_name/email_from_address/support_email` |
+| Testes RLS opt-in | `RUN_DB_TESTS=1 npx vitest run tests/rls.integration.test.ts` | ✅ **14/14 passed** (isolamento por tenant, mega global, super árvore, anon bloqueado) |
+| Testes unitários | `npm test` | ✅ 90 passed / 14 skipped (RLS off por default) |
+| Typecheck | `npm run typecheck` | ✅ **0 erros** (exit 0) — erros pré-existentes corrigidos: `mailer.ts` (await em builder), `app.ts` (render `{single:true}`→`maybeSingle()`), `sw.ts` (webworker typing), `AdminLayout` (import `Menu` conflitante), `upload.ts` (token da sessão), `vite.config.ts` (orientation/includeAssets/category) |
+| Build | `npm run build` | ✅ `vite build` + esbuild OK |
+
+### Correções no caminho
+- **`20260822000000_add_whatsapp_tables.sql`**: corrigido `tenant_id uuid` → `text` (referenciava `tenants(id)` que é `text`); jamais havia sido aplicada.
+- **Nova `20260906000001_harden_get_user_role_search_path.sql`**: a 20260905 redefiniu `get_user_role()` sem `SET search_path` (SECURITY DEFINER vulnerável a hijack); restaurado.
+- **`tests/rls.integration.test.ts`**: expectativa "próprio perfil" atualizada — a policy intencional permite ler perfis do **mesmo tenant** (diretório de equipe/e-mails); segue bloqueando cross-tenant.
+- **Vazamento crítico confirmado ATIVO** antes da correção: `patients` tinha `get_user_role() IN ('super_admin','mega_admin')` (20260905 aplicada manualmente, sem tracker).
+
+## Última verificação (2026-09-06) — Super Admin por árvore + Whitelabel de e-mail
+
+| Item | Comando | Resultado |
+|---|---|---|
+| Testes unitários | `npm test` | ✅ 90 passed, 0 failed, 14 skipped (RLS opt-in) |
+| Typecheck (arquivos alterados) | `npm run typecheck` | ✅ 0 erros em app.ts/mailer.ts/store.ts/GlobalUserManager/NetworkDirectory/ResellerView/TenantEditorModal/WhitelabelConfig/Sidebar/App |
+| Typecheck baseline | `npm run typecheck` (árvore limpa via stash) | ⚠️ Já falhava antes (erros pré-existentes em `mailer.ts` sendTemplatedEmail `.or/.is`, `app.ts` email-templates/render, `sw.ts`, `AdminLayout`, `upload.ts`, `vite.config.ts`) — não introduzidos por esta entrega |
+| Migration RLS por árvore | revisão de `20260906000000_tree_scoped_superadmin.sql` | ✅ Nomes de policy batem com a 20260905; `DROP ... IF EXISTS`; SECURITY DEFINER com search_path |
+| Dados por árvore (mega vs super) | revisão de `has_tenant_tree_access` | ✅ mega=global; super=própria árvore; demais roles sem acesso via função |
+
+### ⚠️ Pendente pós-entrega
+- **Aplicar migrations** `20260905` (se ainda não aplicada) e `20260906` no Supabase e rodar os testes RLS opt-in (`tests/rls.integration.test.ts`) para validar isolamento positivo/negativo.
+
 ## Última verificação (2026-08-13) — Hardening de produção
 
 | Item | Comando | Resultado |

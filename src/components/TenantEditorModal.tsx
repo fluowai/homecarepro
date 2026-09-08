@@ -13,7 +13,7 @@ interface TenantEditorModalProps {
 }
 
 export function TenantEditorModal({ tenant, isCreating = false, onClose }: TenantEditorModalProps) {
-  const { updateTenant, createTenantWithInvite } = useHomeCareStore();
+  const { updateAdminTenant, createTenantWithInvite } = useHomeCareStore();
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [inviteLink, setInviteLink] = useState<string | null>(null);
@@ -24,6 +24,7 @@ export function TenantEditorModal({ tenant, isCreating = false, onClose }: Tenan
   const [customDomain, setCustomDomain] = useState(tenant.customDomain || '');
   const [subdomain, setSubdomain] = useState(tenant.subdomain || '');
   const [primaryColor, setPrimaryColor] = useState(tenant.primaryColor || '#16a34a');
+  const [secondaryColor, setSecondaryColor] = useState(tenant.secondaryColor || '#6366f1');
   const [status, setStatus] = useState(tenant.status || 'active');
   const [plan, setPlan] = useState(tenant.plan || 'Free');
   const [adminEmail, setAdminEmail] = useState('');
@@ -36,6 +37,7 @@ export function TenantEditorModal({ tenant, isCreating = false, onClose }: Tenan
     setCustomDomain(tenant.customDomain || '');
     setSubdomain(tenant.subdomain || '');
     setPrimaryColor(tenant.primaryColor || '#16a34a');
+    setSecondaryColor(tenant.secondaryColor || '#6366f1');
     setStatus(tenant.status || 'active');
     setPlan(tenant.plan || 'Free');
     setAdminEmail('');
@@ -62,6 +64,7 @@ export function TenantEditorModal({ tenant, isCreating = false, onClose }: Tenan
           customDomain: customDomain || undefined,
           subdomain: subdomain || undefined,
           primaryColor,
+          secondaryColor,
           adminEmail,
           tenantType,
         });
@@ -69,13 +72,14 @@ export function TenantEditorModal({ tenant, isCreating = false, onClose }: Tenan
         setSuccess(true);
         return;
       }
-      updateTenant(tenant.id, {
+      updateAdminTenant(tenant.id, {
         name,
         logo,
         cnpj,
         customDomain: customDomain || undefined,
         subdomain: subdomain || undefined,
         primaryColor,
+        secondaryColor,
         status,
         plan,
         tenantType,
@@ -220,7 +224,7 @@ export function TenantEditorModal({ tenant, isCreating = false, onClose }: Tenan
                 onChange={(e) => setCustomDomain(e.target.value)}
                 className="w-full px-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors"
               />
-              <p className="text-xs text-gray-500 mt-1">Configure o DNS apontando para o CNAME do sistema.</p>
+              <p className="text-xs text-gray-500 mt-1">Configure um CNAME apontando para {getAppBaseDomain()} (ou registro A direto). O HTTPS é emitido automaticamente.</p>
             </div>
           </div>
 
@@ -242,6 +246,23 @@ export function TenantEditorModal({ tenant, isCreating = false, onClose }: Tenan
                   type="text"
                   value={primaryColor}
                   onChange={(e) => setPrimaryColor(e.target.value)}
+                  className="flex-1 px-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Cor Secundária</label>
+              <div className="flex items-center gap-3">
+                <input
+                  type="color"
+                  value={secondaryColor}
+                  onChange={(e) => setSecondaryColor(e.target.value)}
+                  className="w-10 h-10 rounded cursor-pointer border-0 p-0"
+                />
+                <input
+                  type="text"
+                  value={secondaryColor}
+                  onChange={(e) => setSecondaryColor(e.target.value)}
                   className="flex-1 px-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors"
                 />
               </div>

@@ -177,6 +177,48 @@ export function createApp(options: CreateAppOptions) {
       .slice(0, 63);
   }
 
+  // ── Custom Domain helpers ────────────────────────────────────────
+  function normalizeCustomDomain(value: unknown): string {
+    if (typeof value !== 'string' || !value.trim()) return '';
+    return value
+      .trim()
+      .toLowerCase()
+      .replace(/^https?:\/\//, '')
+      .replace(/[\/?#].*$/, '');
+  }
+
+  function isValidCustomDomain(domain: string): boolean {
+    if (domain.length < 4 || domain.length > 253) return false;
+    return /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$/.test(domain);
+  }
+
+  async function assertCustomDomainUsable(customDomain: string | undefined, excludeTenantId: string): Promise<string | null> {
+    if (!customDomain) return null;
+
+    const domain = normalizeCustomDomain(customDomain);
+    if (domain !== customDomain) {
+      return "Domínio inválido: informe apenas o hostname (sem http://, caminho ou parâmetros).";
+    }
+    if (!isValidCustomDomain(domain)) {
+      return "Domínio inválido. Informe um hostname completo, ex: app.suamarca.com.br";
+    }
+    if (domain === APP_BASE_DOMAIN || domain === `www.${APP_BASE_DOMAIN}` || domain.endsWith(`.${APP_BASE_DOMAIN}`)) {
+      return `Este domínio pertence ao sistema. Escolha um domínio próprio (diferente de *.${APP_BASE_DOMAIN}).`;
+    }
+
+    const { data: existing } = await supabaseAdmin
+      .from("tenants")
+      .select("id")
+      .eq("custom_domain", domain)
+      .neq("id", excludeTenantId)
+      .maybeSingle();
+    if (existing) {
+      return "Domínio já está em uso por outra conta.";
+    }
+
+    return null;
+  }
+
   // ── Default System Email Templates ──────────────────────────────
   const DEFAULT_TEMPLATES = [
     {
@@ -467,8 +509,21 @@ export function createApp(options: CreateAppOptions) {
         .eq("id", requesterId)
         .single();
         
-      if (!requesterProfile || !['mega_admin', 'super_admin'].includes(requesterProfile.role)) {
+      if (!requesterProfile || !['mega_admin', 'super_admin', 'admin'].includes(requesterProfile.role)) {
         return res.status(403).json({ error: "Unauthorized. Only admins can reset passwords." });
+      }
+
+      // If it's a reseller (admin), they can only reset passwords for users in their own tenant
+      if (requesterProfile.role === 'admin') {
+        const { data: targetProfile } = await supabaseAdmin
+          .from("user_profiles")
+          .select("tenant_id")
+          .eq("id", targetUserId)
+          .single();
+          
+        if (!targetProfile || targetProfile.tenant_id !== requesterProfile.tenant_id) {
+          return res.status(403).json({ error: "Unauthorized. You can only reset passwords for clients in your own reseller/tenant." });
+        }
       }
 
       // Perform password update using Admin API
@@ -828,7 +883,7 @@ Apenas o objeto JSON valido, sem formatacao Markdown adicional nem blocos de cod
   app.put("/api/tenant/config", requireAuth, globalLimiter, async (req, res) => {
     try {
       const userId = (req as any).userId;
-       const { customDomain, primaryColor, secondaryColor, logo, subdomain, tenantId } = req.body;
+       const { customDomain, primaryColor, secondaryColor, logo, subdomain, tenantId, emailFromName, emailFromAddress, supportEmail } = req.body;
 
       const { data: profile } = await supabaseAdmin
         .from("user_profiles")
@@ -843,16 +898,14 @@ Apenas o objeto JSON valido, sem formatacao Markdown adicional nem blocos de cod
       const targetTenantId = profile.role === "mega_admin" && tenantId ? tenantId : profile.tenant_id;
 
       if (customDomain) {
-        // Check if domain is already used by another tenant
-        const { data: existing } = await supabaseAdmin
-          .from("tenants")
-          .select("id")
-          .eq("custom_domain", customDomain)
-          .neq("id", targetTenantId)
-          .maybeSingle();
-        if (existing) {
-          return res.status(400).json({ error: "Domínio já está em uso por outra conta." });
+        const domainError = await assertCustomDomainUsable(customDomain, targetTenantId);
+        if (domainError) {
+          return res.status(400).json({ error: domainError });
         }
+      }
+
+      if (emailFromAddress && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailFromAddress)) {
+        return res.status(400).json({ error: "E-mail remetente inválido." });
       }
 
       // Validate and resolve subdomain
@@ -882,6 +935,9 @@ Apenas o objeto JSON valido, sem formatacao Markdown adicional nem blocos de cod
         primary_color: primaryColor || null,
         secondary_color: secondaryColor || null,
         logo: logo || null,
+        email_from_name: emailFromName || null,
+        email_from_address: emailFromAddress || null,
+        support_email: supportEmail || null,
         subdomain: resolvedSubdomain !== undefined ? (resolvedSubdomain || null) : undefined,
       };
       // Remove undefined keys so we don't overwrite with undefined
@@ -1139,7 +1195,7 @@ Apenas o objeto JSON valido, sem formatacao Markdown adicional nem blocos de cod
 
       const { templateId, variables = {} } = req.body as { templateId?: string; variables?: Record<string, string> };
 
-      let query = supabaseAdmin.from("email_templates").select("*", { single: true });
+      let query = supabaseAdmin.from("email_templates").select("*");
       if (templateId) {
         query = query.eq("id", templateId);
       } else {
@@ -1148,7 +1204,7 @@ Apenas o objeto JSON valido, sem formatacao Markdown adicional nem blocos de cod
         query = query.eq("name", name);
       }
 
-      const { data: tmpl, error } = await query;
+      const { data: tmpl, error } = await query.maybeSingle();
       if (error || !tmpl) {
         return res.status(404).json({ error: "Template não encontrado." });
       }
@@ -1220,7 +1276,7 @@ Apenas o objeto JSON valido, sem formatacao Markdown adicional nem blocos de cod
         return res.status(403).json({ error: "Acesso negado." });
       }
 
-      const { name, cnpj, plan, logo, customDomain, primaryColor, secondaryColor, subdomain, adminEmail, adminName, parentId } = req.body;
+      const { name, cnpj, plan, logo, customDomain, primaryColor, secondaryColor, subdomain, adminEmail, adminName, parentId, tenantType, emailFromName, emailFromAddress, supportEmail } = req.body;
       if (!name || !adminEmail) {
         return res.status(400).json({ error: "Nome da instância e e-mail do administrador são obrigatórios." });
       }
@@ -1236,6 +1292,19 @@ Apenas o objeto JSON valido, sem formatacao Markdown adicional nem blocos de cod
         targetParent = parentId;
       }
       const inviteRole = targetParent ? "admin" : "super_admin";
+
+      const resolvedTenantType = tenantType === "cooperativa" ? "cooperativa" : "homecare";
+
+      if (customDomain) {
+        const domainError = await assertCustomDomainUsable(customDomain, "__create__");
+        if (domainError) {
+          return res.status(400).json({ error: domainError });
+        }
+      }
+
+      if (emailFromAddress && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailFromAddress)) {
+        return res.status(400).json({ error: "E-mail remetente inválido." });
+      }
 
       // Resolve subdomain: use provided or auto-generate from name
       let resolvedSubdomain = (subdomain || "").trim().toLowerCase();
@@ -1285,10 +1354,14 @@ Apenas o objeto JSON valido, sem formatacao Markdown adicional nem blocos de cod
         logo: logo || "",
         status: "active",
         parent_id: targetParent,
+        tenant_type: resolvedTenantType,
         custom_domain: customDomain || null,
         subdomain: resolvedSubdomain,
         primary_color: primaryColor || null,
         secondary_color: secondaryColor || null,
+        email_from_name: emailFromName || null,
+        email_from_address: emailFromAddress || null,
+        support_email: supportEmail || null,
       });
       if (insertError) throw insertError;
 
@@ -1306,10 +1379,13 @@ Apenas o objeto JSON valido, sem formatacao Markdown adicional nem blocos de cod
 
       const inviteLink = `${appUrl}/?invite=${token}`;
       
-      // Enviar email transacional (não bloqueia a resposta, dispara em background)
-      sendInviteEmail(supabaseAdmin, adminEmail, inviteLink, inviteRole, "Sistema HomeCare Pro").catch(err => console.error("Async email error", err));
+      // Enviar email transacional com a marca do tenant/revenda (não bloqueia a resposta)
+      const inviterName = targetParent
+        ? (await supabaseAdmin.from("tenants").select("name").eq("id", targetParent).maybeSingle()).data?.name || "Sistema HomeCare Pro"
+        : name;
+      sendInviteEmail(supabaseAdmin, adminEmail, inviteLink, inviteRole, inviterName, { tenantId }).catch(err => console.error("Async email error", err));
 
-      logEvent("INFO", "Tenant created with invitation", { tenantId, role: inviteRole, createdBy: userId, adminName: adminName || "", subdomain: resolvedSubdomain });
+      logEvent("INFO", "Tenant created with invitation", { tenantId, role: inviteRole, createdBy: userId, adminName: adminName || "", subdomain: resolvedSubdomain, tenantType: resolvedTenantType });
       res.status(201).json({
         tenant: {
           id: tenantId,
@@ -1319,13 +1395,16 @@ Apenas o objeto JSON valido, sem formatacao Markdown adicional nem blocos de cod
           logo: logo || "",
           parentId: targetParent,
           status: "active",
+          tenantType: resolvedTenantType,
           subdomain: resolvedSubdomain,
           customDomain: customDomain || undefined,
           primaryColor: primaryColor || undefined,
           secondaryColor: secondaryColor || undefined,
         },
-        inviteLink: `${appUrl}/?invite=${token}`,
-        tenantUrl: resolvedSubdomain ? `https://${resolvedSubdomain}.${APP_BASE_DOMAIN}` : undefined,
+        inviteLink,
+        tenantUrl: customDomain
+          ? `https://${normalizeCustomDomain(customDomain)}`
+          : resolvedSubdomain ? `https://${resolvedSubdomain}.${APP_BASE_DOMAIN}` : undefined,
       });
     } catch (error: any) {
       logEvent("ERROR", "Tenant creation failed", { error: error.message });
@@ -1350,7 +1429,7 @@ Apenas o objeto JSON valido, sem formatacao Markdown adicional nem blocos de cod
 
       const { data: tenant, error: tenantError } = await supabaseAdmin
         .from("tenants")
-        .select("id, parent_id")
+        .select("id, parent_id, name")
         .eq("id", tenantId)
         .single();
       if (tenantError || !tenant) {
@@ -1376,7 +1455,10 @@ Apenas o objeto JSON valido, sem formatacao Markdown adicional nem blocos de cod
       if (inviteError) throw inviteError;
 
       const inviteLink = `${appUrl}/?invite=${token}`;
-      sendInviteEmail(supabaseAdmin, adminEmail, inviteLink, inviteRole, "Sistema HomeCare Pro").catch(err => console.error("Async email error", err));
+      const inviterName = tenant.parent_id
+        ? (await supabaseAdmin.from("tenants").select("name").eq("id", tenant.parent_id).maybeSingle()).data?.name || "Sistema HomeCare Pro"
+        : tenant.name || "Sistema HomeCare Pro";
+      sendInviteEmail(supabaseAdmin, adminEmail, inviteLink, inviteRole, inviterName, { tenantId }).catch(err => console.error("Async email error", err));
 
       logEvent("INFO", "Invite regenerated", { tenantId, role: inviteRole, adminName: adminName || "" });
       res.status(201).json({ inviteLink });
@@ -1463,6 +1545,195 @@ Apenas o objeto JSON valido, sem formatacao Markdown adicional nem blocos de cod
     }
   });
 
+  // ── Tenant Management (Admin) ──────────────────────────────────
+
+  // Get a single tenant (Mega Admin: any; Super Admin: own reseller or clinics)
+  app.get("/api/admin/tenants/:id", requireAuth, globalLimiter, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const profile = await getProfile(userId);
+      if (!profile || (profile.role !== "mega_admin" && profile.role !== "super_admin")) {
+        return res.status(403).json({ error: "Acesso negado." });
+      }
+
+      const tenantId = (req.params as any).id;
+      const { data: tenant, error } = await supabaseAdmin
+        .from("tenants")
+        .select("*")
+        .eq("id", tenantId)
+        .single();
+      if (error || !tenant) {
+        return res.status(404).json({ error: "Instância não encontrada." });
+      }
+
+      // Super admin: apenas a própria revenda ou clínicas da própria árvore
+      if (profile.role === "super_admin") {
+        const { data: inTree } = await supabaseAdmin
+          .rpc("get_tenant_tree_ids", { root_tenant_id: profile.tenant_id });
+        const treeIds = (inTree || []).map((r: { tenant_id: string }) => r.tenant_id);
+        if (!treeIds.includes(tenant.id)) {
+          return res.status(403).json({ error: "Acesso negado." });
+        }
+      }
+
+      res.json({ tenant });
+    } catch (error: any) {
+      logEvent("ERROR", "Tenant fetch failed", { error: error.message });
+      res.status(500).json({ error: "Falha ao carregar instância." });
+    }
+  });
+
+  // Update a tenant (Mega Admin: any; Super Admin: own reseller or clinics)
+  app.put("/api/admin/tenants/:id", requireAuth, globalLimiter, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const profile = await getProfile(userId);
+      if (!profile || (profile.role !== "mega_admin" && profile.role !== "super_admin")) {
+        return res.status(403).json({ error: "Acesso negado." });
+      }
+
+      const tenantId = (req.params as any).id;
+      const { data: tenant, error: tenantError } = await supabaseAdmin
+        .from("tenants")
+        .select("id, parent_id, name, status")
+        .eq("id", tenantId)
+        .single();
+      if (tenantError || !tenant) {
+        return res.status(404).json({ error: "Instância não encontrada." });
+      }
+
+      // Super admin: apenas o próprio tenant ou clínicas da própria árvore
+      if (profile.role === "super_admin") {
+        const { data: inTree } = await supabaseAdmin
+          .rpc("get_tenant_tree_ids", { root_tenant_id: profile.tenant_id });
+        const treeIds = (inTree || []).map((r: { tenant_id: string }) => r.tenant_id);
+        if (!treeIds.includes(tenant.id)) {
+          return res.status(403).json({ error: "Acesso negado." });
+        }
+      }
+
+      const {
+        name, cnpj, plan, logo, status, tenantType,
+        customDomain, subdomain, primaryColor, secondaryColor,
+        emailFromName, emailFromAddress, supportEmail,
+      } = req.body;
+
+      if (name !== undefined && (typeof name !== "string" || !name.trim())) {
+        return res.status(400).json({ error: "Nome da instância é obrigatório." });
+      }
+      if (customDomain) {
+        const domainError = await assertCustomDomainUsable(customDomain, tenantId);
+        if (domainError) {
+          return res.status(400).json({ error: domainError });
+        }
+      }
+      if (emailFromAddress && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailFromAddress)) {
+        return res.status(400).json({ error: "E-mail remetente inválido." });
+      }
+
+      // Subdomain resolution (validate uniqueness when provided)
+      let resolvedSubdomain: string | null | undefined;
+      if (subdomain !== undefined) {
+        resolvedSubdomain = (subdomain || "").trim().toLowerCase();
+        if (resolvedSubdomain) {
+          const subClean = slugifySubdomain(resolvedSubdomain);
+          if (!subClean || RESERVED_SUBDOMAINS.has(subClean) || subClean !== resolvedSubdomain) {
+            return res.status(400).json({ error: "Subdomínio inválido. Use apenas letras, números e hífen (não inicie/finalise com hífen). Valores reservados não são permitidos." });
+          }
+          const { data: existing } = await supabaseAdmin
+            .from("tenants")
+            .select("id")
+            .eq("subdomain", subClean)
+            .neq("id", tenantId)
+            .maybeSingle();
+          if (existing) {
+            return res.status(400).json({ error: `Subdomínio "${subClean}" já está em uso por outra conta.` });
+          }
+          resolvedSubdomain = subClean;
+        } else {
+          resolvedSubdomain = null;
+        }
+      }
+
+      const updateData: Record<string, unknown> = {
+        ...(name !== undefined ? { name: name.trim() } : {}),
+        ...(cnpj !== undefined ? { cnpj: cnpj || "" } : {}),
+        ...(plan !== undefined ? { plan: plan || "Free" } : {}),
+        ...(logo !== undefined ? { logo: logo || "" } : {}),
+        ...(status !== undefined ? { status } : {}),
+        ...(tenantType !== undefined ? { tenant_type: tenantType === "cooperativa" ? "cooperativa" : "homecare" } : {}),
+        ...(customDomain !== undefined ? { custom_domain: customDomain || null } : {}),
+        ...(resolvedSubdomain !== undefined ? { subdomain: resolvedSubdomain } : {}),
+        ...(primaryColor !== undefined ? { primary_color: primaryColor || null } : {}),
+        ...(secondaryColor !== undefined ? { secondary_color: secondaryColor || null } : {}),
+        ...(emailFromName !== undefined ? { email_from_name: emailFromName || null } : {}),
+        ...(emailFromAddress !== undefined ? { email_from_address: emailFromAddress || null } : {}),
+        ...(supportEmail !== undefined ? { support_email: supportEmail || null } : {}),
+      };
+
+      if (status !== undefined && !["active", "inactive", "blocked"].includes(status)) {
+        return res.status(400).json({ error: "Status inválido." });
+      }
+
+      const { data: updated, error } = await supabaseAdmin
+        .from("tenants")
+        .update(updateData)
+        .eq("id", tenantId)
+        .select()
+        .single();
+      if (error) throw error;
+
+      logEvent("INFO", "Tenant updated", { tenantId, byUserId: userId });
+      res.json({ tenant: updated });
+    } catch (error: any) {
+      logEvent("ERROR", "Tenant update failed", { error: error.message });
+      res.status(500).json({ error: "Falha ao atualizar instância." });
+    }
+  });
+
+  // ── User Directory (e-mails by level) ───────────────────────────
+  // Mega Admin: todos os usuários de todos os níveis.
+  // Super Admin: apenas usuários da própria revenda e clínicas descendentes.
+  app.get("/api/admin/user-directory", requireAuth, globalLimiter, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const profile = await getProfile(userId);
+      if (!profile || (profile.role !== "mega_admin" && profile.role !== "super_admin")) {
+        return res.status(403).json({ error: "Acesso negado." });
+      }
+
+      let query = supabaseAdmin
+        .from("user_profiles")
+        .select("id, tenant_id, full_name, role, email, created_at");
+
+      if (profile.role === "super_admin") {
+        const { data: tree, error: treeError } = await supabaseAdmin
+          .rpc("get_tenant_tree_ids", { root_tenant_id: profile.tenant_id });
+        const treeIds = (tree || []).map((r: { tenant_id: string }) => r.tenant_id);
+        if (treeError) throw treeError;
+        if (treeIds.length === 0) {
+          return res.json({ users: [], tenants: [] });
+        }
+        query = query.in("tenant_id", treeIds);
+      }
+
+      const { data: users, error } = await query.order("created_at", { ascending: false });
+      if (error) throw error;
+
+      const tenantIds = Array.from(new Set((users || []).map((u) => u.tenant_id).filter(Boolean))) as string[];
+      const { data: tenants } = await supabaseAdmin
+        .from("tenants")
+        .select("id, name, parent_id, tenant_type, status")
+        .in("id", tenantIds);
+
+      logEvent("INFO", "User directory fetched", { byUserId: userId, role: profile.role, count: (users || []).length });
+      res.json({ users: users || [], tenants: tenants || [] });
+    } catch (error: any) {
+      logEvent("ERROR", "User directory failed", { error: error.message });
+      res.status(500).json({ error: "Falha ao carregar diretório de usuários." });
+    }
+  });
+
   // ── Domain Validation (Mega Admin & Super Admin) ────────────────
   async function checkDomain(domain: string, expectedTarget: string) {
     const host = String(domain || "").toLowerCase().trim().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
@@ -1528,7 +1799,7 @@ Apenas o objeto JSON valido, sem formatacao Markdown adicional nem blocos de cod
 
       const target = typeof expectedTarget === "string" && expectedTarget.trim()
         ? expectedTarget.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "")
-        : "";
+        : APP_BASE_DOMAIN;
 
       const results = await Promise.all(
         domains.map((d: string) => checkDomain(d, target))

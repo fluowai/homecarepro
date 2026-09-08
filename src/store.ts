@@ -547,6 +547,7 @@ interface HomeCareState {
   refreshTenants: () => Promise<void>;
   createTenantWithInvite: (input: { name: string; cnpj?: string; plan?: string; logo?: string; customDomain?: string; subdomain?: string; primaryColor?: string; secondaryColor?: string; adminEmail: string; parentId?: string; tenantType?: 'homecare' | 'cooperativa' }) => Promise<{ tenant: Tenant; inviteLink: string; tenantUrl?: string }>;
   regenerateInvite: (tenantId: string, adminEmail: string) => Promise<string>;
+  updateAdminTenant: (id: string, updates: Partial<Tenant> & { emailFromName?: string; emailFromAddress?: string; supportEmail?: string }) => Promise<void>;
 
   // Offline/Sync Actions
   setOfflineMode: (offline: boolean) => void;
@@ -1207,6 +1208,38 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
       throw new Error(result.error || 'Falha ao gerar convite.');
     }
     return result.inviteLink as string;
+  },
+
+  updateAdminTenant: async (id, updates) => {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData?.session?.access_token;
+    const res = await fetch(`/api/admin/tenants/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        name: updates.name,
+        logo: updates.logo,
+        cnpj: updates.cnpj,
+        plan: updates.plan,
+        status: updates.status,
+        tenantType: updates.tenantType,
+        customDomain: updates.customDomain,
+        subdomain: updates.subdomain,
+        primaryColor: updates.primaryColor,
+        secondaryColor: updates.secondaryColor,
+        emailFromName: updates.emailFromName,
+        emailFromAddress: updates.emailFromAddress,
+        supportEmail: updates.supportEmail,
+      }),
+    });
+    const result = await res.json();
+    if (!res.ok) {
+      throw new Error(result.error || 'Falha ao atualizar instância.');
+    }
+    await get().refreshTenants();
   },
 
   setOfflineMode: (offline) => {

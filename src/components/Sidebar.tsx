@@ -157,6 +157,7 @@ export default function Sidebar({ currentView, setView, isOpen, onClose }: Sideb
          { id: 'super_plans', label: 'Planos' },
          { id: 'super_domains', label: 'Validação de Domínios' },
          { id: 'super_users', label: 'Usuários e Equipe' },
+         { id: 'super_contacts', label: 'E-mails da Rede' },
          { id: 'super_whitelabel', label: 'Configuração Whitelabel' },
          { id: 'super_emails', label: 'Templates de E-mail' },
          { id: 'super_support', label: 'Suporte' }

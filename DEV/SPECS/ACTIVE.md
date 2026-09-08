@@ -1,4 +1,33 @@
-# Spec Ativa — Correção de dados mockados/simulados (cadastro real)
+# Spec Ativa — Super Admin por árvore + Whitelabel de e-mail (2026-09-06)
+
+## Objetivo
+Corrigir o vazamento RLS introduzido pela migration `20260905000000_superadmin_and_email.sql` (todo super_admin via dados de saúde/e-mails de todas as revendas) e implementar: Super Admin vê e-mails da própria árvore (revenda → clínicas → equipes) e remetente de e-mail por marca da revenda (Resend).
+
+## Decisões do maestro (2026-09-06)
+1. Prioridade: **Segurança + Whitelabel** primeiro (cooperativas ficam no roadmap).
+2. E-mails: **escopados por árvore** (mega_admin global; super_admin só a própria árvore).
+3. Remetente por revenda: **Sim** (Resend, domínio verificado por marca).
+
+## Escopo
+1. Migration `20260906000000_tree_scoped_superadmin.sql`: colunas de e-mail em `tenants`; índices; `get_tenant_tree_ids()` + `has_tenant_tree_access()` (SECURITY DEFINER); RLS por árvore nas tabelas de negócio, `tenants` e `user_profiles` (substitui o escopo global da 20260905).
+2. Backend (`app.ts`): `PUT /api/tenant/config` com `emailFrom*`; `POST /api/admin/tenants` com `tenantType` + validação de domínio; `GET/PUT /api/admin/tenants/:id`; `GET /api/admin/user-directory`; convite com marca.
+3. Mailer: `resolveBrandSender()` em `sendInviteEmail`.
+4. UI: `WhitelabelConfig` (E-mail da Marca), `TenantEditorModal` (`secondaryColor`, `updateAdminTenant`), `GlobalUserManager` reescrito, novo `NetworkDirectory` + seção/menu "E-mails da Rede".
+5. Store: `updateAdminTenant`.
+
+## Status
+**Código concluído** (2026-09-06) — migration pronta; **aplicação no Supabase pendente**. Testes: 90 passed / 14 skipped. Nenhum erro novo de typecheck (erros pré-existentes fora do escopo, ver HANDOFF).
+
+## Aceite
+1. `npm test`: 90+ passed, 0 failed.
+2. Typecheck sem erros novos nos arquivos alterados (baseline já falhava).
+3. Migration `20260906` revisada (policies batem com 20260905; idempotente).
+4. **Pendente pós-deploy**: aplicar migrations no Supabase + rodar `tests/rls.integration.test.ts` (isolamento positivo/negativo).
+
+---
+# Specs anteriores (concluídas)
+
+## Spec — Correção de dados mockados/simulados (cadastro real)
 
 ## Objetivo
 "Valide cada função se tiver dado mockup corrija... quero cadastrar dados reais": eliminar elementos simulados e fazer as telas operarem com dados reais persistidos no banco (financeiro, dashboard, administração, cooperativa, alertas, convites, IA).

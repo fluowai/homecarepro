@@ -7,6 +7,7 @@ import { SupportDesk } from './SupportDesk';
 import { TenantEditorModal } from './TenantEditorModal';
 import { InviteLinkModal } from './InviteLinkModal';
 import { DomainValidator } from './DomainValidator';
+import { NetworkDirectory } from './NetworkDirectory';
 import TenantUserManager from './TenantUserManager';
 import EmailTemplatesManager from './EmailTemplatesManager';
 import { Tenant } from '../types';
@@ -30,6 +31,7 @@ const MENU_GROUPS = [
       { id: 'plans', label: 'Planos', icon: Package },
       { id: 'domains', label: 'Validação de Domínios', icon: Globe },
       { id: 'users', label: 'Usuários e Equipe', icon: Users },
+      { id: 'contacts', label: 'E-mails da Rede', icon: Mail },
       { id: 'emails', label: 'Templates de E-mail', icon: Mail },
     ],
   },
@@ -315,6 +317,8 @@ export default function ResellerView({ onExit, activeSection = 'overview' }: Res
         return <DomainValidator scope="mine" />;
       case 'users':
         return <div className="p-6 bg-gray-50/30"><TenantUserManager /></div>;
+      case 'contacts':
+        return <NetworkDirectory />;
       case 'emails':
         return <EmailTemplatesManager scope="tenant" />;
       default:

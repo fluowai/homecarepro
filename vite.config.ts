@@ -42,7 +42,7 @@ export default defineConfig(() => {
             },
           ],
         },
-        includeAssembleRegExp: ['manifest.webmanifest'],
+        includeAssets: ['manifest.webmanifest'],
         manifest: {
           short_name: 'HomeCare 360',
           name: 'HomeCare Pro 360 — Gestão Home Care',
@@ -54,8 +54,7 @@ export default defineConfig(() => {
           start_url: '/',
           scope: '/',
           lang: 'pt-BR',
-          orientation: 'portrait-primary-preference',
-          category: ['health', 'medical', 'productivity'],
+          orientation: 'portrait-primary',
           icons: [
             {
               src: '/pwa-192x192.png',

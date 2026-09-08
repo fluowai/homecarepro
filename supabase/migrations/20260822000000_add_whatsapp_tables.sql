@@ -3,7 +3,7 @@
 -- 1. WhatsApp Instances
 CREATE TABLE IF NOT EXISTS public.whatsapp_instances (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id uuid NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
+  tenant_id text NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
   instance_name text NOT NULL,
   status text NOT NULL DEFAULT 'disconnected',
   qr_code text,
@@ -33,7 +33,7 @@ CREATE POLICY "Admins can manage their tenant's whatsapp instances"
 -- 2. WhatsApp Contacts
 CREATE TABLE IF NOT EXISTS public.whatsapp_contacts (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id uuid NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
+  tenant_id text NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
   phone text NOT NULL,
   profile_name text,
   profile_pic_url text,
@@ -62,7 +62,7 @@ CREATE POLICY "Admins can manage their tenant's whatsapp contacts"
 -- 3. WhatsApp Messages
 CREATE TABLE IF NOT EXISTS public.whatsapp_messages (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id uuid NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
+  tenant_id text NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
   instance_id uuid NOT NULL REFERENCES public.whatsapp_instances(id) ON DELETE CASCADE,
   contact_id uuid NOT NULL REFERENCES public.whatsapp_contacts(id) ON DELETE CASCADE,
   message_id text, -- ID returned by the provider
@@ -99,7 +99,7 @@ CREATE POLICY "Admins can update their tenant's whatsapp messages"
 -- 4. WhatsApp Threads (For Chat UI aggregation)
 CREATE TABLE IF NOT EXISTS public.whatsapp_threads (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id uuid NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
+  tenant_id text NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
   contact_id uuid NOT NULL REFERENCES public.whatsapp_contacts(id) ON DELETE CASCADE,
   last_message_id uuid REFERENCES public.whatsapp_messages(id) ON DELETE SET NULL,
   unread_count integer DEFAULT 0,
@@ -147,3 +147,4 @@ FOR EACH ROW EXECUTE PROCEDURE trigger_set_timestamp();
 CREATE TRIGGER set_timestamp_whatsapp_threads
 BEFORE UPDATE ON public.whatsapp_threads
 FOR EACH ROW EXECUTE PROCEDURE trigger_set_timestamp();
+
