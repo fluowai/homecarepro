@@ -12,11 +12,11 @@ import AuthView from './components/AuthView';
 import InviteAcceptView from './components/InviteAcceptView';
 import { supabase } from './lib/supabase';
 import { useHomeCareStore } from './store';
-import { extractSubdomain, getAppBaseDomain, buildTenantUrl } from './lib/subdomain';
+import { extractSubdomain, getAppBaseDomain, getEnv, buildTenantUrl } from './lib/subdomain';
 import { Toaster } from 'sonner';
+import PWAInstallGate from './components/PWAInstallGate';
 import {
   registerPushNotifications,
-  setupInstallPrompt,
   isPWAInstalled,
   getVapidPublicKey,
   setAudioEnabled,
@@ -47,6 +47,7 @@ const WhatsAppConnectionsView = lazy(() => import('./components/WhatsAppConnecti
 const AttendancesView = lazy(() => import('./components/AttendancesView').then(m => ({ default: m.AttendancesView })));
 const ApprovalDashboard = lazy(() => import('./components/ApprovalDashboard').then(m => ({ default: m.ApprovalDashboard })));
 const ProfessionalApp = lazy(() => import('./components/ProfessionalApp').then(m => ({ default: m.ProfessionalApp })));
+const ReportsView = lazy(() => import('./components/ReportsView'));
 
 function LoadingScreen() {
   return (
@@ -102,9 +103,6 @@ export default function App() {
   useEffect(() => {
     if (!isAuthenticated || !profile) return;
 
-    // Setup install prompt UI
-    setupInstallPrompt();
-
     // Register push notifications (only if not already installed)
     if (!isPWAInstalled()) {
       (async () => {
@@ -123,9 +121,14 @@ export default function App() {
     }
   }, [isAuthenticated, profile]);
 
-  // Redirect to tenant subdomain after login if on main domain
+  // Redirect to tenant subdomain after login if on main domain.
+  // Disabled by default: requires DNS wildcard (*.<base domain>) configured.
+  // Enable by setting VITE_ENABLE_SUBDOMAIN_REDIRECT=true.
   useEffect(() => {
     if (!isAuthenticated || !profile) return;
+
+    const subdomainRedirectEnabled = getEnv('VITE_ENABLE_SUBDOMAIN_REDIRECT') === 'true';
+    if (!subdomainRedirectEnabled) return;
 
     // Don't redirect during invite flow
     const hasInvite = new URLSearchParams(window.location.search).has('invite');
@@ -227,6 +230,8 @@ export default function App() {
         return <CommunicationView />;
       case 'finance':
         return <FinanceView />;
+      case 'reports':
+        return <ReportsView />;
       case 'crm':
         return <CrmView />;
       case 'contracts':
@@ -278,6 +283,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex font-sans antialiased text-gray-900">
+      <PWAInstallGate />
       {(primaryColor || secondaryColor) && (
         <style>
           {`

@@ -189,6 +189,20 @@ export default function Sidebar({ currentView, setView, isOpen, onClose }: Sideb
     }
   ];
 
+  const megaAdminMenu = [
+    { id: 'mega_overview', label: 'Dashboard', icon: Activity },
+    { id: 'mega_users', label: 'Clientes', icon: Users },
+    { id: 'mega_overview', label: 'Vendas', icon: TrendingUp, hasDropdown: true },
+    { id: 'mega_network', label: 'Revendas Whitelabel', icon: Plug },
+    { id: 'mega_plans', label: 'Produtos e Planos', icon: Server },
+    { id: 'mega_domains', label: 'Cadastros', icon: FileText, hasDropdown: true },
+    { id: 'mega_overview', label: 'Operações', icon: MapPin, hasDropdown: true },
+    { id: 'mega_overview', label: 'Financeiro', icon: DollarSign, hasDropdown: true },
+    { id: 'mega_overview', label: 'Relatórios', icon: LineChart },
+    { id: 'mega_support', label: 'Suporte', icon: Heart },
+    { id: 'settings', label: 'Configurações', icon: Settings },
+  ];
+
   return (
     <>
       {/* Mobile Overlay */}
@@ -221,123 +235,184 @@ export default function Sidebar({ currentView, setView, isOpen, onClose }: Sideb
           </button>
         </div>
 
-        {/* Multi-Tenant Premium Selector */}
+        {/* Top Badge or Multi-Tenant Premium Selector */}
         <div className="px-4 mb-4">
-          <button className="w-full flex items-center justify-between p-3 bg-white border border-gray-200 hover:border-green-300 hover:shadow-soft rounded-2xl transition-all group">
-            <div className="flex items-center gap-3 overflow-hidden">
-              <div className="w-10 h-10 bg-gray-50 rounded-xl border border-gray-100 flex items-center justify-center text-lg shadow-sm">
-                {activeTenant?.logo || '🏢'}
-              </div>
-              <div className="text-left flex-1 min-w-0">
-                <p className="text-sm font-bold text-gray-900 truncate leading-none mb-1.5">{activeTenant?.name || 'Sistema'}</p>
-                <div className="flex items-center gap-1.5">
-                  <span className="px-1.5 py-0.5 rounded-md bg-green-100 text-green-700 font-bold text-[9px] uppercase tracking-wider">
-                    {activeTenant?.plan || 'PRO'}
-                  </span>
+          {currentUserRole === 'mega_admin' ? (
+            <div className="w-full flex items-center justify-between p-3 bg-gray-50 border border-gray-100 rounded-2xl">
+              <div className="flex items-center gap-3 overflow-hidden">
+                <div className="w-10 h-10 bg-white rounded-xl border border-gray-200 flex items-center justify-center text-gray-500 shadow-sm">
+                  <Building2 className="w-5 h-5" />
+                </div>
+                <div className="text-left flex-1 min-w-0">
+                  <p className="text-sm font-bold text-gray-900 truncate leading-none mb-1.5">Mega Admin</p>
+                  <div className="flex items-center gap-1.5">
+                    <span className="px-1.5 py-0.5 rounded-md bg-emerald-100 text-emerald-700 font-bold text-[9px] uppercase tracking-wider">
+                      ADMIN
+                    </span>
+                  </div>
                 </div>
               </div>
+              <ChevronDown className="w-4 h-4 text-gray-400" />
             </div>
-            <ChevronDown className="w-4 h-4 text-gray-400 group-hover:text-green-600 transition-colors" />
-          </button>
+          ) : (
+            <button className="w-full flex items-center justify-between p-3 bg-white border border-gray-200 hover:border-green-300 hover:shadow-soft rounded-2xl transition-all group">
+              <div className="flex items-center gap-3 overflow-hidden">
+                <div className="w-10 h-10 bg-gray-50 rounded-xl border border-gray-100 flex items-center justify-center text-lg shadow-sm">
+                  {activeTenant?.logo || '🏢'}
+                </div>
+                <div className="text-left flex-1 min-w-0">
+                  <p className="text-sm font-bold text-gray-900 truncate leading-none mb-1.5">{activeTenant?.name || 'Sistema'}</p>
+                  <div className="flex items-center gap-1.5">
+                    <span className="px-1.5 py-0.5 rounded-md bg-green-100 text-green-700 font-bold text-[9px] uppercase tracking-wider">
+                      {activeTenant?.plan || 'PRO'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <ChevronDown className="w-4 h-4 text-gray-400 group-hover:text-green-600 transition-colors" />
+            </button>
+          )}
         </div>
 
         {/* Main Navigation */}
         <nav className="flex-1 overflow-y-auto px-4 pb-6 custom-scrollbar">
-          {menuGroups.map((group, groupIdx) => {
-            const filteredItems = group.items.filter(item => item.roles.includes(currentUserRole));
-            
-            if (filteredItems.length === 0) return null;
+          {currentUserRole === 'mega_admin' ? (
+            <div className="space-y-1 mt-2">
+              {megaAdminMenu.map((item) => {
+                const Icon = item.icon;
+                const isActive = currentView === item.id || currentView.replace('mega_', '') === item.id;
+                return (
+                  <button
+                    key={item.label}
+                    onClick={() => setView(item.id)}
+                    className={`w-full flex items-center justify-between px-3 h-12 rounded-xl font-medium text-sm transition-all duration-200 ${
+                      isActive
+                        ? 'bg-emerald-50 text-emerald-700 font-bold shadow-sm'
+                        : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <Icon className={`w-5 h-5 flex-shrink-0 transition-colors ${
+                        isActive ? 'text-emerald-600' : 'text-gray-400'
+                      }`} />
+                      <span className="truncate">{item.label}</span>
+                    </div>
+                    {item.hasDropdown && (
+                      <ChevronDown className="w-4 h-4 text-gray-400" />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            menuGroups.map((group, groupIdx) => {
+              const filteredItems = group.items.filter(item => item.roles.includes(currentUserRole));
+              
+              if (filteredItems.length === 0) return null;
 
-            return (
-              <div key={groupIdx} className="mb-6 last:mb-0">
-                <h4 className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider px-3 mb-3">
-                  {group.title}
-                </h4>
-                <div className="space-y-1">
-                  {filteredItems.map((item) => {
-                    const Icon = item.icon;
-                    const hasSubItems = item.subItems && item.subItems.length > 0;
-                    const isExpanded = expandedMenus[item.id];
-                    const isParentActive = currentView === item.id || (hasSubItems && item.subItems.some(sub => sub.id === currentView));
-                    
-                    if (hasSubItems) {
+              return (
+                <div key={groupIdx} className="mb-6 last:mb-0">
+                  <h4 className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider px-3 mb-3">
+                    {group.title}
+                  </h4>
+                  <div className="space-y-1">
+                    {filteredItems.map((item) => {
+                      const Icon = item.icon;
+                      const hasSubItems = item.subItems && item.subItems.length > 0;
+                      const isExpanded = expandedMenus[item.id];
+                      const isParentActive = currentView === item.id || (hasSubItems && item.subItems.some(sub => sub.id === currentView));
+                      
+                      if (hasSubItems) {
+                        return (
+                          <div key={item.id} className="space-y-1">
+                            <button
+                              onClick={() => toggleMenu(item.id)}
+                              className={`w-full flex items-center justify-between px-3 h-12 rounded-xl font-medium text-sm transition-all duration-200 ${
+                                isParentActive
+                                  ? 'bg-green-50/50 text-green-800 shadow-sm'
+                                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                              }`}
+                            >
+                              <div className="flex items-center gap-3">
+                                <Icon className={`w-5 h-5 flex-shrink-0 transition-colors ${
+                                  isParentActive ? 'text-green-600' : 'text-gray-400'
+                                }`} />
+                                <span className="truncate">{item.label}</span>
+                              </div>
+                              <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                            </button>
+                            
+                            {isExpanded && (
+                              <div className="pl-11 pr-2 py-1 space-y-1">
+                                {item.subItems.map((subItem: any) => (
+                                  <button
+                                    key={subItem.id}
+                                    onClick={() => setView(subItem.id)}
+                                    className={`w-full flex items-center gap-3 px-3 h-10 rounded-lg font-medium text-[13px] transition-all duration-200 ${
+                                      currentView === subItem.id
+                                        ? 'bg-green-50 text-green-700 font-bold shadow-sm'
+                                        : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
+                                    }`}
+                                  >
+                                    <span className="truncate">{subItem.label}</span>
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      }
+
+                      const isActive = currentView === item.id;
                       return (
-                        <div key={item.id} className="space-y-1">
-                          <button
-                            onClick={() => toggleMenu(item.id)}
-                            className={`w-full flex items-center justify-between px-3 h-12 rounded-xl font-medium text-sm transition-all duration-200 ${
-                              isParentActive
-                                ? 'bg-green-50/50 text-green-800 shadow-sm'
-                                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                            }`}
-                          >
-                            <div className="flex items-center gap-3">
-                              <Icon className={`w-5 h-5 flex-shrink-0 transition-colors ${
-                                isParentActive ? 'text-green-600' : 'text-gray-400'
-                              }`} />
-                              <span className="truncate">{item.label}</span>
-                            </div>
-                            <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
-                          </button>
-                          
-                          {isExpanded && (
-                            <div className="pl-11 pr-2 py-1 space-y-1">
-                              {item.subItems.map((subItem: any) => (
-                                <button
-                                  key={subItem.id}
-                                  onClick={() => setView(subItem.id)}
-                                  className={`w-full flex items-center gap-3 px-3 h-10 rounded-lg font-medium text-[13px] transition-all duration-200 ${
-                                    currentView === subItem.id
-                                      ? 'bg-green-50 text-green-700 font-bold shadow-sm'
-                                      : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
-                                  }`}
-                                >
-                                  <span className="truncate">{subItem.label}</span>
-                                </button>
-                              ))}
-                            </div>
-                          )}
-                        </div>
+                        <button
+                          key={item.id}
+                          onClick={() => setView(item.id)}
+                          className={`w-full flex items-center gap-3 px-3 h-12 rounded-xl font-medium text-sm transition-all duration-200 ${
+                            isActive
+                              ? 'bg-green-50 text-green-700 shadow-sm'
+                              : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'
+                          }`}
+                        >
+                          <Icon className={`w-5 h-5 flex-shrink-0 transition-colors ${
+                            isActive ? 'text-green-600' : 'text-gray-400'
+                          }`} />
+                          <span className="truncate">{item.label}</span>
+                        </button>
                       );
-                    }
-
-                    const isActive = currentView === item.id;
-                    return (
-                      <button
-                        key={item.id}
-                        onClick={() => setView(item.id)}
-                        className={`w-full flex items-center gap-3 px-3 h-12 rounded-xl font-medium text-sm transition-all duration-200 ${
-                          isActive
-                            ? 'bg-green-50 text-green-700 shadow-sm'
-                            : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'
-                        }`}
-                      >
-                        <Icon className={`w-5 h-5 flex-shrink-0 transition-colors ${
-                          isActive ? 'text-green-600' : 'text-gray-400'
-                        }`} />
-                        <span className="truncate">{item.label}</span>
-                      </button>
-                    );
-                  })}
+                    })}
+                  </div>
+                  {groupIdx < menuGroups.length - 1 && (
+                    <div className="h-px bg-gray-100 mt-6 mx-2" />
+                  )}
                 </div>
-                {groupIdx < menuGroups.length - 1 && (
-                  <div className="h-px bg-gray-100 mt-6 mx-2" />
-                )}
-              </div>
-            );
-          })}
+              );
+            })
+          )}
         </nav>
 
         {/* Footer info & Current Role */}
         <div className="mt-auto border-t border-gray-100 p-4 space-y-4 bg-gray-50/50">
-          <div className="bg-white p-3 rounded-xl border border-gray-200 shadow-sm">
-            <label className="text-[10px] font-bold text-gray-500 uppercase flex items-center gap-1.5 mb-2 px-1">
-              <Shield className="w-3 h-3 text-green-600" /> Nível de Acesso
-            </label>
-            <p className="px-2 text-sm font-medium text-gray-700">
-              {roleLabels[currentUserRole] || currentUserRole}
-            </p>
-          </div>
+          {currentUserRole === 'mega_admin' ? (
+             <div className="bg-white p-3 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between hover:border-emerald-300 transition-colors cursor-pointer">
+               <div>
+                 <label className="text-[10px] font-bold text-gray-500 uppercase flex items-center gap-1.5 mb-1">
+                   <Shield className="w-3 h-3 text-emerald-600" /> Seu plano atual
+                 </label>
+                 <p className="text-sm font-bold text-gray-900">Mega Admin</p>
+               </div>
+               <ChevronRight className="w-4 h-4 text-gray-400" />
+             </div>
+          ) : (
+            <div className="bg-white p-3 rounded-xl border border-gray-200 shadow-sm">
+              <label className="text-[10px] font-bold text-gray-500 uppercase flex items-center gap-1.5 mb-2 px-1">
+                <Shield className="w-3 h-3 text-green-600" /> Nível de Acesso
+              </label>
+              <p className="px-2 text-sm font-medium text-gray-700">
+                {roleLabels[currentUserRole] || currentUserRole}
+              </p>
+            </div>
+          )}
         </div>
       </aside>
     </>

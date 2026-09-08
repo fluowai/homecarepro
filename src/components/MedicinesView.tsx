@@ -11,7 +11,9 @@ import {
   Minus, 
   PlusCircle, 
   CheckCircle,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Pencil,
+  Save
 } from 'lucide-react';
 import { useHomeCareStore } from '../store';
 import { Medicine } from '../types';
@@ -30,6 +32,7 @@ export default function MedicinesView() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'low_stock' | 'near_expiry'>('all');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [editingMedicineId, setEditingMedicineId] = useState<string | null>(null);
   
   // Form states
   const [name, setName] = useState('');
@@ -94,11 +97,23 @@ export default function MedicinesView() {
     return true;
   });
 
+  const resetForm = () => {
+    setName(''); setDosage(''); setManufacturer(''); setExpiryDate(''); setQuantity(30);
+    setMinQuantity(5); setIsControlled(false); setControlClass('N/A');
+  };
+
+  const openEditor = (medicine: Medicine) => {
+    setEditingMedicineId(medicine.id); setName(medicine.name); setDosage(medicine.dosage);
+    setManufacturer(medicine.manufacturer); setExpiryDate(medicine.expiryDate); setQuantity(medicine.quantity);
+    setMinQuantity(medicine.minQuantity); setIsControlled(medicine.isControlled);
+    setControlClass(medicine.controlClass || 'N/A'); setShowAddModal(true);
+  };
+
   const handleAddMedicine = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !dosage || !manufacturer || !expiryDate) return;
 
-    addMedicine({
+    const medicineData = {
       name,
       dosage,
       manufacturer,
@@ -107,17 +122,12 @@ export default function MedicinesView() {
       minQuantity,
       isControlled,
       controlClass: isControlled ? controlClass : undefined
-    });
+    };
+    if (editingMedicineId) updateMedicine(editingMedicineId, medicineData);
+    else addMedicine(medicineData);
 
-    // Reset Form
-    setName('');
-    setDosage('');
-    setManufacturer('');
-    setExpiryDate('');
-    setQuantity(30);
-    setMinQuantity(5);
-    setIsControlled(false);
-    setControlClass('N/A');
+    resetForm();
+    setEditingMedicineId(null);
     setShowAddModal(false);
   };
 
@@ -163,7 +173,7 @@ export default function MedicinesView() {
           </p>
         </div>
         <button
-          onClick={() => setShowAddModal(true)}
+          onClick={() => { resetForm(); setEditingMedicineId(null); setShowAddModal(true); }}
           className="flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-600 text-white font-semibold text-sm rounded-lg transition-all shadow-md shadow-green-100"
         >
           <Plus className="w-4 h-4" />
@@ -395,6 +405,14 @@ export default function MedicinesView() {
                             </button>
                           )}
 
+                          <button
+                            onClick={() => openEditor(m)}
+                            className="p-1.5 border border-slate-200 text-slate-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                            title="Editar medicamento"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+
                           {/* Delete */}
                           <button
                             onClick={() => {
@@ -442,9 +460,9 @@ export default function MedicinesView() {
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl w-full max-w-lg overflow-hidden animate-scale-in">
             <div className="px-6 py-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
-              <h3 className="font-bold text-slate-800 text-sm uppercase tracking-wide">Cadastrar Novo Medicamento</h3>
+              <h3 className="font-bold text-slate-800 text-sm uppercase tracking-wide">{editingMedicineId ? 'Editar Medicamento' : 'Cadastrar Novo Medicamento'}</h3>
               <button 
-                onClick={() => setShowAddModal(false)}
+                onClick={() => { resetForm(); setEditingMedicineId(null); setShowAddModal(false); }}
                 className="text-slate-400 hover:text-slate-600 font-bold text-sm"
               >
                 ✕
@@ -558,7 +576,7 @@ export default function MedicinesView() {
               <div className="border-t border-slate-100 pt-4 flex justify-end gap-2">
                 <button
                   type="button"
-                  onClick={() => setShowAddModal(false)}
+                  onClick={() => { resetForm(); setEditingMedicineId(null); setShowAddModal(false); }}
                   className="px-4 py-2 border border-slate-200 text-slate-500 hover:bg-slate-50 rounded-xl text-xs font-semibold"
                 >
                   Cancelar
@@ -567,7 +585,7 @@ export default function MedicinesView() {
                   type="submit"
                   className="px-4 py-2 bg-green-600 hover:bg-green-600 text-white rounded-xl text-xs font-bold shadow-md shadow-green-100"
                 >
-                  Salvar Registro
+                  <span className="flex items-center gap-1.5"><Save className="w-3.5 h-3.5" />{editingMedicineId ? 'Salvar Alterações' : 'Salvar Registro'}</span>
                 </button>
               </div>
             </form>

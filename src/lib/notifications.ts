@@ -75,8 +75,13 @@ export function urlBase64ToUint8Array(base64String: string): Uint8Array {
 }
 
 export async function getVapidPublicKey(): Promise<string> {
-  const { data } = await supabase.functions.invoke('get-vapid-key');
-  return (data?.publicKey as string) || '';
+  const response = await fetch('/api/notifications/vapid-key');
+  if (!response.ok) {
+    throw new Error(`Falha ao obter chave VAPID (${response.status})`);
+  }
+
+  const data = (await response.json()) as { publicKey?: unknown };
+  return typeof data.publicKey === 'string' ? data.publicKey : '';
 }
 
 export async function registerPushNotifications(vapidPublicKey: string): Promise<boolean> {
@@ -177,6 +182,12 @@ export async function promptInstall(): Promise<boolean> {
 export function isPWAInstalled(): boolean {
   if (typeof window === 'undefined') return false;
   return window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true;
+}
+
+export function isMobileDevice(): boolean {
+  if (typeof window === 'undefined' || typeof navigator === 'undefined') return false;
+  return /Android|iPhone|iPad|iPod|IEMobile|Windows Phone|Mobile/i.test(navigator.userAgent)
+    || (window.matchMedia?.('(pointer: coarse)').matches === true && window.innerWidth < 900);
 }
 
 // ── Supabase Realtime subscription for notifications ────────────────────

@@ -32,7 +32,7 @@
   "theme_color": "#ffffff",
   "background_color": "#ffffff",
   "description": "Plataforma de Home Care e Cooperativas. Gestão de atendimento domiciliar, prontuários, agenda e notificações.",
-  "orientation": "portrait-primary-preference",
+  "orientation": "portrait-primary",
   "category": ["health", "medical", "productivity"],
   "prefer_related_applications": false,
   "lang": "pt-BR"

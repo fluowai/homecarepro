@@ -13,7 +13,9 @@ import {
   Layers,
   ArrowRight,
   Mic,
-  Volume2
+  Volume2,
+  Pencil,
+  Save
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useHomeCareStore } from '../store';
@@ -23,6 +25,7 @@ import AudioDictationModal from './AudioDictationModal';
 export default function CrmView() {
   const { leads, activeTenantId, addLead, updateLead, deleteLead } = useHomeCareStore();
   const [showAddModal, setShowAddModal] = useState(false);
+  const [editingLeadId, setEditingLeadId] = useState<string | null>(null);
   // Audio dictation states
   const [showDictationModal, setShowDictationModal] = useState(false);
   const [activeDictationLead, setActiveDictationLead] = useState<CRMLead | null>(null);
@@ -40,6 +43,16 @@ export default function CrmView() {
   // Tenant filtered leads
   const tenantLeads = leads.filter(l => l.tenantId === activeTenantId);
 
+  const resetForm = () => {
+    setName(''); setPhone(''); setEmail(''); setSource('WhatsApp'); setEstimatedValue(5000); setNotes(''); setStatus('lead');
+  };
+
+  const openEditor = (lead: CRMLead) => {
+    setEditingLeadId(lead.id); setName(lead.name); setPhone(lead.phone); setEmail(lead.email);
+    setSource(lead.source); setEstimatedValue(lead.estimatedValue); setNotes(lead.notes); setStatus(lead.status);
+    setShowAddModal(true);
+  };
+
   const columns: { id: LeadStatus; label: string; color: string; border: string }[] = [
     { id: 'lead', label: 'Lead / Contato Inicial', color: 'bg-green-600', border: 'border-green-100' },
     { id: 'avaliacao', label: 'Avaliação Técnica', color: 'bg-amber-500', border: 'border-amber-100' },
@@ -54,7 +67,7 @@ export default function CrmView() {
       return;
     }
 
-    addLead({
+    const leadData = {
       name,
       phone,
       email,
@@ -63,14 +76,11 @@ export default function CrmView() {
       estimatedValue: Number(estimatedValue),
       lastInteraction: notes,
       notes
-    });
+    };
+    if (editingLeadId) updateLead(editingLeadId, leadData);
+    else addLead(leadData);
 
-    setName('');
-    setPhone('');
-    setEmail('');
-    setNotes('');
-    setEstimatedValue(5000);
-    setStatus('lead');
+    resetForm(); setEditingLeadId(null);
     setShowAddModal(false);
   };
 
@@ -179,7 +189,7 @@ export default function CrmView() {
           <p className="text-slate-500 text-sm mt-1">Funil comercial de captação de pacientes, agendamentos de orçamentos e auditoria de convênios.</p>
         </div>
         <button
-          onClick={() => setShowAddModal(true)}
+          onClick={() => { resetForm(); setEditingLeadId(null); setShowAddModal(true); }}
           className="flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-600 text-white font-semibold text-sm rounded-lg transition-all shadow-md shadow-green-100"
         >
           <Plus className="w-4 h-4" />
@@ -277,6 +287,14 @@ export default function CrmView() {
                           </button>
 
                           <button
+                            onClick={() => openEditor(lead)}
+                            className="p-1 text-slate-400 hover:text-green-600 rounded transition-colors"
+                            title="Editar oportunidade"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+
+                          <button
                             onClick={() => {
                               if (confirm("Deseja remover esta oportunidade do funil?")) {
                                 deleteLead(lead.id);
@@ -329,11 +347,11 @@ export default function CrmView() {
           <div className="bg-white rounded-2xl max-w-md w-full border border-slate-200 shadow-2xl animate-scale-up">
             <div className="p-6 border-b border-slate-100 flex items-center justify-between">
               <div>
-                <h3 className="font-bold text-base text-slate-800">Novo Contato / Oportunidade</h3>
+                <h3 className="font-bold text-base text-slate-800">{editingLeadId ? 'Editar Oportunidade' : 'Novo Contato / Oportunidade'}</h3>
                 <p className="text-slate-400 text-xs mt-0.5">Adicione os detalhes do lead comercial de home care.</p>
               </div>
               <button
-                onClick={() => setShowAddModal(false)}
+                onClick={() => { resetForm(); setEditingLeadId(null); setShowAddModal(false); }}
                 className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-lg"
               >
                 <X className="w-5 h-5" />
@@ -441,7 +459,7 @@ export default function CrmView() {
               <div className="border-t border-slate-100 pt-5 flex justify-end gap-3 mt-6">
                 <button
                   type="button"
-                  onClick={() => setShowAddModal(false)}
+                  onClick={() => { resetForm(); setEditingLeadId(null); setShowAddModal(false); }}
                   className="px-4 py-2 border border-slate-200 rounded-lg text-slate-500 font-semibold text-xs hover:bg-slate-50 transition-colors"
                 >
                   Cancelar
@@ -450,7 +468,7 @@ export default function CrmView() {
                   type="submit"
                   className="px-5 py-2 bg-green-600 hover:bg-green-600 text-white font-bold text-xs rounded-lg shadow-md transition-all"
                 >
-                  Criar Negócio
+                  <span className="flex items-center gap-1.5"><Save className="w-3.5 h-3.5" />{editingLeadId ? 'Salvar Alterações' : 'Criar Negócio'}</span>
                 </button>
               </div>
             </form>

@@ -1,5 +1,19 @@
 # Handoff
 
+## 2026-09-08 — Próximo contexto: PWA, profissionais e relatórios
+- Implementado bloqueio de uso móvel fora do PWA instalado em `src/components/PWAInstallGate.tsx`.
+- Implementada edição completa de profissionais em `src/components/ProfessionalsView.tsx`.
+- Implementado `src/components/ReportsView.tsx` e roteamento `reports` no `src/App.tsx`.
+- Verificações verdes: typecheck, build frontend e 90 testes unitários/servidor; 14 testes RLS permanecem opt-in.
+- Validar em dispositivo físico Android/iOS: instalação, retorno ao app, login e exportação do relatório.
+
+## 2026-09-08 — Erros pós-deploy corrigidos
+- Rebuild/redeploy necessário para publicar: VAPID same-origin, service worker sem fallback para HTML não precacheado e endpoint MinIO público.
+- No Portainer/Swarm, configurar `MINIO_ENDPOINT` público (ou `MINIO_PUBLIC_ENDPOINT`) e as credenciais `MINIO_ACCESS_KEY`/`MINIO_SECRET_KEY`; o fallback público evita `localhost`, mas não substitui credenciais válidas.
+
+## 2026-09-08 — CSP/Supabase build fix
+- `Dockerfile` and `Dockerfile.frontend` now preserve `.env.production` when optional `VITE_*` build args are empty; rebuild and redeploy the image to replace the old bundle that used `placeholder.supabase.co`.
+
 ## Próximo contexto (2026-09-06 final — migrations aplicadas, RLS 14/14, typecheck limpo)
 1. **Validar no browser** o fluxo ponta a ponta: mega cria revenda → convite → aceite → login Super Admin → cria clínica → "E-mails da Rede" mostra apenas a própria árvore.
 2. Configurar domínio de envio no Resend por revenda (seção "E-mail da Marca" no WhitelabelConfig) — CNAME `send.<marca>` → `getAppBaseDomain()`.

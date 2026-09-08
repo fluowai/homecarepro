@@ -20,9 +20,12 @@ import {
   Pill,
   Package,
   Loader2,
-  Camera
+  Camera,
+  Pencil,
+  Save
 } from 'lucide-react';
 import { useHomeCareStore } from '../store';
+import { PatientStatus } from '../types';
 import { Patient } from '../types';
 import { uploadFileToMinio } from '../lib/upload';
 import { toast } from 'sonner';
@@ -50,6 +53,7 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>('info');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [editingPatientId, setEditingPatientId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
 
   // AI loading and output
@@ -103,6 +107,52 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
 
   const selectedPatient = patients.find(p => p.id === selectedPatientId);
 
+  const resetPatientForm = () => {
+    setName('');
+    setBirthDate('');
+    setCpf('');
+    setGender('F');
+    setPhone('');
+    setEmail('');
+    setPlanType('Particular');
+    setInsuranceId('');
+    setMonthlyPackageValue('');
+    setPadScope('');
+    setContractDuration('');
+    setDiagnostic('');
+    setAllergiesText('');
+    setMedicationsText('');
+    setStreet('');
+    setNumber('');
+    setCity('');
+    setState('SP');
+    setZipCode('');
+  };
+
+  const openPatientEditor = (patient: Patient) => {
+    setEditingPatientId(patient.id);
+    setName(patient.name);
+    setBirthDate(patient.birthDate);
+    setCpf(patient.cpf);
+    setGender(patient.gender || 'F');
+    setPhone(patient.phone);
+    setEmail(patient.email);
+    setPlanType(patient.planType);
+    setInsuranceId(patient.insuranceId || '');
+    setMonthlyPackageValue(patient.monthlyPackageValue ?? '');
+    setPadScope(patient.padScope || '');
+    setContractDuration(patient.contractDuration || '');
+    setDiagnostic(patient.diagnostic);
+    setAllergiesText(patient.allergies.join(', '));
+    setMedicationsText(patient.medications.join(', '));
+    setStreet(patient.address.street);
+    setNumber(patient.address.number);
+    setCity(patient.address.city);
+    setState(patient.address.state);
+    setZipCode(patient.address.zipCode);
+    setShowAddModal(true);
+  };
+
   const handleCreatePatient = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !birthDate || !diagnostic) {
@@ -115,14 +165,14 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
       return;
     }
 
-    addPatient({
+    const patientData = {
       name,
       birthDate,
       cpf,
       gender,
       phone,
       email,
-      status: 'active',
+      status: 'active' as PatientStatus,
       planType,
       insuranceId,
       monthlyPackageValue: Number(monthlyPackageValue) || undefined,
@@ -141,27 +191,19 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
         state,
         zipCode
       }
-    });
+    };
+
+    if (editingPatientId) {
+      updatePatient(editingPatientId, patientData);
+      toast.success('Cadastro do paciente atualizado com sucesso.');
+    } else {
+      addPatient(patientData);
+      toast.success('Prontuário criado com sucesso.');
+    }
 
     // Reset Form & Close
-    setName('');
-    setBirthDate('');
-    setCpf('');
-    setGender('F');
-    setPhone('');
-    setEmail('');
-    setPlanType('Particular');
-    setInsuranceId('');
-    setMonthlyPackageValue('');
-    setPadScope('');
-    setContractDuration('');
-    setDiagnostic('');
-    setAllergiesText('');
-    setMedicationsText('');
-    setStreet('');
-    setNumber('');
-    setCity('');
-    setZipCode('');
+    resetPatientForm();
+    setEditingPatientId(null);
     setShowAddModal(false);
   };
 
@@ -270,6 +312,16 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
               >
                 Alterar Status
               </button>
+              {isManager && (
+                <button
+                  onClick={() => openPatientEditor(selectedPatient)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-semibold transition-colors"
+                  title="Editar cadastro do paciente"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                  <span>Editar cadastro</span>
+                </button>
+              )}
               {currentUserRole === 'admin' && (
                 <button
                   onClick={() => {
@@ -729,7 +781,11 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
               <p className="text-slate-500 text-sm mt-1">Lista unificada de prontuários, planos terapêuticos e monitoramento domiciliar.</p>
             </div>
             <button
-              onClick={() => setShowAddModal(true)}
+              onClick={() => {
+                resetPatientForm();
+                setEditingPatientId(null);
+                setShowAddModal(true);
+              }}
               className="flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-600 text-white font-semibold text-sm rounded-lg transition-all shadow-md shadow-green-100"
             >
               <Plus className="w-4 h-4" />
@@ -846,11 +902,19 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
               <div className="bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto border border-slate-200 shadow-2xl animate-scale-up">
                 <div className="p-6 border-b border-slate-100 flex items-center justify-between">
                   <div>
-                    <h3 className="font-bold text-base text-slate-800">Abertura de Prontuário Domiciliar</h3>
-                    <p className="text-slate-400 text-xs">Preencha os dados do paciente para integrá-lo ao sistema.</p>
+                    <h3 className="font-bold text-base text-slate-800">
+                      {editingPatientId ? 'Editar Cadastro do Paciente' : 'Abertura de Prontuário Domiciliar'}
+                    </h3>
+                    <p className="text-slate-400 text-xs">
+                      {editingPatientId ? 'Atualize os dados e salve as alterações do prontuário.' : 'Preencha os dados do paciente para integrá-lo ao sistema.'}
+                    </p>
                   </div>
                   <button
-                    onClick={() => setShowAddModal(false)}
+                    onClick={() => {
+                      resetPatientForm();
+                      setEditingPatientId(null);
+                      setShowAddModal(false);
+                    }}
                     className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-lg"
                   >
                     <X className="w-5 h-5" />
@@ -1081,16 +1145,21 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
                   <div className="border-t border-slate-100 pt-6 flex justify-end gap-3">
                     <button
                       type="button"
-                      onClick={() => setShowAddModal(false)}
+                      onClick={() => {
+                        resetPatientForm();
+                        setEditingPatientId(null);
+                        setShowAddModal(false);
+                      }}
                       className="px-4 py-2 border border-slate-200 rounded-lg text-slate-500 font-semibold text-xs hover:bg-slate-50 transition-colors"
                     >
                       Cancelar
                     </button>
                     <button
                       type="submit"
-                      className="px-5 py-2 bg-green-600 hover:bg-green-600 text-white font-bold text-xs rounded-lg shadow-md transition-all"
+                      className="px-5 py-2 bg-green-600 hover:bg-green-700 text-white font-bold text-xs rounded-lg shadow-md transition-all flex items-center gap-1.5"
                     >
-                      Criar Prontuário
+                      {editingPatientId ? <Save className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
+                      {editingPatientId ? 'Salvar Alterações' : 'Criar Prontuário'}
                     </button>
                   </div>
                 </form>

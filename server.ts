@@ -9,9 +9,12 @@ import { createApp, logEvent } from "./src/server/app";
 
 // ── Environment Validation ──────────────────────────────────────
 dotenv.config();
+dotenv.config({ path: '.env.production' });
 
 const REQUIRED_ENV_VARS = [
   "SUPABASE_SERVICE_ROLE_KEY",
+  "VITE_SUPABASE_URL",
+  "VITE_SUPABASE_ANON_KEY",
 ] as const;
 
 const missingVars = REQUIRED_ENV_VARS.filter((v) => !process.env[v]);
@@ -92,6 +95,7 @@ const startServer = async () => {
           VITE_SUPABASE_ANON_KEY: process.env.VITE_SUPABASE_ANON_KEY,
           VITE_APP_BASE_DOMAIN: process.env.APP_BASE_DOMAIN || process.env.VITE_APP_BASE_DOMAIN || "homecare.wootech.com.br",
           VITE_PUBLIC_VAPID_KEY: process.env.VITE_PUBLIC_VAPID_KEY || "",
+          VITE_ENABLE_SUBDOMAIN_REDIRECT: process.env.VITE_ENABLE_SUBDOMAIN_REDIRECT || "false",
         })}</script>`;
         indexHtml = indexHtml.replace("</head>", `${envScript}</head>`);
         

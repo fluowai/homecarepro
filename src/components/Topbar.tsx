@@ -83,7 +83,7 @@ export default function Topbar({ onSearch, onMenuClick }: TopbarProps) {
           </span>
           <input
             type="text"
-            placeholder="Pesquisar..."
+            placeholder={profile?.role === 'mega_admin' ? "Buscar clientes, revendas, pedidos, planos..." : "Pesquisar..."}
             onFocus={() => setIsSearchExpanded(true)}
             onBlur={() => setTimeout(() => setIsSearchExpanded(false), 200)}
             onChange={(e) => onSearch(e.target.value)}
@@ -152,7 +152,7 @@ export default function Topbar({ onSearch, onMenuClick }: TopbarProps) {
           >
             <div className="hidden md:block">
               <p className="text-sm font-semibold text-gray-800 leading-none">{profile?.full_name || 'Operador'}</p>
-              <p className="text-xs text-gray-500 mt-1">{profile?.role === 'admin' ? 'Administrador' : 'Operador'}</p>
+              <p className="text-xs text-gray-500 mt-1">{profile?.role === 'mega_admin' ? 'Mega Admin' : profile?.role === 'admin' ? 'Administrador' : 'Operador'}</p>
             </div>
             <img 
               src={profile?.avatar_url || "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=120"} 

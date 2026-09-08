@@ -1,6 +1,51 @@
 # Worklog
 
+## 2026-09-08 — Edição e salvamento nos módulos operacionais
+- Adicionados fluxos de editar e salvar para pacientes, profissionais, convênios, medicamentos, contratos, escalas, CRM e assembleias.
+- Os formulários reutilizam os dados existentes e atualizam somente o registro selecionado, preservando histórico e demais relacionamentos.
+- Verificado com `npm run lint`, `npm run build` e `npm test` (90 testes aprovados; 14 de integração ignorados por configuração).
+
+## 2026-09-08 — Fix: push CORS, service worker fallback e MinIO público
+- **Push**: frontend passou a usar `/api/notifications/vapid-key` same-origin; removida a dependência da Edge Function Supabase com preflight CORS quebrado.
+- **Service worker**: `navigateFallback` desativado junto com o HTML fora do precache, eliminando `non-precached-url`.
+- **MinIO**: fallback de endpoint deixou de ser `localhost:9000`; URLs de upload agora usam o endpoint público configurado ou `https://mypanel.wootech.com.br`.
+- **Verificação**: `npm run lint`, `npm run build:frontend` e `dist/sw.js` sem rota de fallback para `index.html`.
+
+## 2026-09-08 — Root cause: SW precaching index.html sem window.__ENV__
+- **Sintoma persistente**: mesmo com `window.__ENV__` correto no HTML e nonce CSP bate, o app seguia conectando em `placeholder.supabase.co`.
+- **Causa raiz real**: produção usa `generateSW` (default do vite-plugin-pwa), que **pré-cacheava o `index.html` estático** (SEM o `window.__ENV__` injetado pelo server). O service worker servia esse HTML velho nas navegações via precache route → `getEnv` caía no fallback `placeholder.supabase.co`. O custom `src/sw.ts` **não é usado em produção** (generateSW ignora); por isso as edições nele não surtiam efeito.
+- **Fix**: em `vite.config.ts`, adicionado `globPatterns` **excluindo `index.html`** do precache. Navegações passam a sempre buscar o HTML fresco da rede (com credenciais reais injetadas).
+- **Verificação**: `vite build` exit 0; confirmado que `index.html` NÃO está mais no `precacheAndRoute` do `dist/sw.js` gerado (workbox NavigationRoute cai na rede por não estar precacheado).
+- **Ação requerida**: redesenhar a imagem (CI dispara) e redesenhar o stack Portainer/Swarm; usuários com SW antigo precisarão de hard refresh/desregistro do SW.
+
+## 2026-09-08 — Hardening: frontend-only Docker build
+- **Fix**: `Dockerfile.frontend` now appends only non-empty `VITE_*` build args to `.env.production`, matching the production image build and preventing empty args from recreating the Supabase placeholder URL.
+- **Verification**: `npm test` (90 passed / 14 skipped) and `npm run build` passed.
+
 # Worklog
+
+## 2026-09-08 — Fix: build args vazios sobrescreviam .env.production
+- **Sintoma**: bundle deployado (`index-DRpHLbEa.js`) tinha `VITE_SUPABASE_URL:""` e `VITE_SUPABASE_ANON_KEY:""` no `import.meta.env` — o Vite não leu `.env.production` porque o Dockerfile antigo setava `ENV VITE_SUPABASE_URL=${VITE_SUPABASE_URL}` (vazio), que tem precedência sobre `.env` files.
+- **Causa raiz**: `ENV VITE_SUPABASE_URL=` vazio (secrets GitHub não configurados) sobrescrevia `.env.production`. `vite build` prioriza `process.env` vazio → bundle com URL vazio → fallback placeholder.
+- **Fix**: Dockerfile remove os `ENV`; usa script shell que injeta apenas ARGs **não-vazios** no `.env.production` antes do build. Se ARGs ausentes, `.env.production` commitado prevalece sempre.
+- **Verificação**: bundle deployado continha `VITE_APP_BASE_DOMAIN:"homecare.wootech.com.br"` mas `VITE_SUPABASE_URL:""` — confirmado que os ARGs estavam vazios no build CI.
+- **Ação requerida**: redesenhar a imagem (CI dispara automaticamente agora) e redesenhar o stack Portainer/Swarm. O `window.__ENV__` injetado pelo server já fornece o URL real em runtime, mas o bundle deve ter o fallback correto.
+
+## 2026-09-08 — Push para repositório remoto
+- **Commits pendentes enviados**: 3 commits do branch `feature/minio-upload` enviados para `origin/feature/minio-upload`.
+- **Status**: repositório sincronizado, working tree limpa.
+
+## 2026-09-08 — Fix CSP placeholder Supabase URL (https://placeholder.supabase.co)
+- **Sintoma**: login quebra com CSP bloqueando `https://placeholder.supabase.co/auth/v1/token`; o bundle JS em produção usa o URL placeholder em vez do real.
+- **Causa raiz**: a imagem Docker em produção foi construída **antes** do `.env.production` (commit `029380c`) existir, e o CI `docker.yml` **não passava os build args** `VITE_*` para o `Dockerfile`. O fallback `placeholder.supabase.co` em `src/lib/supabase.ts:16` era usado porque `import.meta.env.VITE_SUPABASE_URL` estava vazio no build antigo.
+- **Também**: workflows CI só disparavam em `main` (fixado em commit anterior adicionando `feature/**`).
+- **Fix aplicado**:
+  - `Dockerfile` aceita ARG/ENV `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_PUBLIC_VAPID_KEY`, `VITE_ENABLE_DEMO_MODE`, `VITE_APP_BASE_DOMAIN` no build stage; copia `.env.production` para `.env` na imagem (runtime do server).
+  - `.github/workflows/docker.yml` passa esses valores via secrets do GitHub como build-args.
+  - `docker-compose.yml` passa os build args no service `homecarepro-web`.
+- **Verificação local**: build `vite build` (mode production) embute o URL real (`VITE_SUPABASE_URL:"https://qczwrubsiuafhwojfzbm.supabase.co"`); placeholder fica só como fallback de segurança. Vite ignora ENV vazio e usa `.env.production` commitado.
+- **Ação requerida (GitHub)**: configurar secrets `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_PUBLIC_VAPID_KEY` no repositório para o CI injetar no build.
+- **Ação requerida (deploy)**: reconstruir/redistribuir a imagem Docker e atualizar o stack do Portainer/Swarm com `IMAGE_TAG` novo.
 
 ## 2026-09-07 — Security Scan do CI (PR #2) → causa raiz dupla
 - **`npm audit --audit-level=high`**: highs do `xlsx` (GHSA-4r6h-8v6p-xvw6, GHSA-5pgg-2g8v-p4x9, sem fix). `xlsx` era usado só por scripts pontuais da raiz (`create_mock_excel.js`, `import_sc_saude.ts`) — **removido das dependencies** + stub `xlsx.d.ts` (typecheck segue 0). Restam 3 moderate (express/body-parser/qs) — nível `high` passa (exit 0); fix delas exigiria major bump do express.
@@ -176,3 +221,13 @@
 ### Verificado
 - Vitest: **90 passed, 0 failed, 14 skipped** (integração RLS)
 - Build: ✅ `vite build` + `esbuild` produção OK
+- 2026-09-08 — Edição do cadastro de pacientes
+  - Adicionado botão "Editar cadastro" no prontuário para perfis gestores.
+  - Reutilizado o formulário de cadastro com preenchimento dos dados existentes.
+- Salvamento passa a atualizar o paciente sem substituir anexos, histórico ou inventário.
+
+## 2026-09-08 — PWA obrigatório, edição de profissionais e relatórios
+- PWA: adicionado bloqueio para acesso móvel fora do modo instalado, com instalação automática quando disponível e instruções para iOS/Android; corrigidos idioma, favicon e orientação do manifest.
+- Profissionais: formulário reutilizado para edição completa do cadastro, preservando status, avatar, avaliação e documentos existentes; persistência segue o `updateProfessional` do store.
+- Relatórios: rota `reports` criada e conectada ao menu; relatório operacional por profissional com período, visitas concluídas, valor produzido e exportação CSV baseada em dados reais.
+- Verificação: `npm run typecheck`, `npm run build:frontend` e `npm test` concluídos; 90 testes passaram e 14 testes RLS foram ignorados por opt-in.

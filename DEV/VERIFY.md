@@ -1,5 +1,36 @@
 # Verificação
 
+## Verificação 2026-09-08 — PWA obrigatório, profissionais e relatórios
+| Item | Resultado |
+|---|---|
+| Acesso móvel fora do app instalado | ✅ `PWAInstallGate` bloqueia o sistema e orienta instalação Android/iOS |
+| Edição de profissionais | ✅ formulário completo reutilizado; atualização chama `updateProfessional` e persiste via store |
+| Relatórios profissionais | ✅ rota `reports`, filtros por profissional/período e CSV com visitas/valores reais |
+| `npm run typecheck` | ✅ passou |
+| `npm run build:frontend` | ✅ passou; service worker e manifest gerados |
+| `npm test` | ✅ 90 passed / 14 skipped (RLS opt-in) |
+
+### Risco residual
+- A instalação não pode ser acionada programaticamente em todos os navegadores iOS; nesses casos o bloqueio mostra o procedimento manual do Safari.
+- A validação visual em dispositivo físico e o teste autenticado ponta a ponta ainda dependem de uma sessão de staging/produção.
+
+## Verificação 2026-09-08 — Push, service worker e MinIO
+| Item | Resultado |
+|---|---|
+| VAPID key request | ✅ usa `/api/notifications/vapid-key` same-origin |
+| Service worker | ✅ `navigateFallback` desativado; `dist/sw.js` sem `NavigationRoute` |
+| MinIO endpoint | ✅ fallback não aponta para `localhost:9000` |
+| `npm run lint` | ✅ passou |
+| `npm run build:frontend` | ✅ passou |
+
+## Verificação 2026-09-08 — CSP/Supabase build configuration
+| Item | Resultado |
+|---|---|
+| `npm test` | ✅ 90 passed / 14 skipped |
+| `npm run build` | ✅ Vite + esbuild + PWA generation passed |
+| Production bundle URL check | ✅ real Supabase URL present; placeholder remains only as an unused fallback |
+| Docker build paths | ✅ `Dockerfile` and `Dockerfile.frontend` preserve `.env.production` when build args are empty |
+
 ## Verificação 2026-09-07 — Security Scan CI verde (simulação local dos passos do job)
 | Check | Resultado |
 |---|---|
