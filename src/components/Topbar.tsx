@@ -155,7 +155,7 @@ export default function Topbar({ onSearch, onMenuClick }: TopbarProps) {
               <p className="text-xs text-gray-500 mt-1">{profile?.role === 'mega_admin' ? 'Mega Admin' : profile?.role === 'admin' ? 'Administrador' : 'Operador'}</p>
             </div>
             <img 
-              src={profile?.avatar_url || "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=120"} 
+              src={profile?.avatar_url || "/default-avatar.svg"}
               className="w-10 h-10 rounded-full border border-gray-200 object-cover" 
               alt="Avatar"
             />

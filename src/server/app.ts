@@ -963,7 +963,8 @@ Apenas o objeto JSON valido, sem formatacao Markdown adicional nem blocos de cod
     try {
       const userId = (req as any).userId;
       const profile = await getProfile(userId);
-      if (!profile || !["admin", "super_admin"].includes(profile.role)) {
+      const role = String(profile?.role || '').trim().toLowerCase();
+      if (!profile || !["admin", "super_admin", "mega_admin"].includes(role)) {
         return res.status(403).json({ error: "Acesso negado." });
       }
 
