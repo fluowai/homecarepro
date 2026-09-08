@@ -2,6 +2,10 @@
 
 # Worklog
 
+## 2026-09-08 — Push para repositório remoto
+- **Commits pendentes enviados**: 3 commits do branch `feature/minio-upload` enviados para `origin/feature/minio-upload`.
+- **Status**: repositório sincronizado, working tree limpa.
+
 ## 2026-09-07 — Security Scan do CI (PR #2) → causa raiz dupla
 - **`npm audit --audit-level=high`**: highs do `xlsx` (GHSA-4r6h-8v6p-xvw6, GHSA-5pgg-2g8v-p4x9, sem fix). `xlsx` era usado só por scripts pontuais da raiz (`create_mock_excel.js`, `import_sc_saude.ts`) — **removido das dependencies** + stub `xlsx.d.ts` (typecheck segue 0). Restam 3 moderate (express/body-parser/qs) — nível `high` passa (exit 0); fix delas exigiria major bump do express.
 - **Grep "hardcoded secrets"** : auto-match do próprio `ci.yml` (`*.yml`, linha do padrão JWT) + **segredos reais commitados** — service role JWT em `create_sc_saude.js` e `portainer-stack-homecare-filled.yml`, anon key e **senha do postgres** (`SUPABASE_DB_URL`) no stack do Portainer. Ação: `create_sc_saude.js` agora lê `SUPABASE_SERVICE_ROLE_KEY`/`SC_SAUDE_INITIAL_PASSWORD` do env; stack redigido para `${...}`; novo check de connection string com senha; `.github` excluído do scan (elimina auto-match); regex do SR_KEY corrigida (não pegava valor entre aspas).
