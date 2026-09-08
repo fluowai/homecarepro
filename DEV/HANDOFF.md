@@ -1,5 +1,8 @@
 # Handoff
 
+## 2026-09-08 — CSP/Supabase build fix
+- `Dockerfile` and `Dockerfile.frontend` now preserve `.env.production` when optional `VITE_*` build args are empty; rebuild and redeploy the image to replace the old bundle that used `placeholder.supabase.co`.
+
 ## Próximo contexto (2026-09-06 final — migrations aplicadas, RLS 14/14, typecheck limpo)
 1. **Validar no browser** o fluxo ponta a ponta: mega cria revenda → convite → aceite → login Super Admin → cria clínica → "E-mails da Rede" mostra apenas a própria árvore.
 2. Configurar domínio de envio no Resend por revenda (seção "E-mail da Marca" no WhitelabelConfig) — CNAME `send.<marca>` → `getAppBaseDomain()`.

@@ -14,10 +14,16 @@ ARG VITE_SUPABASE_URL
 ARG VITE_SUPABASE_ANON_KEY
 ARG VITE_ENABLE_DEMO_MODE=false
 ARG VITE_APP_BASE_DOMAIN=homecarepro.com.br
-ENV VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
-ENV VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
-ENV VITE_ENABLE_DEMO_MODE=${VITE_ENABLE_DEMO_MODE}
-ENV VITE_APP_BASE_DOMAIN=${VITE_APP_BASE_DOMAIN}
+
+# Preserve .env.production when optional build args are unset. Empty ENV values
+# take precedence over Vite env files and silently produce placeholder config.
+RUN set -eux; \
+    { \
+      [ -n "$VITE_SUPABASE_URL" ] && echo "VITE_SUPABASE_URL=$VITE_SUPABASE_URL"; \
+      [ -n "$VITE_SUPABASE_ANON_KEY" ] && echo "VITE_SUPABASE_ANON_KEY=$VITE_SUPABASE_ANON_KEY"; \
+      [ -n "$VITE_ENABLE_DEMO_MODE" ] && echo "VITE_ENABLE_DEMO_MODE=$VITE_ENABLE_DEMO_MODE"; \
+      [ -n "$VITE_APP_BASE_DOMAIN" ] && echo "VITE_APP_BASE_DOMAIN=$VITE_APP_BASE_DOMAIN"; \
+    } >> .env.production 2>/dev/null || true
 
 RUN npm run build:frontend
 

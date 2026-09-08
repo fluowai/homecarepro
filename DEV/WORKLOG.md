@@ -1,5 +1,9 @@
 # Worklog
 
+## 2026-09-08 — Hardening: frontend-only Docker build
+- **Fix**: `Dockerfile.frontend` now appends only non-empty `VITE_*` build args to `.env.production`, matching the production image build and preventing empty args from recreating the Supabase placeholder URL.
+- **Verification**: `npm test` (90 passed / 14 skipped) and `npm run build` passed.
+
 # Worklog
 
 ## 2026-09-08 — Fix: build args vazios sobrescreviam .env.production

@@ -1,5 +1,13 @@
 # Verificação
 
+## Verificação 2026-09-08 — CSP/Supabase build configuration
+| Item | Resultado |
+|---|---|
+| `npm test` | ✅ 90 passed / 14 skipped |
+| `npm run build` | ✅ Vite + esbuild + PWA generation passed |
+| Production bundle URL check | ✅ real Supabase URL present; placeholder remains only as an unused fallback |
+| Docker build paths | ✅ `Dockerfile` and `Dockerfile.frontend` preserve `.env.production` when build args are empty |
+
 ## Verificação 2026-09-07 — Security Scan CI verde (simulação local dos passos do job)
 | Check | Resultado |
 |---|---|
