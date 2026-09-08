@@ -9,9 +9,12 @@ import { createApp, logEvent } from "./src/server/app";
 
 // ── Environment Validation ──────────────────────────────────────
 dotenv.config();
+dotenv.config({ path: '.env.production' });
 
 const REQUIRED_ENV_VARS = [
   "SUPABASE_SERVICE_ROLE_KEY",
+  "VITE_SUPABASE_URL",
+  "VITE_SUPABASE_ANON_KEY",
 ] as const;
 
 const missingVars = REQUIRED_ENV_VARS.filter((v) => !process.env[v]);

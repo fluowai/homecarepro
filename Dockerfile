@@ -23,6 +23,7 @@ COPY --from=builder /app/node_modules ./node_modules
 RUN npm prune --omit=dev --ignore-scripts
 
 COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/.env.production .env
 
 RUN chown -R appuser:appgroup /app
 
