@@ -12,7 +12,7 @@ import AuthView from './components/AuthView';
 import InviteAcceptView from './components/InviteAcceptView';
 import { supabase } from './lib/supabase';
 import { useHomeCareStore } from './store';
-import { extractSubdomain, getAppBaseDomain, buildTenantUrl } from './lib/subdomain';
+import { extractSubdomain, getAppBaseDomain, getEnv, buildTenantUrl } from './lib/subdomain';
 import { Toaster } from 'sonner';
 import {
   registerPushNotifications,
@@ -123,9 +123,14 @@ export default function App() {
     }
   }, [isAuthenticated, profile]);
 
-  // Redirect to tenant subdomain after login if on main domain
+  // Redirect to tenant subdomain after login if on main domain.
+  // Disabled by default: requires DNS wildcard (*.<base domain>) configured.
+  // Enable by setting VITE_ENABLE_SUBDOMAIN_REDIRECT=true.
   useEffect(() => {
     if (!isAuthenticated || !profile) return;
+
+    const subdomainRedirectEnabled = getEnv('VITE_ENABLE_SUBDOMAIN_REDIRECT') === 'true';
+    if (!subdomainRedirectEnabled) return;
 
     // Don't redirect during invite flow
     const hasInvite = new URLSearchParams(window.location.search).has('invite');
