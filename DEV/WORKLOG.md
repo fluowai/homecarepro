@@ -2,6 +2,13 @@
 
 # Worklog
 
+## 2026-09-08 — Fix: build args vazios sobrescreviam .env.production
+- **Sintoma**: bundle deployado (`index-DRpHLbEa.js`) tinha `VITE_SUPABASE_URL:""` e `VITE_SUPABASE_ANON_KEY:""` no `import.meta.env` — o Vite não leu `.env.production` porque o Dockerfile antigo setava `ENV VITE_SUPABASE_URL=${VITE_SUPABASE_URL}` (vazio), que tem precedência sobre `.env` files.
+- **Causa raiz**: `ENV VITE_SUPABASE_URL=` vazio (secrets GitHub não configurados) sobrescrevia `.env.production`. `vite build` prioriza `process.env` vazio → bundle com URL vazio → fallback placeholder.
+- **Fix**: Dockerfile remove os `ENV`; usa script shell que injeta apenas ARGs **não-vazios** no `.env.production` antes do build. Se ARGs ausentes, `.env.production` commitado prevalece sempre.
+- **Verificação**: bundle deployado continha `VITE_APP_BASE_DOMAIN:"homecare.wootech.com.br"` mas `VITE_SUPABASE_URL:""` — confirmado que os ARGs estavam vazios no build CI.
+- **Ação requerida**: redesenhar a imagem (CI dispara automaticamente agora) e redesenhar o stack Portainer/Swarm. O `window.__ENV__` injetado pelo server já fornece o URL real em runtime, mas o bundle deve ter o fallback correto.
+
 ## 2026-09-08 — Push para repositório remoto
 - **Commits pendentes enviados**: 3 commits do branch `feature/minio-upload` enviados para `origin/feature/minio-upload`.
 - **Status**: repositório sincronizado, working tree limpa.
