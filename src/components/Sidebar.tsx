@@ -158,6 +158,7 @@ export default function Sidebar({ currentView, setView, isOpen, onClose }: Sideb
          { id: 'super_domains', label: 'Validação de Domínios' },
          { id: 'super_users', label: 'Usuários e Equipe' },
          { id: 'super_contacts', label: 'E-mails da Rede' },
+         { id: 'super_company', label: 'Dados da Revenda' },
          { id: 'super_whitelabel', label: 'Configuração Whitelabel' },
          { id: 'super_emails', label: 'Templates de E-mail' },
          { id: 'super_support', label: 'Suporte' }
@@ -178,7 +179,7 @@ export default function Sidebar({ currentView, setView, isOpen, onClose }: Sideb
         { id: 'users', label: 'Usuários', icon: Users, roles: ['admin'] },
         { id: 'permissions', label: 'Permissões', icon: Lock, roles: ['admin'] },
         { id: 'integrations', label: 'Integrações', icon: Plug, roles: ['admin'] },
-        { id: 'settings', label: 'Configurações', icon: Settings, roles: ['admin'] },
+        { id: 'settings', label: 'Dados da Empresa', icon: Settings, roles: ['admin'] },
         {
           id: 'smtp_settings',
           label: 'E-mail & Notificações',

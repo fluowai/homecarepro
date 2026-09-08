@@ -241,3 +241,8 @@
 ## 2026-09-08 — Login de profissionais por telefone
 - Migration `20260908000000_add_professional_phone_auth.sql` aplicada e registrada em `schema_migrations`.
 - Banco verificado: `professionals.user_id` com FK para `auth.users` e índice único parcial.
+
+## 2026-09-08 — Perfil empresarial por revenda e clínica
+- Criada a tela compartilhada `CompanyProfileView`: revendas editam seus dados em `Dados da Revenda` e clínicas em `Dados da Empresa`.
+- Endpoint autenticado salva sempre no `tenant_id` do perfil, sem aceitar troca de tenant pelo cliente.
+- Migration `20260908000001_add_tenant_company_profile.sql` aplicada e registrada no banco com 12 campos empresariais.

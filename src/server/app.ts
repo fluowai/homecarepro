@@ -958,6 +958,55 @@ Apenas o objeto JSON valido, sem formatacao Markdown adicional nem blocos de cod
     }
   });
 
+  // Each reseller/clinic administrator edits only its own company profile.
+  app.put("/api/tenant/company-profile", requireAuth, globalLimiter, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const profile = await getProfile(userId);
+      if (!profile || !["admin", "super_admin"].includes(profile.role)) {
+        return res.status(403).json({ error: "Acesso negado." });
+      }
+
+      const {
+        companyLegalName, companyTradeName, cnpj, companyEmail, companyPhone, companyWebsite,
+        companyAddress, companyAddressNumber, companyAddressComplement, companyNeighborhood,
+        companyCity, companyState, companyZipCode,
+      } = req.body || {};
+      if (companyEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(companyEmail))) {
+        return res.status(400).json({ error: "E-mail da empresa inválido." });
+      }
+      if (companyWebsite && !/^https?:\/\/[^\s]+$/i.test(String(companyWebsite))) {
+        return res.status(400).json({ error: "Site inválido. Informe uma URL iniciando com http:// ou https://." });
+      }
+      if (companyState && !/^[A-Za-z]{2}$/.test(String(companyState))) {
+        return res.status(400).json({ error: "UF inválida. Informe duas letras." });
+      }
+
+      const clean = (value: unknown) => typeof value === "string" ? value.trim() || null : null;
+      const { data, error } = await supabaseAdmin.from("tenants").update({
+        cnpj: clean(cnpj) || "",
+        company_legal_name: clean(companyLegalName),
+        company_trade_name: clean(companyTradeName),
+        company_email: clean(companyEmail),
+        company_phone: clean(companyPhone),
+        company_website: clean(companyWebsite),
+        company_address: clean(companyAddress),
+        company_address_number: clean(companyAddressNumber),
+        company_address_complement: clean(companyAddressComplement),
+        company_neighborhood: clean(companyNeighborhood),
+        company_city: clean(companyCity),
+        company_state: clean(companyState)?.toUpperCase() || null,
+        company_zip_code: clean(companyZipCode),
+      }).eq("id", profile.tenant_id).select("id").single();
+      if (error) throw error;
+      logEvent("INFO", "Tenant company profile updated", { tenantId: profile.tenant_id, byUserId: userId });
+      res.json({ success: true, tenantId: data.id });
+    } catch (error: any) {
+      logEvent("ERROR", "Tenant company profile update failed", { error: error.message });
+      res.status(500).json({ error: "Falha ao salvar dados da empresa." });
+    }
+  });
+
   app.get("/api/tenant/resolve", globalLimiter, async (req, res) => {
     try {
       const domain = req.query.domain as string;

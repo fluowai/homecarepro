@@ -16,6 +16,18 @@ export interface Tenant {
   subdomain?: string;
   primaryColor?: string;
   secondaryColor?: string;
+  companyLegalName?: string;
+  companyTradeName?: string;
+  companyEmail?: string;
+  companyPhone?: string;
+  companyWebsite?: string;
+  companyAddress?: string;
+  companyAddressNumber?: string;
+  companyAddressComplement?: string;
+  companyNeighborhood?: string;
+  companyCity?: string;
+  companyState?: string;
+  companyZipCode?: string;
 }
 
 export type UserRole = 'mega_admin' | 'super_admin' | 'admin' | 'operator' | 'professional' | 'patient' | 'viewer' | 'family' | 'system_support' | 'auditor';
