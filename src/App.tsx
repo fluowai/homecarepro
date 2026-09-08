@@ -17,6 +17,7 @@ import { Toaster } from 'sonner';
 import PWAInstallGate from './components/PWAInstallGate';
 import {
   registerPushNotifications,
+  setupInstallPrompt,
   isPWAInstalled,
   getVapidPublicKey,
   setAudioEnabled,
@@ -93,6 +94,10 @@ export default function App() {
   useEffect(() => {
     init();
   }, [init]);
+
+  // Capture beforeinstallprompt as soon as the app loads. Waiting for login
+  // can lose the one-shot browser event before the mobile install gate mounts.
+  useEffect(() => setupInstallPrompt(), []);
 
   // Sync audio preference to notification lib
   useEffect(() => {
@@ -179,7 +184,10 @@ export default function App() {
   }
 
   if (!isAuthenticated) {
-    return <AuthView />;
+    return <>
+      <AuthView />
+      <PWAInstallGate />
+    </>;
   }
 
   const handleSetView = (view: string) => {

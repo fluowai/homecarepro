@@ -171,6 +171,10 @@ export function setupInstallPrompt(onAvailable?: () => void) {
   };
 }
 
+export function isInstallPromptAvailable(): boolean {
+  return deferredPrompt !== null;
+}
+
 export async function promptInstall(): Promise<boolean> {
   if (!deferredPrompt) return false;
   await deferredPrompt.prompt();
@@ -186,7 +190,9 @@ export function isPWAInstalled(): boolean {
 
 export function isMobileDevice(): boolean {
   if (typeof window === 'undefined' || typeof navigator === 'undefined') return false;
-  return /Android|iPhone|iPad|iPod|IEMobile|Windows Phone|Mobile/i.test(navigator.userAgent)
+  const userAgentData = (navigator as Navigator & { userAgentData?: { mobile?: boolean } }).userAgentData;
+  return userAgentData?.mobile === true
+    || /Android|iPhone|iPad|iPod|IEMobile|Windows Phone|Mobile/i.test(navigator.userAgent)
     || (window.matchMedia?.('(pointer: coarse)').matches === true && window.innerWidth < 900);
 }
 

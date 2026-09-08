@@ -1,14 +1,15 @@
 import { useEffect, useState } from 'react';
 import { Download, ExternalLink, Smartphone } from 'lucide-react';
-import { isMobileDevice, isPWAInstalled, promptInstall, setupInstallPrompt } from '../lib/notifications';
+import { isInstallPromptAvailable, isMobileDevice, isPWAInstalled, promptInstall, setupInstallPrompt } from '../lib/notifications';
 
 export default function PWAInstallGate() {
   const [installed, setInstalled] = useState(() => isPWAInstalled());
-  const [canPrompt, setCanPrompt] = useState(false);
+  const [canPrompt, setCanPrompt] = useState(() => isInstallPromptAvailable());
 
   useEffect(() => {
     if (!isMobileDevice()) return;
     const cleanup = setupInstallPrompt(() => setCanPrompt(true));
+    setCanPrompt(isInstallPromptAvailable());
     const handleInstalled = () => {
       setInstalled(true);
       setCanPrompt(false);
