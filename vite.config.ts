@@ -18,6 +18,9 @@ export default defineConfig(() => {
           // every request. Precaching the static version would serve the app
           // without those credentials and break login/auth.
           globPatterns: ['**/*.{js,css,ico,png,svg,webmanifest,webp,woff2}'],
+          // The HTML is intentionally network-served; never register a
+          // navigation fallback that expects index.html in the precache.
+          navigateFallback: null,
           runtimeCaching: [
             {
               urlPattern: ({ url }) => url.pathname.startsWith('/api/'),

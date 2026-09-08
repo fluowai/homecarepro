@@ -1,5 +1,11 @@
 # Worklog
 
+## 2026-09-08 — Fix: push CORS, service worker fallback e MinIO público
+- **Push**: frontend passou a usar `/api/notifications/vapid-key` same-origin; removida a dependência da Edge Function Supabase com preflight CORS quebrado.
+- **Service worker**: `navigateFallback` desativado junto com o HTML fora do precache, eliminando `non-precached-url`.
+- **MinIO**: fallback de endpoint deixou de ser `localhost:9000`; URLs de upload agora usam o endpoint público configurado ou `https://mypanel.wootech.com.br`.
+- **Verificação**: `npm run lint`, `npm run build:frontend` e `dist/sw.js` sem rota de fallback para `index.html`.
+
 ## 2026-09-08 — Root cause: SW precaching index.html sem window.__ENV__
 - **Sintoma persistente**: mesmo com `window.__ENV__` correto no HTML e nonce CSP bate, o app seguia conectando em `placeholder.supabase.co`.
 - **Causa raiz real**: produção usa `generateSW` (default do vite-plugin-pwa), que **pré-cacheava o `index.html` estático** (SEM o `window.__ENV__` injetado pelo server). O service worker servia esse HTML velho nas navegações via precache route → `getEnv` caía no fallback `placeholder.supabase.co`. O custom `src/sw.ts` **não é usado em produção** (generateSW ignora); por isso as edições nele não surtiam efeito.

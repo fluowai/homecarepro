@@ -1,5 +1,9 @@
 # Handoff
 
+## 2026-09-08 — Erros pós-deploy corrigidos
+- Rebuild/redeploy necessário para publicar: VAPID same-origin, service worker sem fallback para HTML não precacheado e endpoint MinIO público.
+- No Portainer/Swarm, configurar `MINIO_ENDPOINT` público (ou `MINIO_PUBLIC_ENDPOINT`) e as credenciais `MINIO_ACCESS_KEY`/`MINIO_SECRET_KEY`; o fallback público evita `localhost`, mas não substitui credenciais válidas.
+
 ## 2026-09-08 — CSP/Supabase build fix
 - `Dockerfile` and `Dockerfile.frontend` now preserve `.env.production` when optional `VITE_*` build args are empty; rebuild and redeploy the image to replace the old bundle that used `placeholder.supabase.co`.
 

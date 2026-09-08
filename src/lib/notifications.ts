@@ -75,8 +75,13 @@ export function urlBase64ToUint8Array(base64String: string): Uint8Array {
 }
 
 export async function getVapidPublicKey(): Promise<string> {
-  const { data } = await supabase.functions.invoke('get-vapid-key');
-  return (data?.publicKey as string) || '';
+  const response = await fetch('/api/notifications/vapid-key');
+  if (!response.ok) {
+    throw new Error(`Falha ao obter chave VAPID (${response.status})`);
+  }
+
+  const data = (await response.json()) as { publicKey?: unknown };
+  return typeof data.publicKey === 'string' ? data.publicKey : '';
 }
 
 export async function registerPushNotifications(vapidPublicKey: string): Promise<boolean> {

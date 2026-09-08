@@ -2619,7 +2619,7 @@ Apenas o objeto JSON valido, sem formatacao Markdown adicional nem blocos de cod
 
       const s3Client = new S3Client({
         region: process.env.MINIO_REGION || "us-east-1",
-        endpoint: process.env.MINIO_ENDPOINT || "https://mypanel.wootech.com.br",
+        endpoint: process.env.MINIO_ENDPOINT || process.env.MINIO_PUBLIC_ENDPOINT || "https://mypanel.wootech.com.br",
         forcePathStyle: true,
         credentials: {
           accessKeyId: process.env.MINIO_ACCESS_KEY || "",
@@ -2638,7 +2638,7 @@ Apenas o objeto JSON valido, sem formatacao Markdown adicional nem blocos de cod
 
       const uploadUrl = await getSignedUrl(s3Client, command, { expiresIn: 3600 });
       
-      const publicUrl = `${process.env.MINIO_ENDPOINT || "https://mypanel.wootech.com.br"}/${bucket}/${key}`;
+      const publicUrl = `${process.env.MINIO_ENDPOINT || process.env.MINIO_PUBLIC_ENDPOINT || "https://mypanel.wootech.com.br"}/${bucket}/${key}`;
 
       res.json({ uploadUrl, publicUrl, key });
     } catch (error: any) {

@@ -1,5 +1,14 @@
 # Verificação
 
+## Verificação 2026-09-08 — Push, service worker e MinIO
+| Item | Resultado |
+|---|---|
+| VAPID key request | ✅ usa `/api/notifications/vapid-key` same-origin |
+| Service worker | ✅ `navigateFallback` desativado; `dist/sw.js` sem `NavigationRoute` |
+| MinIO endpoint | ✅ fallback não aponta para `localhost:9000` |
+| `npm run lint` | ✅ passou |
+| `npm run build:frontend` | ✅ passou |
+
 ## Verificação 2026-09-08 — CSP/Supabase build configuration
 | Item | Resultado |
 |---|---|

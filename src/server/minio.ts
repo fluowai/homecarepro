@@ -1,7 +1,9 @@
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
-const endpoint = process.env.MINIO_ENDPOINT || "http://localhost:9000";
+// This URL is returned to the browser for the direct PUT. A localhost
+// fallback only works inside the Docker network and creates unusable URLs.
+const endpoint = process.env.MINIO_ENDPOINT || process.env.MINIO_PUBLIC_ENDPOINT || "https://mypanel.wootech.com.br";
 const region = process.env.MINIO_REGION || "us-east-1"; // MinIO usually ignores this but SDK requires it
 const accessKeyId = process.env.MINIO_ACCESS_KEY || "minioadmin";
 const secretAccessKey = process.env.MINIO_SECRET_KEY || "minioadmin";
