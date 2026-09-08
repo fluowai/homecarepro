@@ -8,7 +8,9 @@ import {
   Mail,
   User,
   Trash2,
-  X
+  X,
+  Pencil,
+  Save
 } from 'lucide-react';
 import { useHomeCareStore } from '../store';
 
@@ -16,11 +18,13 @@ export default function InsurancesView() {
   const { 
     insurances, 
     activeTenantId, 
-    addInsurance, 
+    addInsurance,
+    updateInsurance,
     deleteInsurance 
   } = useHomeCareStore();
 
   const [showAddModal, setShowAddModal] = useState(false);
+  const [editingInsuranceId, setEditingInsuranceId] = useState<string | null>(null);
   const [searchFilter, setSearchFilter] = useState('');
 
   // Form states
@@ -28,6 +32,19 @@ export default function InsurancesView() {
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [contactPerson, setContactPerson] = useState('');
+
+  const resetForm = () => {
+    setName(''); setPhone(''); setEmail(''); setContactPerson('');
+  };
+
+  const openEditor = (insurance: typeof insurances[number]) => {
+    setEditingInsuranceId(insurance.id);
+    setName(insurance.name);
+    setPhone(insurance.phone);
+    setEmail(insurance.email || '');
+    setContactPerson(insurance.contactPerson || '');
+    setShowAddModal(true);
+  };
 
   // Filter insurances
   const tenantInsurances = insurances.filter(i => i.tenantId === activeTenantId);
@@ -43,17 +60,17 @@ export default function InsurancesView() {
       return;
     }
 
-    addInsurance({
+    const insuranceData = {
       name,
       phone,
       email,
       contactPerson
-    });
+    };
+    if (editingInsuranceId) updateInsurance(editingInsuranceId, insuranceData);
+    else addInsurance(insuranceData);
 
-    setName('');
-    setPhone('');
-    setEmail('');
-    setContactPerson('');
+    resetForm();
+    setEditingInsuranceId(null);
     setShowAddModal(false);
   };
 
@@ -66,7 +83,7 @@ export default function InsurancesView() {
           <p className="text-slate-500 text-sm mt-1">Gerenciamento de operadoras de saúde e contatos de autorização.</p>
         </div>
         <button
-          onClick={() => setShowAddModal(true)}
+          onClick={() => { resetForm(); setEditingInsuranceId(null); setShowAddModal(true); }}
           className="flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-600 text-white font-semibold text-sm rounded-lg transition-all shadow-md shadow-green-100"
         >
           <Plus className="w-4 h-4" />
@@ -133,6 +150,13 @@ export default function InsurancesView() {
                     </div>
                   )}
                 </div>
+                <button
+                  onClick={() => openEditor(ins)}
+                  className="p-1 text-slate-400 hover:text-green-600 rounded transition-colors"
+                  title="Editar convênio"
+                >
+                  <Pencil className="w-4 h-4" />
+                </button>
               </div>
 
               {/* Bottom stats and delete */}
@@ -171,11 +195,11 @@ export default function InsurancesView() {
           <div className="bg-white rounded-2xl max-w-md w-full border border-slate-200 shadow-2xl animate-scale-up">
             <div className="p-6 border-b border-slate-100 flex items-center justify-between">
               <div>
-                <h3 className="font-bold text-base text-slate-800">Cadastrar Convênio</h3>
+                <h3 className="font-bold text-base text-slate-800">{editingInsuranceId ? 'Editar Convênio' : 'Cadastrar Convênio'}</h3>
                 <p className="text-slate-400 text-xs mt-0.5">Adicione uma nova operadora de saúde ao sistema.</p>
               </div>
               <button
-                onClick={() => setShowAddModal(false)}
+                onClick={() => { resetForm(); setEditingInsuranceId(null); setShowAddModal(false); }}
                 className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-lg"
               >
                 <X className="w-5 h-5" />
@@ -205,7 +229,7 @@ export default function InsurancesView() {
               <div className="border-t border-slate-100 pt-5 flex justify-end gap-3 mt-6">
                 <button
                   type="button"
-                  onClick={() => setShowAddModal(false)}
+                  onClick={() => { resetForm(); setEditingInsuranceId(null); setShowAddModal(false); }}
                   className="px-4 py-2 border border-slate-200 rounded-lg text-slate-500 font-semibold text-xs hover:bg-slate-50 transition-colors"
                 >
                   Cancelar
@@ -214,7 +238,7 @@ export default function InsurancesView() {
                   type="submit"
                   className="px-5 py-2 bg-green-600 hover:bg-green-600 text-white font-bold text-xs rounded-lg shadow-md transition-all"
                 >
-                  Confirmar Cadastro
+                  <span className="flex items-center gap-1.5"><Save className="w-3.5 h-3.5" />{editingInsuranceId ? 'Salvar Alterações' : 'Confirmar Cadastro'}</span>
                 </button>
               </div>
             </form>

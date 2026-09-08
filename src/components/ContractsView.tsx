@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FileText, Plus, Search, FileSignature, CheckCircle2, AlertCircle, Eye, Download, X } from 'lucide-react';
+import { FileText, Plus, Search, FileSignature, CheckCircle2, AlertCircle, Eye, Download, X, Pencil, Save } from 'lucide-react';
 import { useHomeCareStore } from '../store';
 import { Contract } from '../types';
 
@@ -7,6 +7,7 @@ export default function ContractsView() {
   const { patients, contracts, activeTenantId, addContract, updateContract, deleteContract } = useHomeCareStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [showNewModal, setShowNewModal] = useState(false);
+  const [editingContractId, setEditingContractId] = useState<string | null>(null);
   const [viewing, setViewing] = useState<Contract | null>(null);
 
   // New contract form state
@@ -26,6 +27,16 @@ export default function ContractsView() {
            c.title.toLowerCase().includes(searchQuery.toLowerCase());
   });
 
+  const resetForm = () => {
+    setFormPatientId(''); setFormTitle(''); setFormStatus('draft'); setFormStart(''); setFormEnd(''); setFormValue('');
+  };
+
+  const openEditor = (contract: Contract) => {
+    setEditingContractId(contract.id); setFormPatientId(contract.patientId); setFormTitle(contract.title);
+    setFormStatus(contract.status); setFormStart(contract.startDate || ''); setFormEnd(contract.endDate || '');
+    setFormValue(contract.value?.toString() || ''); setShowNewModal(true);
+  };
+
   const getStatusInfo = (status: string) => {
     switch (status) {
       case 'active': return { label: 'Vigente', color: 'bg-green-50 text-green-700 border-green-200' };
@@ -40,21 +51,18 @@ export default function ContractsView() {
     e.preventDefault();
     if (!formPatientId) return;
     const patient = tenantPatients.find(p => p.id === formPatientId);
-    addContract({
+    const contractData = {
       patientId: formPatientId,
       title: formTitle || `Contrato de Prestação de Serviços - ${patient?.planType || ''}`,
       status: formStatus,
       startDate: formStart || undefined,
       endDate: formEnd || undefined,
       value: formValue ? Number(formValue) : undefined,
-    });
+    };
+    if (editingContractId) updateContract(editingContractId, contractData);
+    else addContract(contractData);
     setShowNewModal(false);
-    setFormPatientId('');
-    setFormTitle('');
-    setFormStatus('draft');
-    setFormStart('');
-    setFormEnd('');
-    setFormValue('');
+    resetForm(); setEditingContractId(null);
   };
 
   const handleDownloadContract = (c: Contract) => {
@@ -89,7 +97,7 @@ export default function ContractsView() {
           <p className="text-gray-500 text-sm mt-1">Gerencie os contratos de prestação de serviços com pacientes e convênios.</p>
         </div>
         <button
-          onClick={() => setShowNewModal(true)}
+          onClick={() => { resetForm(); setEditingContractId(null); setShowNewModal(true); }}
           className="flex items-center justify-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold text-sm rounded-lg transition-all shadow-md shadow-green-100"
         >
           <Plus className="w-4 h-4" />
@@ -163,6 +171,9 @@ export default function ContractsView() {
                           <button onClick={() => setViewing(c)} className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors" title="Visualizar">
                             <Eye className="w-4 h-4" />
                           </button>
+                          <button onClick={() => openEditor(c)} className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors" title="Editar contrato">
+                            <Pencil className="w-4 h-4" />
+                          </button>
                           <button onClick={() => handleDownloadContract(c)} className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors" title="Download">
                             <Download className="w-4 h-4" />
                           </button>
@@ -189,6 +200,29 @@ export default function ContractsView() {
           </table>
         </div>
       </div>
+
+      {showNewModal && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-30 p-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full border border-slate-200 shadow-2xl">
+            <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+              <h3 className="font-bold text-base text-slate-800">{editingContractId ? 'Editar Contrato' : 'Novo Contrato'}</h3>
+              <button onClick={() => { resetForm(); setEditingContractId(null); setShowNewModal(false); }} className="p-1.5 text-slate-400 hover:bg-slate-50 rounded-lg"><X className="w-5 h-5" /></button>
+            </div>
+            <form onSubmit={handleCreateContract} className="p-6 space-y-4">
+              <select required value={formPatientId} onChange={e => setFormPatientId(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-lg text-sm px-3 py-2">
+                <option value="">Selecione o paciente</option>
+                {tenantPatients.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+              <input value={formTitle} onChange={e => setFormTitle(e.target.value)} placeholder="Título do contrato" className="w-full bg-slate-50 border border-slate-200 rounded-lg text-sm px-3 py-2" />
+              <select value={formStatus} onChange={e => setFormStatus(e.target.value as Contract['status'])} className="w-full bg-slate-50 border border-slate-200 rounded-lg text-sm px-3 py-2">
+                <option value="draft">Rascunho</option><option value="pending_signature">Aguardando Assinatura</option><option value="active">Vigente</option><option value="terminated">Encerrado</option>
+              </select>
+              <div className="grid grid-cols-3 gap-3"><input type="date" value={formStart} onChange={e => setFormStart(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-lg text-sm px-2 py-2" /><input type="date" value={formEnd} onChange={e => setFormEnd(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-lg text-sm px-2 py-2" /><input type="number" min="0" value={formValue} onChange={e => setFormValue(e.target.value)} placeholder="Valor mensal" className="bg-slate-50 border border-slate-200 rounded-lg text-sm px-2 py-2" /></div>
+              <div className="flex justify-end gap-3 border-t border-slate-100 pt-4"><button type="button" onClick={() => { resetForm(); setEditingContractId(null); setShowNewModal(false); }} className="px-4 py-2 border border-slate-200 rounded-lg text-sm">Cancelar</button><button type="submit" className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-bold flex items-center gap-1.5"><Save className="w-4 h-4" />Salvar</button></div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Contract View Modal */}
       {viewing && (

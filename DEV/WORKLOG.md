@@ -1,5 +1,10 @@
 # Worklog
 
+## 2026-09-08 — Edição e salvamento nos módulos operacionais
+- Adicionados fluxos de editar e salvar para pacientes, profissionais, convênios, medicamentos, contratos, escalas, CRM e assembleias.
+- Os formulários reutilizam os dados existentes e atualizam somente o registro selecionado, preservando histórico e demais relacionamentos.
+- Verificado com `npm run lint`, `npm run build` e `npm test` (90 testes aprovados; 14 de integração ignorados por configuração).
+
 ## 2026-09-08 — Fix: push CORS, service worker fallback e MinIO público
 - **Push**: frontend passou a usar `/api/notifications/vapid-key` same-origin; removida a dependência da Edge Function Supabase com preflight CORS quebrado.
 - **Service worker**: `navigateFallback` desativado junto com o HTML fora do precache, eliminando `non-precached-url`.
@@ -216,3 +221,13 @@
 ### Verificado
 - Vitest: **90 passed, 0 failed, 14 skipped** (integração RLS)
 - Build: ✅ `vite build` + `esbuild` produção OK
+- 2026-09-08 — Edição do cadastro de pacientes
+  - Adicionado botão "Editar cadastro" no prontuário para perfis gestores.
+  - Reutilizado o formulário de cadastro com preenchimento dos dados existentes.
+- Salvamento passa a atualizar o paciente sem substituir anexos, histórico ou inventário.
+
+## 2026-09-08 — PWA obrigatório, edição de profissionais e relatórios
+- PWA: adicionado bloqueio para acesso móvel fora do modo instalado, com instalação automática quando disponível e instruções para iOS/Android; corrigidos idioma, favicon e orientação do manifest.
+- Profissionais: formulário reutilizado para edição completa do cadastro, preservando status, avatar, avaliação e documentos existentes; persistência segue o `updateProfessional` do store.
+- Relatórios: rota `reports` criada e conectada ao menu; relatório operacional por profissional com período, visitas concluídas, valor produzido e exportação CSV baseada em dados reais.
+- Verificação: `npm run typecheck`, `npm run build:frontend` e `npm test` concluídos; 90 testes passaram e 14 testes RLS foram ignorados por opt-in.

@@ -1,5 +1,19 @@
 # Verificação
 
+## Verificação 2026-09-08 — PWA obrigatório, profissionais e relatórios
+| Item | Resultado |
+|---|---|
+| Acesso móvel fora do app instalado | ✅ `PWAInstallGate` bloqueia o sistema e orienta instalação Android/iOS |
+| Edição de profissionais | ✅ formulário completo reutilizado; atualização chama `updateProfessional` e persiste via store |
+| Relatórios profissionais | ✅ rota `reports`, filtros por profissional/período e CSV com visitas/valores reais |
+| `npm run typecheck` | ✅ passou |
+| `npm run build:frontend` | ✅ passou; service worker e manifest gerados |
+| `npm test` | ✅ 90 passed / 14 skipped (RLS opt-in) |
+
+### Risco residual
+- A instalação não pode ser acionada programaticamente em todos os navegadores iOS; nesses casos o bloqueio mostra o procedimento manual do Safari.
+- A validação visual em dispositivo físico e o teste autenticado ponta a ponta ainda dependem de uma sessão de staging/produção.
+
 ## Verificação 2026-09-08 — Push, service worker e MinIO
 | Item | Resultado |
 |---|---|

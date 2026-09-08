@@ -184,6 +184,12 @@ export function isPWAInstalled(): boolean {
   return window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true;
 }
 
+export function isMobileDevice(): boolean {
+  if (typeof window === 'undefined' || typeof navigator === 'undefined') return false;
+  return /Android|iPhone|iPad|iPod|IEMobile|Windows Phone|Mobile/i.test(navigator.userAgent)
+    || (window.matchMedia?.('(pointer: coarse)').matches === true && window.innerWidth < 900);
+}
+
 // ── Supabase Realtime subscription for notifications ────────────────────
 
 export interface RealtimeNotification {

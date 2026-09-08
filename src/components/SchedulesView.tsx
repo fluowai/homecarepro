@@ -15,6 +15,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Filter
+  ,Pencil, Save
 } from 'lucide-react';
 import { useHomeCareStore } from '../store';
 import { VisitStatus } from '../types';
@@ -41,6 +42,7 @@ export default function SchedulesView() {
   const [activeTab, setActiveTab] = useState<'escalas' | 'plantoes'>('escalas');
 
   const [showAddModal, setShowAddModal] = useState(false);
+  const [editingVisitId, setEditingVisitId] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [filterProfessionalId, setFilterProfessionalId] = useState<string>('all');
   
@@ -70,6 +72,16 @@ export default function SchedulesView() {
 
   const openShifts = tenantVisits.filter(v => v.status === 'open_shift' && v.date === selectedDate);
 
+  const resetForm = () => {
+    setPatientId(''); setProfessionalId(''); setTimeStart('08:00'); setTimeEnd('10:00'); setValue(150);
+  };
+
+  const openEditor = (visit: typeof visits[number]) => {
+    setEditingVisitId(visit.id); setPatientId(visit.patientId); setProfessionalId(visit.professionalId);
+    setSelectedDate(visit.date); setTimeStart(visit.timeStart); setTimeEnd(visit.timeEnd); setValue(visit.value);
+    setShowAddModal(true);
+  };
+
   // Simple day shifting helpers
   const shiftDate = (days: number) => {
     const d = new Date(selectedDate);
@@ -84,19 +96,20 @@ export default function SchedulesView() {
       return;
     }
 
-    addVisit({
+    const visitData = {
       patientId,
       professionalId,
       date: selectedDate,
       timeStart,
       timeEnd,
-      status: (isCooperativa && activeTab === 'plantoes' ? 'open_shift' : 'agendada'),
+      status: (isCooperativa && activeTab === 'plantoes' ? 'open_shift' : 'agendada') as VisitStatus,
       value: Number(value),
       baseValue: Number(value)
-    });
+    };
+    if (editingVisitId) updateVisit(editingVisitId, visitData);
+    else addVisit(visitData);
 
-    setPatientId('');
-    setProfessionalId('');
+    resetForm(); setEditingVisitId(null);
     setShowAddModal(false);
   };
 
@@ -126,12 +139,14 @@ export default function SchedulesView() {
             {isCooperativa ? 'Mural de vagas, solicitação de coberturas e organização de escalas da cooperativa.' : 'Planejador diário de visitas domiciliares, rotas de profissionais e conciliação.'}
           </p>
         </div>
-        <button
+                            <button
           onClick={() => {
             if (tenantPatients.length === 0 || tenantProfessionals.length === 0) {
               toast.error("Por favor, certifique-se de possuir pacientes e profissionais cadastrados.");
               return;
             }
+            setEditingVisitId(null);
+            resetForm();
             setPatientId(tenantPatients[0]?.id || '');
             setProfessionalId(tenantProfessionals[0]?.id || '');
             setShowAddModal(true);
@@ -505,11 +520,11 @@ export default function SchedulesView() {
           <div className="bg-white rounded-2xl max-w-md w-full border border-slate-200 shadow-2xl animate-scale-up">
             <div className="p-6 border-b border-slate-100 flex items-center justify-between">
               <div>
-                <h3 className="font-bold text-base text-slate-800">Alocação de Visita Assistencial</h3>
+                <h3 className="font-bold text-base text-slate-800">{editingVisitId ? 'Editar Visita Assistencial' : 'Alocação de Visita Assistencial'}</h3>
                 <p className="text-slate-400 text-xs mt-0.5">Defina paciente, profissional e período do atendimento.</p>
               </div>
               <button
-                onClick={() => setShowAddModal(false)}
+                onClick={() => { resetForm(); setEditingVisitId(null); setShowAddModal(false); }}
                 className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-lg"
               >
                 <X className="w-5 h-5" />
@@ -586,7 +601,7 @@ export default function SchedulesView() {
               <div className="border-t border-slate-100 pt-5 flex justify-end gap-3 mt-6">
                 <button
                   type="button"
-                  onClick={() => setShowAddModal(false)}
+                  onClick={() => { resetForm(); setEditingVisitId(null); setShowAddModal(false); }}
                   className="px-4 py-2 border border-slate-200 rounded-lg text-slate-500 font-semibold text-xs hover:bg-slate-50 transition-colors"
                 >
                   Cancelar
@@ -595,7 +610,7 @@ export default function SchedulesView() {
                   type="submit"
                   className="px-5 py-2 bg-green-600 hover:bg-green-600 text-white font-bold text-xs rounded-lg shadow-md transition-all"
                 >
-                  {isCooperativa && activeTab === 'plantoes' ? 'Publicar Vaga' : 'Agendar na Escala'}
+                  <span className="flex items-center gap-1.5"><Save className="w-3.5 h-3.5" />{editingVisitId ? 'Salvar Alterações' : (isCooperativa && activeTab === 'plantoes' ? 'Publicar Vaga' : 'Agendar na Escala')}</span>
                 </button>
               </div>
             </form>

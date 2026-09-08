@@ -15,7 +15,9 @@ import {
   MapPin,
   Key,
   AlertTriangle,
-  Loader2
+  Loader2,
+  Pencil,
+  Save
 } from 'lucide-react';
 import { useHomeCareStore } from '../store';
 import { ProfessionalStatus, ProfessionalSpecialty } from '../types';
@@ -33,6 +35,7 @@ export default function ProfessionalsView() {
   } = useHomeCareStore();
 
   const [showAddModal, setShowAddModal] = useState(false);
+  const [editingProfessionalId, setEditingProfessionalId] = useState<string | null>(null);
   const [searchFilter, setSearchFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'busy' | 'offline'>('all');
 
@@ -66,6 +69,25 @@ export default function ProfessionalsView() {
     return matchesSearch && matchesStatus;
   });
 
+  const resetForm = () => {
+    setName(''); setCpf(''); setGender('F'); setSpecialty('Enfermeiro'); setRegistration('');
+    setEmail(''); setPhone(''); setStreet(''); setNumber(''); setCity(''); setState('SP'); setZipCode('');
+    setDocsUploaded([]); setDocsFiles({}); setCredentialNotice(''); setModalTab('personal');
+  };
+
+  const openEditor = (professional: typeof professionals[number]) => {
+    setEditingProfessionalId(professional.id);
+    setName(professional.name); setCpf(professional.cpf); setGender(professional.gender);
+    setSpecialty(professional.specialty); setRegistration(professional.registration);
+    setEmail(professional.email); setPhone(professional.phone);
+    setStreet(professional.address.street); setNumber(professional.address.number);
+    setCity(professional.address.city); setState(professional.address.state); setZipCode(professional.address.zipCode);
+    setDocsUploaded(professional.documents.map(d => d.name));
+    setDocsFiles(Object.fromEntries(professional.documents.map(d => [d.name, d.url])));
+    setCredentialNotice('');
+    setModalTab('personal'); setShowAddModal(true);
+  };
+
   const handleCreateProfessional = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !registration) {
@@ -73,36 +95,32 @@ export default function ProfessionalsView() {
       return;
     }
 
-    addProfessional({
+    const professionalData = {
       name,
       cpf,
       gender,
       specialty,
       registration,
-      status: 'active',
+      status: editingProfessionalId ? (professionals.find(p => p.id === editingProfessionalId)?.status ?? 'active') : 'active',
       email,
       phone,
-      avatar: gender === 'M' 
-        ? 'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?auto=format&fit=crop&q=80&w=120' 
+      avatar: editingProfessionalId ? (professionals.find(p => p.id === editingProfessionalId)?.avatar ?? '') : gender === 'M'
+        ? 'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?auto=format&fit=crop&q=80&w=120'
         : 'https://images.unsplash.com/photo-1594824813573-246434de83fb?auto=format&fit=crop&q=80&w=120',
-      rating: 5.0,
+      rating: professionals.find(p => p.id === editingProfessionalId)?.rating ?? 5.0,
       address: { street, number, city, state, zipCode },
       documents: docsUploaded.map(d => ({ type: 'document', name: d, url: docsFiles[d] || '' }))
-    });
+    };
+    if (editingProfessionalId) {
+      updateProfessional(editingProfessionalId, professionalData);
+      toast.success('Cadastro do profissional atualizado.');
+    } else {
+      addProfessional(professionalData);
+      toast.success('Profissional cadastrado.');
+    }
 
-    setName('');
-    setCpf('');
-    setRegistration('');
-    setEmail('');
-    setPhone('');
-    setStreet('');
-    setNumber('');
-    setCity('');
-    setZipCode('');
-    setDocsUploaded([]);
-    setDocsFiles({});
-    setCredentialNotice('');
-    setModalTab('personal');
+    resetForm();
+    setEditingProfessionalId(null);
     setShowAddModal(false);
   };
 
@@ -137,7 +155,7 @@ export default function ProfessionalsView() {
           <p className="text-slate-500 text-sm mt-1">Gerenciamento de credenciais, especialidades e escala de disponibilidade da equipe domiciliar.</p>
         </div>
         <button
-          onClick={() => setShowAddModal(true)}
+          onClick={() => { resetForm(); setEditingProfessionalId(null); setShowAddModal(true); }}
           className="flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-600 text-white font-semibold text-sm rounded-lg transition-all shadow-md shadow-green-100"
         >
           <Plus className="w-4 h-4" />
@@ -232,7 +250,17 @@ export default function ProfessionalsView() {
                         </span>
                       )}
                     </div>
-                  </div>
+                </div>
+
+                {currentUserRole === 'admin' && (
+                  <button
+                    onClick={() => openEditor(prof)}
+                    className="p-1 text-slate-400 hover:text-green-600 rounded transition-colors"
+                    title="Editar profissional"
+                  >
+                    <Pencil className="w-4 h-4" />
+                  </button>
+                )}
 
                   {/* Status Picker */}
                   <select
@@ -306,11 +334,11 @@ export default function ProfessionalsView() {
           <div className="bg-white rounded-2xl max-w-md w-full border border-slate-200 shadow-2xl animate-scale-up">
             <div className="p-6 border-b border-slate-100 flex items-center justify-between">
               <div>
-                <h3 className="font-bold text-base text-slate-800">Credenciamento de Profissional</h3>
+                <h3 className="font-bold text-base text-slate-800">{editingProfessionalId ? 'Editar Profissional' : 'Credenciamento de Profissional'}</h3>
                 <p className="text-slate-400 text-xs mt-0.5">Registre o profissional clínico em sua base operacional.</p>
               </div>
               <button
-                onClick={() => setShowAddModal(false)}
+                onClick={() => { resetForm(); setEditingProfessionalId(null); setShowAddModal(false); }}
                 className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-lg"
               >
                 <X className="w-5 h-5" />
@@ -483,7 +511,7 @@ export default function ProfessionalsView() {
               <div className="border-t border-slate-100 pt-5 flex justify-end gap-3 mt-6">
                 <button
                   type="button"
-                  onClick={() => setShowAddModal(false)}
+                  onClick={() => { resetForm(); setEditingProfessionalId(null); setShowAddModal(false); }}
                   className="px-4 py-2 border border-slate-200 rounded-lg text-slate-500 font-semibold text-xs hover:bg-slate-50 transition-colors"
                 >
                   Cancelar
@@ -492,7 +520,7 @@ export default function ProfessionalsView() {
                   type="submit"
                   className="px-5 py-2 bg-green-600 hover:bg-green-600 text-white font-bold text-xs rounded-lg shadow-md transition-all"
                 >
-                  Confirmar Cadastro
+                  <span className="flex items-center gap-1.5"><Save className="w-3.5 h-3.5" />{editingProfessionalId ? 'Salvar Alterações' : 'Confirmar Cadastro'}</span>
                 </button>
               </div>
             </form>
