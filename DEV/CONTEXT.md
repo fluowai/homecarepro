@@ -27,7 +27,7 @@ SaaS multi-tenant de gestão de Home Care em fase **pré-produção com hardenin
 1. **🔴 Rotacionar service role key no Supabase + purgar histórico git** (chave antiga foi commitada em `docker-compose.prod.yml` history). Ação manual/externa. Em 2026-09-07 redigidos do git: service role JWT, anon key e senha do postgres (em `SUPABASE_DB_URL`) presentes em `portainer-stack-homecare-filled.yml` e `create_sc_saude.js` (agora lê do env). Rotação continua OBRIGATÓRIA (histórico git).
 2. CSP nonce (unsafe-inline para `window.__ENV__`).
 3. localStorage de dados clínicos (migrar para sessionStorage com expiração) — **pendente 2026-09-06**.
-4. Features incompletas: upload de arquivos, Evolution API WhatsApp, GPS check-in.
+4. Features incompletas: upload de arquivos, WhatsMeow WhatsApp, GPS check-in.
 5. Amostragem RLS: perseguir "same-tenant read" simulado; validar envio real de convite Resend com `.or()/.is()` (mock de testes não cobre), E2E e zod validation em endpoints de IA.
 6. Configurar domínio de envio Resend por revenda (CNAME `send.<marca>`) — pré-requisito para remetente por marca em produção.
 

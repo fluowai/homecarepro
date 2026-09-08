@@ -28,8 +28,9 @@ services:
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - ASAAS_API_KEY=${ASAAS_API_KEY}
       - ASAAS_WEBHOOK_TOKEN=${ASAAS_WEBHOOK_TOKEN}
-      - EVOLUTION_API_URL=${EVOLUTION_API_URL:-http://evolution-api:8080}
-      - EVOLUTION_API_KEY=${EVOLUTION_API_KEY:-homecare-evo-secret-123}
+      - WHATSMEOW_URL=${WHATSMEOW_URL:-http://whatsmeow:8080}
+      - WHATSMEOW_API_KEY=${WHATSMEOW_API_KEY:-local-whatsmeow-secret}
+      - WHATSMEOW_WEBHOOK_KEY=${WHATSMEOW_WEBHOOK_KEY:-local-webhook-secret}
     networks:
       - homecarepro-network
     healthcheck:
@@ -44,21 +45,22 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  evolution-api:
-    image: atendai/evolution-api:v2.2.1
-    container_name: evolution-api
+  whatsmeow:
+    build:
+      context: ./whatsmeow-service
+      dockerfile: Dockerfile
+    image: homecarepro/whatsmeow:latest
+    container_name: whatsmeow
     restart: unless-stopped
     ports:
       - "8080:8080"
     environment:
-      - SERVER_URL=${APP_URL:-http://localhost:3000}/evolution
-      - AUTHENTICATION_TYPE=apikey
-      - AUTHENTICATION_API_KEY=${EVOLUTION_API_KEY:-homecare-evo-secret-123}
-      - DATABASE_PROVIDER=sqlite
-      - DATABASE_CONNECTION_URI=sqlite://./db.sqlite
+      - PORT=8080
+      - WHATSMEOW_API_KEY=${WHATSMEOW_API_KEY:-local-whatsmeow-secret}
+      - WHATSMEOW_WEBHOOK_URL=http://homecarepro-web:3000/api/whatsapp/webhook
+      - WHATSMEOW_WEBHOOK_KEY=${WHATSMEOW_WEBHOOK_KEY:-local-webhook-secret}
     volumes:
-      - evolution_instances:/evolution/instances
-      - evolution_db:/evolution/db
+      - whatsmeow_data:/data
     networks:
       - homecarepro-network
 
@@ -68,5 +70,4 @@ networks:
     driver: bridge
 
 volumes:
-  evolution_instances:
-  evolution_db:
+  whatsmeow_data:

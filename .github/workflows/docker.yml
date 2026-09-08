@@ -49,3 +49,27 @@ jobs:
             VITE_PUBLIC_VAPID_KEY=${{ secrets.VITE_PUBLIC_VAPID_KEY }}
             VITE_ENABLE_DEMO_MODE=false
             VITE_APP_BASE_DOMAIN=homecare.wootech.com.br
+
+  build-and-push-whatsmeow:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push WhatsMeow image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./whatsmeow-service
+          file: ./whatsmeow-service/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}-whatsmeow:latest
+            ghcr.io/${{ github.repository }}-whatsmeow:${{ github.sha }}

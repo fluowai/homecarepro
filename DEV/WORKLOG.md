@@ -249,5 +249,5 @@
 
 ## 2026-09-08 — CSP e integração WhatsApp
 - CSP passou a permitir o WebSocket seguro do Supabase para Realtime.
-- Evolution API recebeu configuração explícita no Docker Compose e falhas de conexão deixaram de retornar erro genérico.
+- WhatsMeow substituiu o provedor anterior com serviço Go próprio, sessões SQLite persistentes, QR Code e API interna autenticada.
 - A tela de conexões agora exibe o erro retornado pela API ao criar uma instância.
