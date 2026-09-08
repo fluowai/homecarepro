@@ -23,6 +23,8 @@ import { useHomeCareStore } from '../store';
 import { ProfessionalStatus, ProfessionalSpecialty } from '../types';
 import { uploadFileToMinio } from '../lib/upload';
 import { toast } from 'sonner';
+import { supabase } from '../lib/supabase';
+import { normalizeBrazilPhone } from '../lib/formatters';
 
 export default function ProfessionalsView() {
   const { 
@@ -57,6 +59,7 @@ export default function ProfessionalsView() {
   const [docsFiles, setDocsFiles] = useState<Record<string, string>>({});
   const [isUploading, setIsUploading] = useState<string | null>(null);
   const [credentialNotice, setCredentialNotice] = useState('');
+  const [accessPassword, setAccessPassword] = useState('');
 
   // Filter professionals
   const tenantProfessionals = professionals.filter(p => p.tenantId === activeTenantId);
@@ -72,7 +75,7 @@ export default function ProfessionalsView() {
   const resetForm = () => {
     setName(''); setCpf(''); setGender('F'); setSpecialty('Enfermeiro'); setRegistration('');
     setEmail(''); setPhone(''); setStreet(''); setNumber(''); setCity(''); setState('SP'); setZipCode('');
-    setDocsUploaded([]); setDocsFiles({}); setCredentialNotice(''); setModalTab('personal');
+    setDocsUploaded([]); setDocsFiles({}); setCredentialNotice(''); setAccessPassword(''); setModalTab('personal');
   };
 
   const openEditor = (professional: typeof professionals[number]) => {
@@ -88,10 +91,31 @@ export default function ProfessionalsView() {
     setModalTab('personal'); setShowAddModal(true);
   };
 
-  const handleCreateProfessional = (e: React.FormEvent) => {
+  const provisionAccess = async (professionalId: string, password: string) => {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData.session?.access_token;
+    if (!token) throw new Error('Sessão expirada. Entre novamente.');
+    const response = await fetch(`/api/professionals/${professionalId}/access`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ password }),
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || 'Falha ao criar acesso profissional.');
+  };
+
+  const handleCreateProfessional = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name || !registration) {
+    if (!name || !registration || !phone) {
       toast.error("Por favor, preencha o nome e o registro profissional (COREN/CRM/CREFITO).");
+      return;
+    }
+    if (!/^\+55\d{10,11}$/.test(normalizeBrazilPhone(phone))) {
+      toast.error('Informe um telefone celular brasileiro válido com DDD.');
+      return;
+    }
+    if (!editingProfessionalId && accessPassword.length < 6) {
+      toast.error('Informe uma senha inicial com pelo menos 6 caracteres para o profissional.');
       return;
     }
 
@@ -111,13 +135,25 @@ export default function ProfessionalsView() {
       address: { street, number, city, state, zipCode },
       documents: docsUploaded.map(d => ({ type: 'document', name: d, url: docsFiles[d] || '' }))
     };
-    if (editingProfessionalId) {
-      updateProfessional(editingProfessionalId, professionalData);
-      toast.success('Cadastro do profissional atualizado.');
-    } else {
-      addProfessional(professionalData);
-      toast.success('Profissional cadastrado.');
+    const savedProfessional = editingProfessionalId
+      ? (updateProfessional(editingProfessionalId, professionalData), professionals.find(p => p.id === editingProfessionalId))
+      : await addProfessional(professionalData);
+
+    if (!savedProfessional) {
+      toast.error('Não foi possível localizar o cadastro salvo.');
+      return;
     }
+
+    if (accessPassword) {
+      try {
+        await provisionAccess(savedProfessional.id, accessPassword);
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : 'Falha ao criar acesso profissional.');
+        return;
+      }
+    }
+
+    toast.success(editingProfessionalId ? 'Profissional atualizado e acesso salvo.' : 'Profissional cadastrado com acesso por telefone.');
 
     resetForm();
     setEditingProfessionalId(null);
@@ -139,11 +175,11 @@ export default function ProfessionalsView() {
   };
 
   const handleSendCredentials = () => {
-    if (!email) {
-      setCredentialNotice('Informe o e-mail do profissional para gerar o login.');
+    if (!phone) {
+      setCredentialNotice('Informe o telefone do profissional para gerar o acesso.');
       return;
     }
-    setCredentialNotice(`Credenciais de acesso enviadas para ${email}.`);
+    setCredentialNotice('O acesso por telefone será criado ao salvar o cadastro.');
   };
 
   return (
@@ -393,12 +429,17 @@ export default function ProfessionalsView() {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Telefone / WhatsApp</label>
-                      <input type="text" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(11) 98888-8888" className="w-full bg-slate-50 border border-slate-200 rounded-lg text-xs py-2 px-3 text-slate-700 focus:outline-none" />
+                      <input type="tel" required value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(11) 98888-8888" className="w-full bg-slate-50 border border-slate-200 rounded-lg text-xs py-2 px-3 text-slate-700 focus:outline-none" />
                     </div>
                     <div>
                       <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">E-mail Corporativo</label>
                       <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="nome@homecarepro.com" className="w-full bg-slate-50 border border-slate-200 rounded-lg text-xs py-2 px-3 text-slate-700 focus:outline-none" />
                     </div>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Senha de acesso do profissional {editingProfessionalId ? '(opcional para redefinir)' : '*'}</label>
+                    <input type="password" minLength={6} required={!editingProfessionalId} value={accessPassword} onChange={(e) => setAccessPassword(e.target.value)} placeholder="Mínimo de 6 caracteres" autoComplete="new-password" className="w-full bg-slate-50 border border-slate-200 rounded-lg text-xs py-2 px-3 text-slate-700 focus:outline-none focus:border-green-600" />
+                    <p className="text-[10px] text-slate-400 mt-1">O profissional entrará somente com este telefone e esta senha.</p>
                   </div>
                 </div>
               )}

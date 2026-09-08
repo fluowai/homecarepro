@@ -134,6 +134,7 @@ export type ProfessionalSpecialty =
 export interface Professional {
   id: string;
   tenantId: string;
+  userId?: string;
   name: string;
   cpf: string;
   gender: 'M' | 'F' | 'O';

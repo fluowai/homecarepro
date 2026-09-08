@@ -109,6 +109,7 @@ function professionalToRow(p: Professional) {
   return {
     id: p.id,
     tenant_id: p.tenantId,
+    user_id: p.userId ?? null,
     name: p.name,
     specialty: p.specialty,
     cpf: p.cpf,
@@ -129,6 +130,7 @@ function professionalFromRow(r: Record<string, unknown>): Professional {
   return {
     id: r.id as string,
     tenantId: r.tenant_id as string,
+    userId: (r.user_id as string) || undefined,
     name: r.name as string,
     specialty: r.specialty as Professional['specialty'],
     cpf: r.cpf as string,
@@ -563,7 +565,7 @@ interface HomeCareState {
   consumePatientInventory: (patientId: string, medicineId: string, qty: number) => void;
 
   // Professional Actions
-  addProfessional: (professional: Omit<Professional, 'id' | 'tenantId'>) => void;
+  addProfessional: (professional: Omit<Professional, 'id' | 'tenantId'>) => Promise<Professional>;
   updateProfessional: (id: string, professional: Partial<Professional>) => void;
   deleteProfessional: (id: string) => void;
 
@@ -1369,12 +1371,13 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
 
   // ── Professionals ───────────────────────────────────────────
 
-  addProfessional: (professional) => {
+  addProfessional: async (professional) => {
     const newProf: Professional = { ...professional, id: `prof-${Date.now()}`, tenantId: get().activeTenantId, rating: 5.0, documents: professional.documents || [] };
     const updated = [...get().professionals, newProf];
     set({ professionals: updated });
     saveToStorage('professionals', updated);
-    upsertRow('professionals', professionalToRow(newProf));
+    await upsertRow('professionals', professionalToRow(newProf));
+    return newProf;
   },
 
   updateProfessional: (id, data) => {

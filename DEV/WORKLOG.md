@@ -1,5 +1,11 @@
 # Worklog
 
+## 2026-09-08 — Login de profissionais por telefone
+- Adicionado vínculo opcional entre `professionals` e `auth.users` por `user_id`.
+- Profissionais passam a receber acesso com telefone normalizado e senha; gestores continuam usando e-mail.
+- Incluída rota protegida para provisionar/atualizar o acesso e bloqueio de perfil não profissional no login por telefone.
+- Adicionados testes para normalização de telefones.
+
 ## 2026-09-08 — Edição e salvamento nos módulos operacionais
 - Adicionados fluxos de editar e salvar para pacientes, profissionais, convênios, medicamentos, contratos, escalas, CRM e assembleias.
 - Os formulários reutilizam os dados existentes e atualizam somente o registro selecionado, preservando histórico e demais relacionamentos.
@@ -231,3 +237,7 @@
 - Profissionais: formulário reutilizado para edição completa do cadastro, preservando status, avatar, avaliação e documentos existentes; persistência segue o `updateProfessional` do store.
 - Relatórios: rota `reports` criada e conectada ao menu; relatório operacional por profissional com período, visitas concluídas, valor produzido e exportação CSV baseada em dados reais.
 - Verificação: `npm run typecheck`, `npm run build:frontend` e `npm test` concluídos; 90 testes passaram e 14 testes RLS foram ignorados por opt-in.
+
+## 2026-09-08 — Login de profissionais por telefone
+- Migration `20260908000000_add_professional_phone_auth.sql` aplicada e registrada em `schema_migrations`.
+- Banco verificado: `professionals.user_id` com FK para `auth.users` e índice único parcial.

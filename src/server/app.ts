@@ -1267,6 +1267,82 @@ Apenas o objeto JSON valido, sem formatacao Markdown adicional nem blocos de cod
     return data as { role: string; tenant_id: string } | null;
   }
 
+  function normalizePhone(phone: string) {
+    const digits = String(phone || '').replace(/\D/g, '');
+    if (!digits) return '';
+    return digits.startsWith('55') ? `+${digits}` : `+55${digits}`;
+  }
+
+  // Provision a professional account without exposing service-role credentials to the browser.
+  app.post("/api/professionals/:id/access", requireAuth, globalLimiter, async (req, res) => {
+    try {
+      const requesterId = (req as any).userId;
+      const requester = await getProfile(requesterId);
+      if (!requester || !['mega_admin', 'super_admin', 'admin', 'operator'].includes(requester.role)) {
+        return res.status(403).json({ error: "Acesso negado." });
+      }
+
+      const professionalId = String((req.params as any).id || '');
+      const password = String(req.body?.password || '');
+      if (password.length < 6) {
+        return res.status(400).json({ error: "A senha do profissional deve ter pelo menos 6 caracteres." });
+      }
+
+      const { data: professional, error: professionalError } = await supabaseAdmin
+        .from('professionals')
+        .select('id, tenant_id, name, phone, user_id')
+        .eq('id', professionalId)
+        .single();
+      if (professionalError || !professional) return res.status(404).json({ error: "Profissional não encontrado." });
+      if (requester.role !== 'mega_admin' && professional.tenant_id !== requester.tenant_id) {
+        return res.status(403).json({ error: "Acesso negado ao profissional." });
+      }
+
+      const phone = normalizePhone(professional.phone);
+      if (!/^\+55\d{10,11}$/.test(phone)) {
+        return res.status(400).json({ error: "O profissional precisa ter um telefone brasileiro válido." });
+      }
+
+      let userId = professional.user_id as string | null;
+      if (userId) {
+        const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+          phone,
+          password,
+          phone_confirm: true,
+          user_metadata: { full_name: professional.name, tenant_id: professional.tenant_id, role: 'professional' },
+        });
+        if (error) throw error;
+      } else {
+        const { data: created, error } = await supabaseAdmin.auth.admin.createUser({
+          phone,
+          password,
+          phone_confirm: true,
+          user_metadata: { full_name: professional.name, tenant_id: professional.tenant_id, role: 'professional' },
+        });
+        if (error) {
+          if (String(error.message || '').toLowerCase().includes('already')) {
+            return res.status(409).json({ error: "Este telefone já está vinculado a outra conta." });
+          }
+          throw error;
+        }
+        userId = created.user?.id || null;
+      }
+
+      if (!userId) throw new Error('A conta profissional não foi criada.');
+      const { error: linkError } = await supabaseAdmin
+        .from('professionals')
+        .update({ user_id: userId })
+        .eq('id', professionalId);
+      if (linkError) throw linkError;
+
+      logEvent('INFO', 'Professional phone access provisioned', { professionalId, userId, tenantId: professional.tenant_id, byUserId: requesterId });
+      res.json({ success: true, userId, phone });
+    } catch (error: any) {
+      logEvent('ERROR', 'Professional access provisioning failed', { error: error.message });
+      res.status(500).json({ error: 'Falha ao criar o acesso do profissional.' });
+    }
+  });
+
   // Create a tenant (reseller for mega_admin, clinic for super_admin) and emit an invite link
   app.post("/api/admin/tenants", requireAuth, globalLimiter, async (req, res) => {
     try {
