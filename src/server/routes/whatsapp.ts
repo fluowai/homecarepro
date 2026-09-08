@@ -6,7 +6,7 @@ import { logEvent } from "../app";
 export function createWhatsAppRouter(supabaseAdmin: SupabaseClient, requireAuth: any) {
   const router = express.Router();
   const EVOLUTION_API_URL = process.env.EVOLUTION_API_URL || "http://evolution-api:8080";
-  const EVOLUTION_API_KEY = process.env.EVOLUTION_API_KEY || "homecare-evo-secret-123";
+  const EVOLUTION_API_KEY = process.env.EVOLUTION_API_KEY || (process.env.NODE_ENV === "production" ? "" : "homecare-evo-secret-123");
 
   // Helper for requests to Evolution API
   const fetchEvo = async (path: string, options: RequestInit = {}) => {
@@ -164,8 +164,14 @@ export function createWhatsAppRouter(supabaseAdmin: SupabaseClient, requireAuth:
   // 1. Create Instance
   router.post("/instances", requireAuth, async (req, res) => {
     try {
-      const { instanceName } = req.body;
+      const instanceName = String(req.body?.instanceName || "").trim();
       const userId = (req as any).userId;
+      if (!instanceName || !/^[\p{L}\p{N}_ -]{2,80}$/u.test(instanceName)) {
+        return res.status(400).json({ error: "Informe um nome de instância válido (2 a 80 caracteres)." });
+      }
+      if (!EVOLUTION_API_KEY) {
+        return res.status(503).json({ error: "Integração WhatsApp não configurada no servidor." });
+      }
       
       const { data: profile } = await supabaseAdmin
         .from("user_profiles")
@@ -192,18 +198,27 @@ export function createWhatsAppRouter(supabaseAdmin: SupabaseClient, requireAuth:
         })
       });
       const data = await evoRes.json();
+      if (!evoRes.ok) {
+        logEvent("ERROR", "Evolution API rejected instance creation", { status: evoRes.status, instanceName, response: data });
+        return res.status(502).json({ error: "O provedor WhatsApp recusou a criação da conexão.", details: data?.message || data?.error || undefined });
+      }
 
       // Save to DB
-      await supabaseAdmin.from("whatsapp_instances").insert({
+      const { error: insertError } = await supabaseAdmin.from("whatsapp_instances").insert({
         tenant_id: tenantId,
         instance_name: instanceName,
         status: data.instance?.status || "connecting",
         qr_code: data.qrcode?.base64 || null
       });
+      if (insertError) {
+        if (insertError.code === "23505") return res.status(409).json({ error: "Já existe uma conexão com esse nome." });
+        throw insertError;
+      }
 
       res.json({ success: true, data });
     } catch (err: any) {
-      res.status(500).json({ error: err.message });
+      logEvent("ERROR", "WhatsApp instance creation failed", { error: err.message });
+      res.status(502).json({ error: "Não foi possível conectar ao provedor WhatsApp. Verifique a configuração do Evolution API." });
     }
   });
 

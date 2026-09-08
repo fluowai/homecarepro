@@ -133,6 +133,7 @@ export function createApp(options: CreateAppOptions) {
   const dns = dnsClient ?? dnsImpl;
 
   const SUPABASE_URL = process.env.VITE_SUPABASE_URL || "";
+  const SUPABASE_WS_URL = SUPABASE_URL.replace(/^https?:/i, "wss:");
   const APP_BASE_DOMAIN = appBaseDomain || process.env.APP_BASE_DOMAIN || "homecare.wootech.com.br";
 
   const RESERVED_SUBDOMAINS = new Set([
@@ -370,7 +371,7 @@ export function createApp(options: CreateAppOptions) {
         styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
         mediaSrc: ["'self'", "blob:"],
         imgSrc: ["'self'", "data:", "https:"],
-        connectSrc: ["'self'", SUPABASE_URL, "ws://localhost:*", "http://localhost:*"].filter(Boolean),
+        connectSrc: ["'self'", SUPABASE_URL, SUPABASE_WS_URL, "ws://localhost:*", "http://localhost:*"].filter(Boolean),
         fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
         objectSrc: ["'none'"],
         frameAncestors: ["'none'"],

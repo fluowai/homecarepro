@@ -246,3 +246,8 @@
 - Criada a tela compartilhada `CompanyProfileView`: revendas editam seus dados em `Dados da Revenda` e clínicas em `Dados da Empresa`.
 - Endpoint autenticado salva sempre no `tenant_id` do perfil, sem aceitar troca de tenant pelo cliente.
 - Migration `20260908000001_add_tenant_company_profile.sql` aplicada e registrada no banco com 12 campos empresariais.
+
+## 2026-09-08 — CSP e integração WhatsApp
+- CSP passou a permitir o WebSocket seguro do Supabase para Realtime.
+- Evolution API recebeu configuração explícita no Docker Compose e falhas de conexão deixaram de retornar erro genérico.
+- A tela de conexões agora exibe o erro retornado pela API ao criar uma instância.

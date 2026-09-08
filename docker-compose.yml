@@ -28,6 +28,8 @@ services:
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - ASAAS_API_KEY=${ASAAS_API_KEY}
       - ASAAS_WEBHOOK_TOKEN=${ASAAS_WEBHOOK_TOKEN}
+      - EVOLUTION_API_URL=${EVOLUTION_API_URL:-http://evolution-api:8080}
+      - EVOLUTION_API_KEY=${EVOLUTION_API_KEY:-homecare-evo-secret-123}
     networks:
       - homecarepro-network
     healthcheck:

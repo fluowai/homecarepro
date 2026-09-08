@@ -78,7 +78,7 @@ export const useWhatsAppStore = create<WhatsAppState>((set, get) => ({
       const token = session?.session?.access_token;
       if (!token) return;
 
-      await fetch('/api/whatsapp/instances', {
+      const response = await fetch('/api/whatsapp/instances', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -86,6 +86,10 @@ export const useWhatsAppStore = create<WhatsAppState>((set, get) => ({
         },
         body: JSON.stringify({ instanceName: name })
       });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(result.error || 'Não foi possível criar a conexão WhatsApp.');
+      }
       await get().fetchInstances();
     } finally {
       set({ isLoading: false });
