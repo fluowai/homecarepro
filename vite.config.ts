@@ -13,6 +13,11 @@ export default defineConfig(() => {
         registerType: 'autoUpdate',
         injectRegister: 'auto',
         workbox: {
+          // Do NOT precache index.html. The server injects runtime config
+          // (window.__ENV__ with real Supabase credentials) into index.html on
+          // every request. Precaching the static version would serve the app
+          // without those credentials and break login/auth.
+          globPatterns: ['**/*.{js,css,ico,png,svg,webmanifest,webp,woff2}'],
           runtimeCaching: [
             {
               urlPattern: ({ url }) => url.pathname.startsWith('/api/'),

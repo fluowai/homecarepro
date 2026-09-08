@@ -1,5 +1,12 @@
 # Worklog
 
+## 2026-09-08 — Root cause: SW precaching index.html sem window.__ENV__
+- **Sintoma persistente**: mesmo com `window.__ENV__` correto no HTML e nonce CSP bate, o app seguia conectando em `placeholder.supabase.co`.
+- **Causa raiz real**: produção usa `generateSW` (default do vite-plugin-pwa), que **pré-cacheava o `index.html` estático** (SEM o `window.__ENV__` injetado pelo server). O service worker servia esse HTML velho nas navegações via precache route → `getEnv` caía no fallback `placeholder.supabase.co`. O custom `src/sw.ts` **não é usado em produção** (generateSW ignora); por isso as edições nele não surtiam efeito.
+- **Fix**: em `vite.config.ts`, adicionado `globPatterns` **excluindo `index.html`** do precache. Navegações passam a sempre buscar o HTML fresco da rede (com credenciais reais injetadas).
+- **Verificação**: `vite build` exit 0; confirmado que `index.html` NÃO está mais no `precacheAndRoute` do `dist/sw.js` gerado (workbox NavigationRoute cai na rede por não estar precacheado).
+- **Ação requerida**: redesenhar a imagem (CI dispara) e redesenhar o stack Portainer/Swarm; usuários com SW antigo precisarão de hard refresh/desregistro do SW.
+
 ## 2026-09-08 — Hardening: frontend-only Docker build
 - **Fix**: `Dockerfile.frontend` now appends only non-empty `VITE_*` build args to `.env.production`, matching the production image build and preventing empty args from recreating the Supabase placeholder URL.
 - **Verification**: `npm test` (90 passed / 14 skipped) and `npm run build` passed.
