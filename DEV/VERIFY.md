@@ -1,5 +1,17 @@
 # Verificação
 
+## Verificação 2026-09-09 — Isolamento de equipe e correção do usuário
+| Item | Resultado |
+|---|---|
+| `sccuidadores2023@gmail.com` | ✅ `tenant_id` corrigido para `SC SAUDE`; associação antiga removida |
+| Policies legadas `Tenant access` em negócio | ✅ removidas/reestruturadas sem acesso global para `super_admin` |
+| `npm run typecheck` | ✅ passou |
+| `npm test` | ✅ 94 passed / 14 skipped |
+| `RUN_DB_TESTS=1 npm exec vitest -- run tests/rls.integration.test.ts` | ✅ 14/14 passed |
+
+### Regra efetiva
+Clínica lê apenas o próprio tenant; usuário com vínculo secundário lê somente os tenants explicitamente associados; super admin lê sua revenda e descendentes; mega admin permanece global.
+
 ## Verificação 2026-09-09 — Responsáveis do paciente e edição
 | Item | Resultado |
 |---|---|

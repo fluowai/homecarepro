@@ -1,5 +1,12 @@
 # Worklog
 
+## 2026-09-09 — Isolamento de usuários por clínica/revenda
+- Corrigido o vínculo de `sccuidadores2023@gmail.com`: saiu de `Cooperativa CoopSaúde Mais` e passou a pertencer somente à `SC SAUDE` em `user_profiles`, `user_tenants` e metadata de autenticação.
+- A tela de equipe passou a usar o `tenant_id` do perfil autenticado como raiz, evitando tenant ativo antigo do `localStorage`; super_admin mantém apenas a árvore autorizada.
+- Removidas policies legadas ambíguas e consolidado o escopo como tenant próprio + acesso secundário explícito + árvore do super_admin; nenhum super_admin comum recebe acesso global.
+- Migration aplicada: `20260909010000_harden_legacy_tenant_policies.sql` e `20260909020000_restore_authorized_secondary_access.sql`.
+- Verificação: typecheck passou; suíte existente 94 passed / 14 skipped; RLS real 14/14 passed.
+
 ## 2026-09-08 — Login de profissionais por telefone
 - Adicionado vínculo opcional entre `professionals` e `auth.users` por `user_id`.
 - Profissionais passam a receber acesso com telefone normalizado e senha; gestores continuam usando e-mail.

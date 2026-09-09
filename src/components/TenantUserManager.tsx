@@ -20,7 +20,7 @@ export default function TenantUserManager() {
   const [newPassword, setNewPassword] = useState('');
   const [isResetting, setIsResetting] = useState(false);
   
-  const { tenants, activeTenantId, currentUserRole } = useHomeCareStore();
+  const { tenants, activeTenantId, currentUserRole, profile } = useHomeCareStore();
 
   useEffect(() => {
     fetchUsers();
@@ -56,11 +56,33 @@ export default function TenantUserManager() {
   const fetchUsers = async () => {
     setLoading(true);
     try {
-      let targetTenantIds = [activeTenantId];
+      // O tenant ativo pode ser um valor antigo do localStorage. Para impedir
+      // que a tela de equipe consulte uma instância diferente da sessão atual,
+      // o perfil autenticado é a fonte de verdade para o tenant raiz.
+      const rootTenantId = profile?.tenant_id || activeTenantId;
+      if (!rootTenantId) {
+        setUsers([]);
+        return;
+      }
+
+      let targetTenantIds = [rootTenantId];
 
       if (currentUserRole === 'super_admin') {
-        const childTenants = tenants.filter(t => t.parentId === activeTenantId).map(t => t.id);
-        targetTenantIds = [...targetTenantIds, ...childTenants];
+        // O banco já aplica a árvore via RLS. Aqui mantemos apenas a
+        // apresentação da árvore carregada pelo usuário, sem incluir o tenant
+        // de outra sessão ou um valor arbitrário do navegador.
+        const descendantIds = new Set<string>([rootTenantId]);
+        let changed = true;
+        while (changed) {
+          changed = false;
+          for (const tenant of tenants) {
+            if (tenant.parentId && descendantIds.has(tenant.parentId) && !descendantIds.has(tenant.id)) {
+              descendantIds.add(tenant.id);
+              changed = true;
+            }
+          }
+        }
+        targetTenantIds = [...descendantIds];
       }
 
       const { data, error } = await supabase
