@@ -251,3 +251,9 @@
 - CSP passou a permitir o WebSocket seguro do Supabase para Realtime.
 - WhatsMeow substituiu o provedor anterior com serviço Go próprio, sessões SQLite persistentes, QR Code e API interna autenticada.
 - A tela de conexões agora exibe o erro retornado pela API ao criar uma instância.
+
+## 2026-09-09 — Responsáveis do paciente e correção do editor
+- Adicionados responsáveis múltiplos com nome e telefone no cadastro/edição de pacientes.
+- Persistência criada na coluna `patients.responsibles` via migration `20260909000000_add_patient_responsibles.sql`, aplicada no banco.
+- Corrigido o modal de paciente: ele estava dentro do ramo da lista, então o botão Editar apenas aparecia após Voltar; agora é renderizado fora da condição lista/detalhes.
+- Verificação: typecheck, build frontend e testes existentes executados.

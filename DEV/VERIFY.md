@@ -1,5 +1,15 @@
 # Verificação
 
+## Verificação 2026-09-09 — Responsáveis do paciente e edição
+| Item | Resultado |
+|---|---|
+| Campos de responsáveis | ✅ Nome e telefone, com múltiplos responsáveis e remoção individual |
+| Persistência | ✅ Migration `20260909000000_add_patient_responsibles.sql` aplicada no Supabase |
+| Botão Editar paciente | ✅ Modal abre diretamente na tela de detalhes, sem depender de Voltar |
+| `npm run typecheck` | ✅ passou |
+| `npm run build:frontend` | ✅ passou |
+| `npm test` | ✅ suíte existente executada; testes RLS permanecem opt-in |
+
 ## Verificação 2026-09-08 — PWA obrigatório, profissionais e relatórios
 | Item | Resultado |
 |---|---|

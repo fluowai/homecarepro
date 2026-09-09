@@ -26,7 +26,7 @@ import {
 } from 'lucide-react';
 import { useHomeCareStore } from '../store';
 import { PatientStatus } from '../types';
-import { Patient } from '../types';
+import { Patient, PatientResponsible } from '../types';
 import { uploadFileToMinio } from '../lib/upload';
 import { toast } from 'sonner';
 
@@ -80,6 +80,7 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
   const [city, setCity] = useState('');
   const [state, setState] = useState('SP');
   const [zipCode, setZipCode] = useState('');
+  const [responsibles, setResponsibles] = useState<PatientResponsible[]>([{ name: '', phone: '' }]);
 
   // Manual event adding
   const [eventTitle, setEventTitle] = useState('');
@@ -127,6 +128,7 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
     setCity('');
     setState('SP');
     setZipCode('');
+    setResponsibles([{ name: '', phone: '' }]);
   };
 
   const openPatientEditor = (patient: Patient) => {
@@ -150,6 +152,8 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
     setCity(patient.address.city);
     setState(patient.address.state);
     setZipCode(patient.address.zipCode);
+    setResponsibles(patient.responsibles?.length ? patient.responsibles : [{ name: '', phone: '' }]);
+    setActiveTab('info');
     setShowAddModal(true);
   };
 
@@ -172,6 +176,7 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
       gender,
       phone,
       email,
+      responsibles: responsibles.filter((responsible) => responsible.name.trim() || responsible.phone.trim()),
       status: 'active' as PatientStatus,
       planType,
       insuranceId,
@@ -314,7 +319,11 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
               </button>
               {isManager && (
                 <button
-                  onClick={() => openPatientEditor(selectedPatient)}
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    openPatientEditor(selectedPatient);
+                  }}
                   className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-semibold transition-colors"
                   title="Editar cadastro do paciente"
                 >
@@ -440,6 +449,23 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Telefone Residencial / Celular</span>
                     <p className="text-slate-700 text-sm font-medium">{selectedPatient.phone || 'Não informado'}</p>
                   </div>
+
+                <div className="border-t border-slate-100 pt-6">
+                  <h3 className="font-bold text-slate-800 text-sm uppercase tracking-wide mb-4">Responsáveis pelo Paciente</h3>
+                  {selectedPatient.responsibles?.length ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {selectedPatient.responsibles.map((responsible, index) => (
+                        <div key={`${responsible.name}-${responsible.phone}-${index}`} className="bg-slate-50/50 p-4 rounded-xl border border-slate-100">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Responsável {index + 1}</span>
+                          <p className="text-slate-700 text-sm font-medium mt-1">{responsible.name || 'Nome não informado'}</p>
+                          <p className="text-slate-500 text-xs mt-1">{responsible.phone || 'Telefone não informado'}</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-slate-400 text-xs">Nenhum responsável cadastrado.</p>
+                  )}
+                </div>
                   <div className="space-y-1 bg-slate-50/50 p-4 rounded-xl border border-slate-100">
                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">E-mail para Faturamento / Convênio</span>
                     <p className="text-slate-700 text-sm font-medium">{selectedPatient.email || 'Não informado'}</p>
@@ -896,7 +922,10 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
             </div>
           )}
 
-          {/* Add Patient Modal */}
+        </div>
+      )}
+
+      {/* Add Patient Modal */}
           {showAddModal && (
             <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-30 p-4">
               <div className="bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto border border-slate-200 shadow-2xl animate-scale-up">
@@ -1080,9 +1109,59 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
                     </div>
                   </div>
 
-                  {/* Seção 3: Endereço */}
+                  {/* Seção 3: Responsáveis */}
                   <div>
-                    <h4 className="font-bold text-xs text-green-600 uppercase tracking-wider mb-4 border-b pb-1 border-slate-100">3. Endereço e Logística</h4>
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-1 mb-4">
+                      <h4 className="font-bold text-xs text-green-600 uppercase tracking-wider">3. Responsáveis pelo Paciente</h4>
+                      <button
+                        type="button"
+                        onClick={() => setResponsibles((current) => [...current, { name: '', phone: '' }])}
+                        className="inline-flex items-center gap-1 text-[10px] font-bold text-green-600 hover:text-green-700"
+                      >
+                        <PlusCircle className="w-3.5 h-3.5" />
+                        Adicionar responsável
+                      </button>
+                    </div>
+                    <div className="space-y-3">
+                      {responsibles.map((responsible, index) => (
+                        <div key={index} className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-3 items-end">
+                          <div>
+                            <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Nome do responsável {index + 1}</label>
+                            <input
+                              type="text"
+                              value={responsible.name}
+                              onChange={(event) => setResponsibles((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, name: event.target.value } : item))}
+                              placeholder="Ex: Maria da Silva"
+                              className="w-full bg-slate-50 border border-slate-200 rounded-lg text-xs px-3 py-2 text-slate-700 focus:outline-none focus:border-green-600"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Telefone do responsável</label>
+                            <input
+                              type="tel"
+                              value={responsible.phone}
+                              onChange={(event) => setResponsibles((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, phone: event.target.value } : item))}
+                              placeholder="(11) 99999-9999"
+                              className="w-full bg-slate-50 border border-slate-200 rounded-lg text-xs px-3 py-2 text-slate-700 focus:outline-none focus:border-green-600"
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setResponsibles((current) => current.length > 1 ? current.filter((_, itemIndex) => itemIndex !== index) : [{ name: '', phone: '' }])}
+                            className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
+                            title="Remover responsável"
+                            aria-label={`Remover responsável ${index + 1}`}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Seção 4: Endereço */}
+                  <div>
+                    <h4 className="font-bold text-xs text-green-600 uppercase tracking-wider mb-4 border-b pb-1 border-slate-100">4. Endereço e Logística</h4>
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                       <div className="md:col-span-2">
                         <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Rua / Logradouro</label>
@@ -1166,8 +1245,6 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
               </div>
             </div>
           )}
-        </div>
-      )}
     </div>
   );
 }
