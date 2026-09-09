@@ -10,6 +10,7 @@ import { DomainValidator } from './DomainValidator';
 import { NetworkDirectory } from './NetworkDirectory';
 import TenantUserManager from './TenantUserManager';
 import EmailTemplatesManager from './EmailTemplatesManager';
+import CompanyProfileView from './CompanyProfileView';
 import { Tenant } from '../types';
 
 interface ResellerViewProps {
@@ -32,6 +33,7 @@ const MENU_GROUPS = [
       { id: 'domains', label: 'Validação de Domínios', icon: Globe },
       { id: 'users', label: 'Usuários e Equipe', icon: Users },
       { id: 'contacts', label: 'E-mails da Rede', icon: Mail },
+      { id: 'company', label: 'Dados da Revenda', icon: Building },
       { id: 'emails', label: 'Templates de E-mail', icon: Mail },
     ],
   },
@@ -319,6 +321,8 @@ export default function ResellerView({ onExit, activeSection = 'overview' }: Res
         return <div className="p-6 bg-gray-50/30"><TenantUserManager /></div>;
       case 'contacts':
         return <NetworkDirectory />;
+      case 'company':
+        return <CompanyProfileView title="Dados da Revenda" subtitle="Mantenha os dados oficiais da sua revenda atualizados." />;
       case 'emails':
         return <EmailTemplatesManager scope="tenant" />;
       default:
@@ -436,4 +440,3 @@ export default function ResellerView({ onExit, activeSection = 'overview' }: Res
     </div>
   );
 }
-

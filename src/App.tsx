@@ -17,6 +17,7 @@ import { Toaster } from 'sonner';
 import PWAInstallGate from './components/PWAInstallGate';
 import {
   registerPushNotifications,
+  setupInstallPrompt,
   isPWAInstalled,
   getVapidPublicKey,
   setAudioEnabled,
@@ -48,6 +49,7 @@ const AttendancesView = lazy(() => import('./components/AttendancesView').then(m
 const ApprovalDashboard = lazy(() => import('./components/ApprovalDashboard').then(m => ({ default: m.ApprovalDashboard })));
 const ProfessionalApp = lazy(() => import('./components/ProfessionalApp').then(m => ({ default: m.ProfessionalApp })));
 const ReportsView = lazy(() => import('./components/ReportsView'));
+const CompanyProfileView = lazy(() => import('./components/CompanyProfileView'));
 
 function LoadingScreen() {
   return (
@@ -93,6 +95,10 @@ export default function App() {
   useEffect(() => {
     init();
   }, [init]);
+
+  // Capture beforeinstallprompt as soon as the app loads. Waiting for login
+  // can lose the one-shot browser event before the mobile install gate mounts.
+  useEffect(() => setupInstallPrompt(), []);
 
   // Sync audio preference to notification lib
   useEffect(() => {
@@ -179,7 +185,10 @@ export default function App() {
   }
 
   if (!isAuthenticated) {
-    return <AuthView />;
+    return <>
+      <AuthView />
+      <PWAInstallGate />
+    </>;
   }
 
   const handleSetView = (view: string) => {
@@ -252,6 +261,8 @@ export default function App() {
         return <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto"><TenantUserManager /></div>;
       case 'smtp_settings':
         return <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto"><EmailTemplatesManager scope="tenant" title="E-mail & Notificações" subtitle="Gerencie os templates de e-mail que são enviados aos pacientes e familiares." /></div>;
+      case 'settings':
+        return <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto"><CompanyProfileView /></div>;
       case 'mega_overview':
       case 'mega_network':
       case 'mega_plans':
@@ -270,6 +281,7 @@ export default function App() {
       case 'super_emails':
       case 'super_support':
       case 'super_contacts':
+      case 'super_company':
         return <ResellerView activeSection={currentView.replace('super_', '')} onExit={handleSetView} />;
       default:
         return <DashboardView setView={handleSetView} searchQuery={searchQuery} />;

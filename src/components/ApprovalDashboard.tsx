@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 
 export function ApprovalDashboard() {
   const [pendingVisits, setPendingVisits] = useState([
-    { id: '1', professionalName: 'Ana Clara (Téc. Enf)', patientName: 'João Souza', time: '08:00 - 12:00', location: 'Av. Paulista, 1000', photoUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=120', aiStatus: 'verified' },
+    { id: '1', professionalName: 'Ana Clara (Téc. Enf)', patientName: 'João Souza', time: '08:00 - 12:00', location: 'Av. Paulista, 1000', photoUrl: '/default-avatar.svg', aiStatus: 'verified' },
     { id: '2', professionalName: 'Carlos Silva (Enfermeiro)', patientName: 'Maria Mendonça', time: '14:00 - 18:00', location: 'Rua Augusta, 500', photoUrl: 'https://images.unsplash.com/photo-1537368910025-700350fe46c7?auto=format&fit=crop&q=80&w=120', aiStatus: 'warning' }
   ]);
 

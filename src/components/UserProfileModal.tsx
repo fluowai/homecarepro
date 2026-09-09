@@ -86,7 +86,7 @@ export function UserProfileModal({ onClose }: UserProfileModalProps) {
             <div className="flex flex-col items-center">
               <div className="relative group cursor-pointer">
                 <img 
-                  src={avatarUrl || "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=120"} 
+                  src={avatarUrl || "/default-avatar.svg"}
                   className="w-24 h-24 rounded-full border border-gray-200 object-cover" 
                   alt="Avatar"
                 />

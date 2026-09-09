@@ -133,6 +133,7 @@ export function createApp(options: CreateAppOptions) {
   const dns = dnsClient ?? dnsImpl;
 
   const SUPABASE_URL = process.env.VITE_SUPABASE_URL || "";
+  const SUPABASE_WS_URL = SUPABASE_URL.replace(/^https?:/i, "wss:");
   const APP_BASE_DOMAIN = appBaseDomain || process.env.APP_BASE_DOMAIN || "homecare.wootech.com.br";
 
   const RESERVED_SUBDOMAINS = new Set([
@@ -370,7 +371,7 @@ export function createApp(options: CreateAppOptions) {
         styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
         mediaSrc: ["'self'", "blob:"],
         imgSrc: ["'self'", "data:", "https:"],
-        connectSrc: ["'self'", SUPABASE_URL, "ws://localhost:*", "http://localhost:*"].filter(Boolean),
+        connectSrc: ["'self'", SUPABASE_URL, SUPABASE_WS_URL, "ws://localhost:*", "http://localhost:*"].filter(Boolean),
         fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
         objectSrc: ["'none'"],
         frameAncestors: ["'none'"],
@@ -958,6 +959,56 @@ Apenas o objeto JSON valido, sem formatacao Markdown adicional nem blocos de cod
     }
   });
 
+  // Each reseller/clinic administrator edits only its own company profile.
+  app.put("/api/tenant/company-profile", requireAuth, globalLimiter, async (req, res) => {
+    try {
+      const userId = (req as any).userId;
+      const profile = await getProfile(userId);
+      const role = String(profile?.role || '').trim().toLowerCase();
+      if (!profile || !["admin", "super_admin", "mega_admin"].includes(role)) {
+        return res.status(403).json({ error: "Acesso negado." });
+      }
+
+      const {
+        companyLegalName, companyTradeName, cnpj, companyEmail, companyPhone, companyWebsite,
+        companyAddress, companyAddressNumber, companyAddressComplement, companyNeighborhood,
+        companyCity, companyState, companyZipCode,
+      } = req.body || {};
+      if (companyEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(companyEmail))) {
+        return res.status(400).json({ error: "E-mail da empresa inválido." });
+      }
+      if (companyWebsite && !/^https?:\/\/[^\s]+$/i.test(String(companyWebsite))) {
+        return res.status(400).json({ error: "Site inválido. Informe uma URL iniciando com http:// ou https://." });
+      }
+      if (companyState && !/^[A-Za-z]{2}$/.test(String(companyState))) {
+        return res.status(400).json({ error: "UF inválida. Informe duas letras." });
+      }
+
+      const clean = (value: unknown) => typeof value === "string" ? value.trim() || null : null;
+      const { data, error } = await supabaseAdmin.from("tenants").update({
+        cnpj: clean(cnpj) || "",
+        company_legal_name: clean(companyLegalName),
+        company_trade_name: clean(companyTradeName),
+        company_email: clean(companyEmail),
+        company_phone: clean(companyPhone),
+        company_website: clean(companyWebsite),
+        company_address: clean(companyAddress),
+        company_address_number: clean(companyAddressNumber),
+        company_address_complement: clean(companyAddressComplement),
+        company_neighborhood: clean(companyNeighborhood),
+        company_city: clean(companyCity),
+        company_state: clean(companyState)?.toUpperCase() || null,
+        company_zip_code: clean(companyZipCode),
+      }).eq("id", profile.tenant_id).select("id").single();
+      if (error) throw error;
+      logEvent("INFO", "Tenant company profile updated", { tenantId: profile.tenant_id, byUserId: userId });
+      res.json({ success: true, tenantId: data.id });
+    } catch (error: any) {
+      logEvent("ERROR", "Tenant company profile update failed", { error: error.message });
+      res.status(500).json({ error: "Falha ao salvar dados da empresa." });
+    }
+  });
+
   app.get("/api/tenant/resolve", globalLimiter, async (req, res) => {
     try {
       const domain = req.query.domain as string;
@@ -1266,6 +1317,82 @@ Apenas o objeto JSON valido, sem formatacao Markdown adicional nem blocos de cod
       .single();
     return data as { role: string; tenant_id: string } | null;
   }
+
+  function normalizePhone(phone: string) {
+    const digits = String(phone || '').replace(/\D/g, '');
+    if (!digits) return '';
+    return digits.startsWith('55') ? `+${digits}` : `+55${digits}`;
+  }
+
+  // Provision a professional account without exposing service-role credentials to the browser.
+  app.post("/api/professionals/:id/access", requireAuth, globalLimiter, async (req, res) => {
+    try {
+      const requesterId = (req as any).userId;
+      const requester = await getProfile(requesterId);
+      if (!requester || !['mega_admin', 'super_admin', 'admin', 'operator'].includes(requester.role)) {
+        return res.status(403).json({ error: "Acesso negado." });
+      }
+
+      const professionalId = String((req.params as any).id || '');
+      const password = String(req.body?.password || '');
+      if (password.length < 6) {
+        return res.status(400).json({ error: "A senha do profissional deve ter pelo menos 6 caracteres." });
+      }
+
+      const { data: professional, error: professionalError } = await supabaseAdmin
+        .from('professionals')
+        .select('id, tenant_id, name, phone, user_id')
+        .eq('id', professionalId)
+        .single();
+      if (professionalError || !professional) return res.status(404).json({ error: "Profissional não encontrado." });
+      if (requester.role !== 'mega_admin' && professional.tenant_id !== requester.tenant_id) {
+        return res.status(403).json({ error: "Acesso negado ao profissional." });
+      }
+
+      const phone = normalizePhone(professional.phone);
+      if (!/^\+55\d{10,11}$/.test(phone)) {
+        return res.status(400).json({ error: "O profissional precisa ter um telefone brasileiro válido." });
+      }
+
+      let userId = professional.user_id as string | null;
+      if (userId) {
+        const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+          phone,
+          password,
+          phone_confirm: true,
+          user_metadata: { full_name: professional.name, tenant_id: professional.tenant_id, role: 'professional' },
+        });
+        if (error) throw error;
+      } else {
+        const { data: created, error } = await supabaseAdmin.auth.admin.createUser({
+          phone,
+          password,
+          phone_confirm: true,
+          user_metadata: { full_name: professional.name, tenant_id: professional.tenant_id, role: 'professional' },
+        });
+        if (error) {
+          if (String(error.message || '').toLowerCase().includes('already')) {
+            return res.status(409).json({ error: "Este telefone já está vinculado a outra conta." });
+          }
+          throw error;
+        }
+        userId = created.user?.id || null;
+      }
+
+      if (!userId) throw new Error('A conta profissional não foi criada.');
+      const { error: linkError } = await supabaseAdmin
+        .from('professionals')
+        .update({ user_id: userId })
+        .eq('id', professionalId);
+      if (linkError) throw linkError;
+
+      logEvent('INFO', 'Professional phone access provisioned', { professionalId, userId, tenantId: professional.tenant_id, byUserId: requesterId });
+      res.json({ success: true, userId, phone });
+    } catch (error: any) {
+      logEvent('ERROR', 'Professional access provisioning failed', { error: error.message });
+      res.status(500).json({ error: 'Falha ao criar o acesso do profissional.' });
+    }
+  });
 
   // Create a tenant (reseller for mega_admin, clinic for super_admin) and emit an invite link
   app.post("/api/admin/tenants", requireAuth, globalLimiter, async (req, res) => {

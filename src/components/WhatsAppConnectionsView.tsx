@@ -8,6 +8,7 @@ export function WhatsAppConnectionsView() {
   const [newInstanceName, setNewInstanceName] = useState('');
   const [showQRModal, setShowQRModal] = useState<string | null>(null);
   const [qrCodeData, setQrCodeData] = useState<string | null>(null);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     fetchInstances();
@@ -26,8 +27,13 @@ export function WhatsAppConnectionsView() {
 
   const handleCreate = async () => {
     if (!newInstanceName.trim()) return;
-    await createInstance(newInstanceName);
-    setNewInstanceName('');
+    setError('');
+    try {
+      await createInstance(newInstanceName);
+      setNewInstanceName('');
+    } catch (err: any) {
+      setError(err.message || 'Não foi possível criar a conexão WhatsApp.');
+    }
   };
 
   const handleShowQR = async (instanceName: string) => {
@@ -82,6 +88,7 @@ export function WhatsAppConnectionsView() {
             Conectar
           </button>
         </div>
+        {error && <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Mail, Lock, User, Building2, Eye, EyeOff, Loader2, Heart, ArrowRight, ArrowLeft } from 'lucide-react';
+import { Mail, Phone, Lock, User, Building2, Eye, EyeOff, Loader2, Heart, ArrowRight, ArrowLeft } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useHomeCareStore } from '../store';
+import { normalizeBrazilPhone } from '../lib/formatters';
 
 type AuthMode = 'login' | 'signup' | 'first_access_check' | 'first_access_submit';
 
@@ -11,6 +12,7 @@ export default function AuthView() {
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [tenantId, setTenantId] = useState('sp');
+  const [loginType, setLoginType] = useState<'manager' | 'professional'>('manager');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -81,16 +83,27 @@ export default function AuthView() {
         });
         if (authError) throw authError;
       } else {
-        const { error: authError } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-        if (authError) throw authError;
+        if (loginType === 'professional') {
+          const phone = normalizeBrazilPhone(email);
+          if (!/^\+55\d{10,11}$/.test(phone)) throw new Error('Informe um telefone celular válido com DDD.');
+          const { error: authError } = await supabase.auth.signInWithPassword({ phone, password });
+          if (authError) throw authError;
+          await init();
+          if (useHomeCareStore.getState().currentUserRole !== 'professional') {
+            await supabase.auth.signOut();
+            throw new Error('Este acesso por telefone é exclusivo para profissionais.');
+          }
+          window.location.href = '/';
+          return;
+        } else {
+          const { error: authError } = await supabase.auth.signInWithPassword({ email: email.trim().toLowerCase(), password });
+          if (authError) throw authError;
+        }
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Erro ao autenticar';
       if (message.includes('Invalid login credentials')) {
-        setError('Email ou senha incorretos.');
+        setError(loginType === 'professional' ? 'Telefone ou senha incorretos.' : 'E-mail ou senha incorretos.');
       } else if (message.includes('already registered')) {
         setError('Este email já está cadastrado.');
       } else if (message.includes('Password should be at least')) {
@@ -165,6 +178,13 @@ export default function AuthView() {
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
+              {mode === 'login' && (
+                <div className="grid grid-cols-2 gap-1 p-1 bg-slate-100 rounded-lg">
+                  <button type="button" onClick={() => { setLoginType('manager'); setEmail(''); setError(''); }} className={`py-2 rounded-md text-xs font-semibold transition ${loginType === 'manager' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'}`}>Gestor</button>
+                  <button type="button" onClick={() => { setLoginType('professional'); setEmail(''); setError(''); }} className={`py-2 rounded-md text-xs font-semibold transition ${loginType === 'professional' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'}`}>Profissional</button>
+                </div>
+              )}
+
               {mode === 'signup' && canSignup && (
                 <>
                   <div>
@@ -204,18 +224,18 @@ export default function AuthView() {
 
               {(mode === 'login' || mode === 'signup' || mode === 'first_access_check' || mode === 'first_access_submit') && (
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">E-mail</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">{mode === 'login' && loginType === 'professional' ? 'Telefone' : 'E-mail'}</label>
                   <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    {mode === 'login' && loginType === 'professional' ? <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" /> : <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />}
                     <input
-                      type="email"
+                      type={mode === 'login' && loginType === 'professional' ? 'tel' : 'email'}
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       required
                       disabled={mode === 'first_access_submit'}
-                      autoComplete="email"
+                      autoComplete={mode === 'login' && loginType === 'professional' ? 'tel' : 'email'}
                       className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-600 focus:border-transparent transition disabled:bg-slate-50 disabled:text-slate-500"
-                      placeholder="seu@email.com"
+                      placeholder={mode === 'login' && loginType === 'professional' ? '(11) 99999-9999' : 'seu@email.com'}
                     />
                   </div>
                 </div>

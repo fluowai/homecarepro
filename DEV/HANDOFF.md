@@ -1,5 +1,11 @@
 # Handoff
 
+## 2026-09-08 — WhatsMeow no lugar do provedor anterior
+- Criado `whatsmeow-service` em Go com uma sessão persistida por instância, QR Code, reconexão e envio de texto.
+- Rotas Node `/api/whatsapp/*` agora usam somente o serviço WhatsMeow; containers e variáveis do provedor anterior foram removidos.
+- O Docker CLI não estava disponível para validar `docker compose config`; o build Go e o typecheck local passaram.
+- Produção: configurar `WHATSMEOW_API_KEY` e `WHATSMEOW_WEBHOOK_KEY` no Portainer e fazer deploy da imagem gerada pelo GitHub Actions.
+
 ## 2026-09-08 — Próximo contexto: PWA, profissionais e relatórios
 - Implementado bloqueio de uso móvel fora do PWA instalado em `src/components/PWAInstallGate.tsx`.
 - Implementada edição completa de profissionais em `src/components/ProfessionalsView.tsx`.

@@ -46,7 +46,7 @@ O código-fonte atual (HEAD) passa em todos os gates de CI (typecheck, build, te
 1. **Git history purge** — a `SUPABASE_SERVICE_ROLE_KEY` e `VITE_SUPABASE_ANON_KEY` ainda estão em commits antigos de `docker-compose.prod.yml`. A chave deve ser rotacionada no painel Supabase e o histórico purgado com `git filter-repo`.
 2. **CSP nonce** — `unsafe-inline`/`unsafe-eval` precisam de nonce para o `window.__ENV__` injection.
 3. **localStorage clínico** — dados sensíveis persistidos sem criptografia (risco LGPD).
-4. **Features incompletas** — upload de arquivos, WhatsApp (Evolution API), GPS check-in ainda são simulados.
+4. **Features incompletas** — upload de arquivos, WhatsApp (WhatsMeow), GPS check-in ainda são simulados.
 5. **Testes de RLS** — 14 testes skipped (opt-in via `RUN_DB_TESTS=1 + SUPABASE_DB_URL`); E2E ausente.
 
 ---
@@ -110,7 +110,7 @@ src/components/GlobalUserManager.tsx(68,14): error TS2304: Cannot find name 'Use
 
 ### 10. Features incompletas
 - **Arquivos**: apenas metadados JSONB — não há upload real (sem Supabase Storage).
-- **WhatsApp CRM** (`CommunicationView`): respostas via `setTimeout` fixo — sem Evolution API.
+- **WhatsApp CRM** (`CommunicationView`): respostas via `setTimeout` fixo — integração ainda pendente no fluxo de atendimento.
 - **GPS check-in**: coordenadas randomizadas.
 - **IA**: fallback rule-based removido (503 honesto). ✅
 
@@ -201,7 +201,7 @@ Endpoints de export/delete existem (bom), mas:
 **🟡 Curto prazo (produto + engenharia)**
 11. Migrar cache clínico de `localStorage` → `sessionStorage` com expiração (LGPD).
 12. Implementar upload real (Supabase Storage + RLS bucket) ou ocultar feature.
-13. Evolution API para WhatsApp CRM ou marcar como "demo" (current).
+13. Completar o fluxo de atendimento WhatsApp sobre o serviço WhatsMeow.
 14. Migrations gate no CI (verificar `schema_migrations` antes do deploy).
 15. Testes RLS opt-in (`RUN_DB_TESTS=1` + `SUPABASE_DB_URL`) — validar em staging.
 16. E2E Playwright: login → dashboard → fluxo crítico.
