@@ -1,5 +1,14 @@
 # Verificação
 
+## Verificação 2026-09-09 — Cache de sessão por conta
+| Item | Resultado |
+|---|---|
+| RLS com usuário de clínica/revenda/Mega Admin | ✅ sem leitura cross-tenant; Mega Admin não aparece na árvore da revenda |
+| Limpeza de cache ao trocar/sair da conta | ✅ dados tenant-scoped removidos antes de renderizar a nova sessão |
+| `npm run typecheck` | ✅ passou |
+| `npm test` | ✅ 94 passed / 14 skipped |
+| `npm run build:frontend` | ✅ passou |
+
 ## Verificação 2026-09-09 — Isolamento de equipe e correção do usuário
 | Item | Resultado |
 |---|---|

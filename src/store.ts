@@ -679,6 +679,20 @@ const saveToStorage = <T,>(key: string, value: T) => {
   }
 };
 
+const TENANT_SCOPED_STORAGE_KEYS = [
+  'activeTenantId', 'tenants', 'patients', 'professionals', 'insurances',
+  'visits', 'leads', 'messages', 'medicines', 'surveys', 'surveyConfig',
+  'alertConfig', 'resolvedAlertIds', 'assemblies', 'assemblyVotes',
+  'contracts', 'invoices', 'emailTemplates',
+] as const;
+
+function clearTenantScopedCache() {
+  if (typeof window === 'undefined') return;
+  for (const key of TENANT_SCOPED_STORAGE_KEYS) {
+    sessionStorage.removeItem(`homecare_pro_${key}`);
+  }
+}
+
 const isDemoModeEnabled = () => {
   if (isSupabaseConfigured) return false;
   const windowEnv = (window as any).__ENV__;
@@ -741,7 +755,27 @@ function registerAuthListener() {
       return;
     }
     if (event === 'SIGNED_OUT' || !session) {
-      useHomeCareStore.setState({ user: null, profile: null, isAuthenticated: false });
+      clearTenantScopedCache();
+      useHomeCareStore.setState({
+        user: null,
+        profile: null,
+        isAuthenticated: false,
+        activeTenantId: '',
+        tenants: [],
+        patients: [],
+        professionals: [],
+        insurances: [],
+        visits: [],
+        leads: [],
+        messages: [],
+        medicines: [],
+        surveys: [],
+        assemblies: [],
+        assemblyVotes: [],
+        contracts: [],
+        invoices: [],
+        emailTemplates: [],
+      });
     }
   });
 }
@@ -889,6 +923,28 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
       if (profileError) throw profileError;
 
       const profileTenantId = profile.tenant_id;
+
+      // O cache da sessão anterior não pode aparecer enquanto a nova conta
+      // ainda carrega seus dados. O RLS protege o banco, mas não protege um
+      // estado antigo já renderizado no navegador.
+      clearTenantScopedCache();
+      set({
+        activeTenantId: profileTenantId,
+        tenants: [],
+        patients: [],
+        professionals: [],
+        insurances: [],
+        visits: [],
+        leads: [],
+        messages: [],
+        medicines: [],
+        surveys: [],
+        assemblies: [],
+        assemblyVotes: [],
+        contracts: [],
+        invoices: [],
+        emailTemplates: [],
+      });
 
       // Determine the active tenant: prioritize subdomain context over profile
       const currentHostname = typeof window !== 'undefined' ? window.location.hostname : '';
@@ -1065,7 +1121,27 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
     if (isSupabaseConfigured) {
       await supabase.auth.signOut();
     }
-    set({ user: null, profile: null, isAuthenticated: false });
+    clearTenantScopedCache();
+    set({
+      user: null,
+      profile: null,
+      isAuthenticated: false,
+      activeTenantId: '',
+      tenants: [],
+      patients: [],
+      professionals: [],
+      insurances: [],
+      visits: [],
+      leads: [],
+      messages: [],
+      medicines: [],
+      surveys: [],
+      assemblies: [],
+      assemblyVotes: [],
+      contracts: [],
+      invoices: [],
+      emailTemplates: [],
+    });
     window.location.href = '/login';
   },
 

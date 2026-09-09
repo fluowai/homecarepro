@@ -84,9 +84,10 @@
 # Handoff — 2026-09-09
 
 ## Última entrega
+- Corrigido cache compartilhado entre contas: a sessão nova não herda pacientes, clínicas, equipe ou tenant ativo do login anterior.
 - Corrigido o usuário `sccuidadores2023@gmail.com` para `SC SAUDE` no banco de produção.
 - Endurecido o isolamento da tela de equipe e das policies RLS, preservando somente acessos autorizados por tenant, vínculo secundário e árvore de revenda.
 - Migrations aplicadas e testes RLS reais aprovados.
 
 ## Próximo cuidado operacional
-- Após deploy do frontend, pedir logout/login ou limpar a sessão do navegador para descartar `activeTenantId` antigo em `localStorage`.
+- Após deploy do frontend, pedir logout/login ou atualizar a página; o código agora limpa automaticamente o cache antigo da sessão.

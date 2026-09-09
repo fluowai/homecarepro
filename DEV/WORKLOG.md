@@ -1,5 +1,10 @@
 # Worklog
 
+## 2026-09-09 — Correção de cache entre contas
+- O RLS foi validado com usuários reais: clínica, revenda e Mega Admin retornam somente os tenants autorizados.
+- Corrigido o store para limpar cache tenant-scoped ao iniciar nova sessão, sair ou perder a sessão; o tenant do perfil autenticado passa a ser a origem do tenant ativo.
+- Verificação: typecheck, testes (94 passed / 14 skipped) e build frontend aprovados.
+
 ## 2026-09-09 — Isolamento de usuários por clínica/revenda
 - Corrigido o vínculo de `sccuidadores2023@gmail.com`: saiu de `Cooperativa CoopSaúde Mais` e passou a pertencer somente à `SC SAUDE` em `user_profiles`, `user_tenants` e metadata de autenticação.
 - A tela de equipe passou a usar o `tenant_id` do perfil autenticado como raiz, evitando tenant ativo antigo do `localStorage`; super_admin mantém apenas a árvore autorizada.

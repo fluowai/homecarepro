@@ -24,7 +24,7 @@ export default function TenantUserManager() {
 
   useEffect(() => {
     fetchUsers();
-  }, [activeTenantId, currentUserRole]);
+  }, [activeTenantId, currentUserRole, profile?.tenant_id]);
 
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
