@@ -1016,6 +1016,14 @@ Apenas o objeto JSON valido, sem formatacao Markdown adicional nem blocos de cod
         return res.status(400).json({ error: "Domain is required" });
       }
 
+      // The base domain is a valid system context even when the optional
+      // `system` tenant row has not been seeded yet. Keep this fallback
+      // independent from the database so a fresh/partially migrated install
+      // does not fail during the very first page load.
+      const normalizedDomain = normalizeCustomDomain(domain);
+      const normalizedBaseDomain = normalizeCustomDomain(APP_BASE_DOMAIN);
+      const isBaseDomain = normalizedDomain === normalizedBaseDomain || normalizedDomain === `www.${normalizedBaseDomain}`;
+
       // Try to find tenant by custom_domain first
       let { data: tenant } = await supabaseAdmin
         .from("tenants")
@@ -1049,9 +1057,7 @@ Apenas o objeto JSON valido, sem formatacao Markdown adicional nem blocos de cod
       }
 
       if (!tenant) {
-        const normalizedDomain = normalizeCustomDomain(domain);
-        const normalizedBaseDomain = APP_BASE_DOMAIN.replace(/^https?:\/\//, '').replace(/\/$/, '').toLowerCase();
-        if (normalizedDomain === normalizedBaseDomain || normalizedDomain === `www.${normalizedBaseDomain}`) {
+        if (isBaseDomain) {
           return res.json({
             id: "system",
             name: "HomeCare Pro",

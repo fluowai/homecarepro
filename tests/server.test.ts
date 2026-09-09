@@ -191,11 +191,23 @@ describe("GET /api/tenant/resolve", () => {
     expect(res.status).toBe(403);
   });
 
-   it("retorna 404 quando nem custom nem system existem", async () => {
+  it("retorna 404 quando nem custom nem system existem", async () => {
      const { app } = makeApp({ tableResult: () => ({ data: null, error: null }) });
      const res = await request(app).get("/api/tenant/resolve").query({ domain: "ghost.com" });
      expect(res.status).toBe(404);
    });
+
+  it("resolve o domínio base sem exigir a linha system no banco", async () => {
+    const { app } = makeApp({
+      appBaseDomain: "homecare.wootech.com.br",
+      tableResult: () => ({ data: null, error: null }),
+    });
+    const res = await request(app)
+      .get("/api/tenant/resolve")
+      .query({ domain: "homecare.wootech.com.br" });
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ id: "system", name: "HomeCare Pro", status: "active" });
+  });
 
   it("resolve tenant por subdomain", async () => {
     const { app } = makeApp({
