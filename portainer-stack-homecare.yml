@@ -15,12 +15,8 @@ services:
       - ASAAS_API_KEY=${ASAAS_API_KEY}
       - ASAAS_WEBHOOK_TOKEN=${ASAAS_WEBHOOK_TOKEN}
       - RESEND_API_KEY=${RESEND_API_KEY}
-      - WHATSMEOW_URL=http://whatsmeow:8080
-      - WHATSMEOW_API_KEY=${WHATSMEOW_API_KEY}
-      - WHATSMEOW_WEBHOOK_KEY=${WHATSMEOW_WEBHOOK_KEY}
     networks:
       - wootech1
-      - homecarepro_internal
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=wootech1"
@@ -41,37 +37,6 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  whatsmeow:
-    image: ghcr.io/fluowai/homecarepro-whatsmeow:latest
-    restart: unless-stopped
-    environment:
-      - PORT=8080
-      - WHATSMEOW_API_KEY=${WHATSMEOW_API_KEY}
-      - WHATSMEOW_WEBHOOK_URL=http://homecarepro-web:3000/api/whatsapp/webhook
-      - WHATSMEOW_WEBHOOK_KEY=${WHATSMEOW_WEBHOOK_KEY}
-    volumes:
-      - whatsmeow_data:/data
-    networks:
-      - homecarepro_internal
-    deploy:
-      mode: replicated
-      replicas: 1
-      restart_policy:
-        condition: on-failure
-      resources:
-        limits:
-          cpus: "1.00"
-          memory: 1G
-        reservations:
-          cpus: "0.10"
-          memory: 256M
-
 networks:
   wootech1:
     external: true
-  homecarepro_internal:
-    driver: overlay
-    attachable: true
-
-volumes:
-  whatsmeow_data:

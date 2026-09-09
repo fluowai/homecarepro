@@ -28,9 +28,6 @@ services:
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - ASAAS_API_KEY=${ASAAS_API_KEY}
       - ASAAS_WEBHOOK_TOKEN=${ASAAS_WEBHOOK_TOKEN}
-      - WHATSMEOW_URL=${WHATSMEOW_URL:-http://whatsmeow:8080}
-      - WHATSMEOW_API_KEY=${WHATSMEOW_API_KEY:-local-whatsmeow-secret}
-      - WHATSMEOW_WEBHOOK_KEY=${WHATSMEOW_WEBHOOK_KEY:-local-webhook-secret}
     networks:
       - homecarepro-network
     healthcheck:
@@ -45,29 +42,7 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  whatsmeow:
-    build:
-      context: ./whatsmeow-service
-      dockerfile: Dockerfile
-    image: homecarepro/whatsmeow:latest
-    container_name: whatsmeow
-    restart: unless-stopped
-    ports:
-      - "8080:8080"
-    environment:
-      - PORT=8080
-      - WHATSMEOW_API_KEY=${WHATSMEOW_API_KEY:-local-whatsmeow-secret}
-      - WHATSMEOW_WEBHOOK_URL=http://homecarepro-web:3000/api/whatsapp/webhook
-      - WHATSMEOW_WEBHOOK_KEY=${WHATSMEOW_WEBHOOK_KEY:-local-webhook-secret}
-    volumes:
-      - whatsmeow_data:/data
-    networks:
-      - homecarepro-network
-
 networks:
   homecarepro-network:
     name: homecarepro-network
     driver: bridge
-
-volumes:
-  whatsmeow_data:
