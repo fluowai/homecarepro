@@ -1,5 +1,11 @@
 # Handoff
 
+## 2026-09-09 — Responsáveis do paciente e editor
+- `PatientsView` agora permite cadastrar, editar, adicionar e remover responsáveis com nome e telefone.
+- `Patient`/store persistem `responsibles` como JSONB em `patients`.
+- Migration `20260909000000_add_patient_responsibles.sql` aplicada pelo `run-sql.js`.
+- O modal foi movido para fora do ramo condicional da lista; Editar abre diretamente na tela de detalhes.
+
 ## 2026-09-08 — WhatsMeow no lugar do provedor anterior
 - Criado `whatsmeow-service` em Go com uma sessão persistida por instância, QR Code, reconexão e envio de texto.
 - Rotas Node `/api/whatsapp/*` agora usam somente o serviço WhatsMeow; containers e variáveis do provedor anterior foram removidos.

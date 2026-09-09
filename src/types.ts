@@ -51,6 +51,11 @@ export interface PatientFamilyLink {
   patient?: Patient;
 }
 
+export interface PatientResponsible {
+  name: string;
+  phone: string;
+}
+
 export interface UserTenant {
   userId: string;
   tenantId: string;
@@ -102,6 +107,7 @@ export interface Patient {
   gender?: 'M' | 'F' | 'O';
   phone: string;
   email: string;
+  responsibles: PatientResponsible[];
   status: PatientStatus;
   planType: string;
   insuranceId?: string;
