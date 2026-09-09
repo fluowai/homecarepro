@@ -149,25 +149,33 @@ export async function checkPushPermission(): Promise<NotificationPermission> {
 // ── Install Prompt Handler (PWA) ───────────────────────────────────────
 
 let deferredPrompt: BeforeInstallPromptEvent | null = null;
+const installPromptListeners = new Set<() => void>();
 
 interface BeforeInstallPromptEvent extends Event {
   prompt(): Promise<void>;
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
 }
 
+// Register at module load time. The browser can emit this one-shot event
+// before React effects are mounted; missing it makes the install button inert.
+if (typeof window !== 'undefined') {
+  window.addEventListener('beforeinstallprompt', (event: Event) => {
+    event.preventDefault();
+    deferredPrompt = event as BeforeInstallPromptEvent;
+    installPromptListeners.forEach((listener) => listener());
+  }, { once: true });
+}
+
 export function setupInstallPrompt(onAvailable?: () => void) {
   if (typeof window === 'undefined') return () => {};
 
-  const handler = (e: Event) => {
-    e.preventDefault();
-    deferredPrompt = e as BeforeInstallPromptEvent;
-    onAvailable?.();
-  };
-
-  window.addEventListener('beforeinstallprompt', handler as EventListener);
+  if (onAvailable) {
+    installPromptListeners.add(onAvailable);
+    if (deferredPrompt) onAvailable();
+  }
 
   return () => {
-    window.removeEventListener('beforeinstallprompt', handler as EventListener);
+    if (onAvailable) installPromptListeners.delete(onAvailable);
   };
 }
 
