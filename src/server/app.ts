@@ -1049,6 +1049,20 @@ Apenas o objeto JSON valido, sem formatacao Markdown adicional nem blocos de cod
       }
 
       if (!tenant) {
+        const normalizedDomain = normalizeCustomDomain(domain);
+        const normalizedBaseDomain = APP_BASE_DOMAIN.replace(/^https?:\/\//, '').replace(/\/$/, '').toLowerCase();
+        if (normalizedDomain === normalizedBaseDomain || normalizedDomain === `www.${normalizedBaseDomain}`) {
+          return res.json({
+            id: "system",
+            name: "HomeCare Pro",
+            logo: null,
+            primary_color: "#16a34a",
+            secondary_color: "#4f46e5",
+            status: "active",
+            custom_domain: null,
+            subdomain: null,
+          });
+        }
         return res.status(404).json({ error: "Tenant not found" });
       }
 
