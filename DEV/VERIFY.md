@@ -1,5 +1,17 @@
 # Verificação
 
+## Verificação 2026-09-10 — Contratos, valores fixos e escala automática
+| Item | Resultado |
+|---|---|
+| Cadastro de serviços no contrato | ✅ campos de recorrência, horário, valores e profissional vinculável |
+| Valor do plantão | ✅ valor fixo do profissional congelado no plantão; sem comissão |
+| Geração automática | ✅ próximos 30 dias, respeitando dias/horários/vigência |
+| Idempotência | ✅ não duplica plantões do mesmo serviço/data |
+| Persistência | ✅ migration expand-only criada; aplicação no Supabase pendente |
+| `npm run typecheck` | ✅ passou |
+| `npm run build` | ✅ passou |
+| `npm test` | ⚠️ iniciado, mas não concluiu nesta execução |
+
 ## Verificação 2026-09-09 — Cache de sessão por conta
 | Item | Resultado |
 |---|---|

@@ -1,4 +1,30 @@
-# Spec Ativa — Super Admin por árvore + Whitelabel de e-mail (2026-09-06)
+# Spec Ativa — Contratos com serviços e escala automática (2026-09-10)
+
+## Objetivo
+Permitir que a clínica cadastre serviços dentro de contratos, defina o valor fixo do plantão do profissional e gere automaticamente os próximos 30 dias de escala ao vincular o profissional.
+
+## Decisões
+- O valor do profissional é fixo por serviço/plantão; não há cálculo por comissão.
+- O plantão grava os valores no momento da geração para preservar o histórico.
+- A geração considera dias da semana, horário e vigência do contrato.
+- A geração é idempotente e não duplica plantões existentes.
+- A migration é expand-only; os contratos e plantões legados continuam válidos.
+
+## Escopo implementado
+1. `ContractService` com serviço, especialidade, dias da semana, horário, valor da clínica, valor do profissional e vínculo do profissional.
+2. Contrato com descrição operacional da escala e serviços persistidos em JSONB.
+3. Plantões com contrato/serviço de origem, valor da clínica e indicação de geração automática.
+4. Tela de contratos com cadastro de serviços e geração automática de 30 dias.
+5. Migration `20260910000000_contract_services_and_auto_schedule.sql`.
+
+## Pós-deploy
+- Aplicar a migration no Supabase antes de usar o novo formulário em produção.
+- Validar no browser a criação de contrato, vínculo do profissional e escala gerada.
+- Confirmar regras específicas de feriados, trocas e renovação futura de períodos.
+
+---
+
+# Spec anterior — Super Admin por árvore + Whitelabel de e-mail (2026-09-06)
 
 ## Objetivo
 Corrigir o vazamento RLS introduzido pela migration `20260905000000_superadmin_and_email.sql` (todo super_admin via dados de saúde/e-mails de todas as revendas) e implementar: Super Admin vê e-mails da própria árvore (revenda → clínicas → equipes) e remetente de e-mail por marca da revenda (Resend).

@@ -1,5 +1,11 @@
 # Worklog
 
+## 2026-09-10 — Contratos com serviços e escala automática
+- Contratos passaram a aceitar descrição operacional e serviços recorrentes com dias, horários, especialidade, profissional vinculado, valor da clínica e valor fixo do profissional.
+- Ao salvar um serviço com profissional vinculado, o store gera os próximos 30 dias de plantões, preservando o valor histórico e evitando duplicidades.
+- Migration expand-only criada: `20260910000000_contract_services_and_auto_schedule.sql`.
+- Verificação: `npm run typecheck` e `npm run build` passaram. A suíte Vitest foi iniciada, mas não concluiu no ambiente desta execução; aplicação da migration no Supabase e validação browser permanecem pendentes.
+
 ## 2026-09-09 — Correção de cache entre contas
 - O RLS foi validado com usuários reais: clínica, revenda e Mega Admin retornam somente os tenants autorizados.
 - Corrigido o store para limpar cache tenant-scoped ao iniciar nova sessão, sair ou perder a sessão; o tenant do perfil autenticado passa a ser a origem do tenant ativo.

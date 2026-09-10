@@ -1,5 +1,12 @@
 # Handoff
 
+## 2026-09-10 — Contratos com serviços e escala automática
+- A tela de contratos agora permite cadastrar serviços recorrentes e vincular um profissional.
+- O valor fixo do profissional é salvo por plantão; o valor da clínica fica separado para faturamento.
+- A geração automática cria os próximos 30 dias e evita duplicidades.
+- Antes do uso em produção, aplicar `supabase/migrations/20260910000000_contract_services_and_auto_schedule.sql` e validar no browser.
+- Regras ainda abertas: feriados, troca de profissional, renovação automática após 30 dias e política para editar serviços com plantões já concluídos.
+
 ## 2026-09-09 — Responsáveis do paciente e editor
 - `PatientsView` agora permite cadastrar, editar, adicionar e remover responsáveis com nome e telefone.
 - `Patient`/store persistem `responsibles` como JSONB em `patients`.

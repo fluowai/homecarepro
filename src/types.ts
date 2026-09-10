@@ -204,6 +204,10 @@ export interface Visit {
   value: number;
   baseValue?: number;
   isCoverageRequested?: boolean;
+  contractId?: string;
+  contractServiceId?: string;
+  billingValue?: number;
+  generatedFromContract?: boolean;
 }
 
 export interface CRMLead {
@@ -375,8 +379,26 @@ export interface Contract {
   startDate?: string;
   endDate?: string;
   value?: number;
+  scheduleDescription?: string;
+  services?: ContractService[];
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ContractService {
+  id: string;
+  name: string;
+  description?: string;
+  specialty: ProfessionalSpecialty;
+  daysOfWeek: number[];
+  timeStart: string;
+  timeEnd: string;
+  billingValue: number;
+  professionalValue: number;
+  professionalId?: string;
+  startDate?: string;
+  endDate?: string;
+  active: boolean;
 }
 
 export interface Invoice {
