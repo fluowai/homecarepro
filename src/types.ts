@@ -108,6 +108,38 @@ export interface AttendedPatient {
   shiftValue: number;
 }
 
+
+export interface Anamnesis {
+  conditions: {
+    parkinson?: boolean;
+    hypertension?: boolean;
+    diabetes?: boolean;
+    alzheimer?: boolean;
+    osteoporosis?: boolean;
+    cancer?: boolean;
+    fractured?: boolean;
+  };
+  mobility: {
+    needsHelp?: boolean;
+    usesObjects?: string[];
+  };
+  careNeeds: {
+    bathHelp?: boolean;
+    bathLocation?: string;
+    diaper?: boolean;
+    constipation?: boolean;
+  };
+  history: {
+    falls?: boolean;
+    recentFalls?: string;
+  };
+  nursingDiagnostics?: string[];
+  expectedResults?: string[];
+  nursingInterventions?: string[];
+  medicalHistory?: string;
+  physicalExam?: string;
+}
+
 export interface Patient {
   id: string;
   tenantId: string;
@@ -146,6 +178,7 @@ export interface Patient {
     state: string;
     zipCode: string;
   };
+  anamnesis?: Anamnesis;
   summaryAi?: string;
 }
 

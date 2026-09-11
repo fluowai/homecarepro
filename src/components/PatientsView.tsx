@@ -4,7 +4,8 @@ import {
   Search, 
   ChevronRight, 
   FileText, 
-  Clock, 
+  Clock,
+  Calendar as CalendarIcon, 
   MapPin, 
   Activity, 
   HeartHandshake, 
@@ -15,6 +16,7 @@ import {
   AlertTriangle,
   FileCheck2,
   Trash2,
+  CalendarDays,
   ArrowLeft,
   Users,
   Pill,
@@ -34,7 +36,7 @@ interface PatientsViewProps {
   searchQuery: string;
 }
 
-type TabType = 'info' | 'clinical' | 'inventory' | 'files' | 'timeline' | 'ai';
+type TabType = 'info' | 'anamnesis' | 'clinical' | 'inventory' | 'files' | 'timeline' | 'schedules' | 'ai';
 
 export default function PatientsView({ searchQuery }: PatientsViewProps) {
   const { 
@@ -47,13 +49,26 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
     addTimelineEvent,
     generateAiSummary,
     insurances,
-    currentUserRole
+    currentUserRole,
+    professionals,
+    visits,
+    addVisit,
+    deleteVisit
   } = useHomeCareStore();
 
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>('info');
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingPatientId, setEditingPatientId] = useState<string | null>(null);
+
+  // Schedule Generator states
+  const [scheduleMonth, setScheduleMonth] = useState(new Date().toISOString().slice(0, 7)); // YYYY-MM
+  const [scheduleProfId, setScheduleProfId] = useState('');
+  const [scheduleDays, setScheduleDays] = useState<number[]>([]);
+  const [scheduleTimeStart, setScheduleTimeStart] = useState('08:00');
+  const [scheduleTimeEnd, setScheduleTimeEnd] = useState('20:00');
+  const [scheduleValue, setScheduleValue] = useState(150);
+
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
 
   // AI loading and output
@@ -85,6 +100,19 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
   const [zipCode, setZipCode] = useState('');
   const [responsibles, setResponsibles] = useState<PatientResponsible[]>([{ name: '', phone: '' }]);
 
+  // Anamnesis state
+  const [anamnesis, setAnamnesis] = useState<any>({
+    conditions: {},
+    mobility: {},
+    careNeeds: {},
+    history: {},
+    nursingDiagnostics: [],
+    expectedResults: [],
+    nursingInterventions: [],
+    medicalHistory: '',
+    physicalExam: ''
+  });
+
   // Manual event adding
   const [eventTitle, setEventTitle] = useState('');
   const [eventType, setEventType] = useState<'clinical' | 'visit' | 'system' | 'billing'>('clinical');
@@ -95,6 +123,50 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+
+  const handleGenerateSchedules = () => {
+    if (!scheduleProfId || scheduleDays.length === 0) {
+      toast.error('Selecione o profissional e os dias da semana.');
+      return;
+    }
+    
+    const [year, month] = scheduleMonth.split('-').map(Number);
+    const date = new Date(year, month - 1, 1);
+    const lastDay = new Date(year, month, 0).getDate();
+    let count = 0;
+
+    for (let day = 1; day <= lastDay; day++) {
+      const currentDate = new Date(year, month - 1, day);
+      if (scheduleDays.includes(currentDate.getDay())) {
+        const visitDateStr = currentDate.toISOString().split('T')[0];
+        addVisit({
+          tenantId: activeTenantId,
+          patientId: editingPatientId!,
+          professionalId: scheduleProfId,
+          date: visitDateStr,
+          timeStart: scheduleTimeStart,
+          timeEnd: scheduleTimeEnd,
+          status: 'agendada',
+          value: scheduleValue
+        });
+        count++;
+      }
+    }
+    
+    toast.success(`${count} plantões gerados com sucesso para ${scheduleMonth}!`);
+    setScheduleDays([]);
+    setScheduleProfId('');
+  };
+
+  const patientVisits = visits.filter(v => v.patientId === editingPatientId).sort((a, b) => a.date.localeCompare(b.date));
+  const tenantProfessionals = professionals.filter(p => p.tenantId === activeTenantId);
+
+  const handleDeleteVisit = (visitId: string) => {
+    if (confirm('Tem certeza que deseja cancelar este plantão?')) {
+      deleteVisit(visitId);
+      toast.success('Plantão cancelado.');
+    }
+  };
 
   const isManager = ['mega_admin', 'super_admin', 'admin', 'operator'].includes(currentUserRole);
 
@@ -135,6 +207,17 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
     setState('SP');
     setZipCode('');
     setResponsibles([{ name: '', phone: '' }]);
+    setAnamnesis({
+      conditions: {},
+      mobility: {},
+      careNeeds: {},
+      history: {},
+      nursingDiagnostics: [],
+      expectedResults: [],
+      nursingInterventions: [],
+      medicalHistory: '',
+      physicalExam: ''
+    });
   };
 
   const openPatientEditor = (patient: Patient) => {
@@ -162,6 +245,17 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
     setState(patient.address.state);
     setZipCode(patient.address.zipCode);
     setResponsibles(patient.responsibles?.length ? patient.responsibles : [{ name: '', phone: '' }]);
+    setAnamnesis(patient.anamnesis || {
+      conditions: {},
+      mobility: {},
+      careNeeds: {},
+      history: {},
+      nursingDiagnostics: [],
+      expectedResults: [],
+      nursingInterventions: [],
+      medicalHistory: '',
+      physicalExam: ''
+    });
     setActiveTab('info');
     setShowAddModal(true);
   };
