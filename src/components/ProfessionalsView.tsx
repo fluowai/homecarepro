@@ -42,7 +42,9 @@ export default function ProfessionalsView() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'busy' | 'offline'>('all');
 
   // Form states
-  const [modalTab, setModalTab] = useState<'personal' | 'professional' | 'address' | 'docs'>('personal');
+  const [modalTab, setModalTab] = useState<'personal' | 'professional' | 'address' | 'docs' | 'patients'>('personal');
+  const [attendedPatients, setAttendedPatients] = useState<{patientId: string, shiftValue: number}[]>([]);
+  const { patients } = useHomeCareStore();
   const [name, setName] = useState('');
   const [cpf, setCpf] = useState('');
   const [gender, setGender] = useState<'M' | 'F' | 'O'>('F');
@@ -75,7 +77,7 @@ export default function ProfessionalsView() {
   const resetForm = () => {
     setName(''); setCpf(''); setGender('F'); setSpecialty('Enfermeiro'); setRegistration('');
     setEmail(''); setPhone(''); setStreet(''); setNumber(''); setCity(''); setState('SP'); setZipCode('');
-    setDocsUploaded([]); setDocsFiles({}); setCredentialNotice(''); setAccessPassword(''); setModalTab('personal');
+    setDocsUploaded([]); setDocsFiles({}); setCredentialNotice(''); setAccessPassword(''); setModalTab('personal'); setAttendedPatients([]);
   };
 
   const openEditor = (professional: typeof professionals[number]) => {
@@ -88,6 +90,7 @@ export default function ProfessionalsView() {
     setDocsUploaded(professional.documents.map(d => d.name));
     setDocsFiles(Object.fromEntries(professional.documents.map(d => [d.name, d.url])));
     setCredentialNotice('');
+    setAttendedPatients(professional.attendedPatients || []);
     setModalTab('personal'); setShowAddModal(true);
   };
 
@@ -133,6 +136,7 @@ export default function ProfessionalsView() {
         : 'https://images.unsplash.com/photo-1594824813573-246434de83fb?auto=format&fit=crop&q=80&w=120',
       rating: professionals.find(p => p.id === editingProfessionalId)?.rating ?? 5.0,
       address: { street, number, city, state, zipCode },
+      attendedPatients,
       documents: docsUploaded.map(d => ({ type: 'document', name: d, url: docsFiles[d] || '' }))
     };
     const savedProfessional = editingProfessionalId
@@ -387,6 +391,7 @@ export default function ProfessionalsView() {
                 { id: 'professional', label: 'Profissional', icon: Award },
                 { id: 'address', label: 'Endereço', icon: MapPin },
                 { id: 'docs', label: 'Documentos', icon: FileText },
+                { id: 'patients', label: 'Pacientes', icon: Users },
               ].map(tab => {
                 const Icon = tab.icon;
                 return (

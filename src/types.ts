@@ -98,6 +98,16 @@ export interface TimelineEvent {
   };
 }
 
+export interface PadItem {
+  specialty: string;
+  quantity: number;
+}
+
+export interface AttendedPatient {
+  patientId: string;
+  shiftValue: number;
+}
+
 export interface Patient {
   id: string;
   tenantId: string;
@@ -113,6 +123,9 @@ export interface Patient {
   insuranceId?: string;
   monthlyPackageValue?: number;
   padScope?: string;
+  padItems?: PadItem[];
+  dailyPackageValue?: number;
+  dailyPackageShifts?: number;
   contractDuration?: string;
   avatar: string;
   diagnostic: string;
@@ -181,6 +194,7 @@ export interface Professional {
   score?: number;
   tier?: 'Bronze' | 'Prata' | 'Ouro' | 'Diamante';
   balance?: number;
+  attendedPatients?: AttendedPatient[];
 }
 
 export interface Visit {

@@ -29,6 +29,21 @@ export default function AuthView() {
 
   const canSignup = isDemoMode();
 
+  const handleGoogleLogin = async () => {
+    setError('');
+    setLoading(true);
+    try {
+      const { error: authError } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo: window.location.origin },
+      });
+      if (authError) throw authError;
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Não foi possível iniciar o login com Google.');
+      setLoading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -124,213 +139,128 @@ export default function AuthView() {
   const isFirstAccess = mode === 'first_access_check' || mode === 'first_access_submit';
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-indigo-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        {/* Logo */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-green-600 rounded-2xl mb-4 shadow-lg shadow-green-600/20">
-            <Heart className="w-8 h-8 text-white" />
-          </div>
-          <h1 className="text-2xl font-bold text-slate-900">HomeCare Pro</h1>
-          <p className="text-slate-500 mt-1">Gestão de Atendimento Domiciliar</p>
+    <main className="auth-screen">
+      <section className="auth-visual" aria-label="Woodesk Home Care">
+        <div className="auth-visual-wash" />
+      </section>
+
+      <section className="auth-content">
+        <div className="auth-language" aria-label="Idioma atual">
+          <span aria-hidden="true">🇧🇷</span>
+          <span>PT-BR</span>
+          <span className="auth-language-chevron">⌄</span>
         </div>
 
-        {/* Card */}
-        <div className="bg-white rounded-2xl shadow-xl shadow-slate-200/50 border border-slate-100 p-8 relative overflow-hidden">
-          {isFirstAccess && (
-            <button
-              onClick={() => { setMode('login'); setError(''); }}
-              className="absolute top-6 left-6 text-slate-400 hover:text-slate-600"
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </button>
-          )}
-
-          <h2 className={`text-xl font-semibold text-slate-900 mb-1 ${isFirstAccess ? 'text-center mt-2' : ''}`}>
-            {mode === 'login' && 'Entrar na plataforma'}
-            {mode === 'signup' && 'Criar conta'}
-            {isFirstAccess && 'Primeiro Acesso'}
-          </h2>
-          <p className={`text-sm text-slate-500 mb-6 ${isFirstAccess ? 'text-center' : ''}`}>
-            {mode === 'login' && 'Acesse o painel de gestão domiciliar'}
-            {mode === 'signup' && 'Cadastre-se para começar a usar'}
-            {mode === 'first_access_check' && 'Informe o seu e-mail para validar o seu convite.'}
-            {mode === 'first_access_submit' && 'Crie sua senha para ativar sua conta.'}
-          </p>
-
-          {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
-              {error}
+        <div className="auth-card-wrap">
+          <div className="auth-card">
+            <div className="auth-logo" aria-label="Woodesk Home Care">
+              <span className="auth-logo-mark" aria-hidden="true" />
+              <strong>Woodesk</strong>
+              <span>Home Care</span>
             </div>
-          )}
 
-          {!canSignup && mode === 'signup' ? (
-            <div className="text-center py-8">
-              <p className="text-sm text-slate-500 mb-4">
-                O cadastro direto está desativado. Contas são criadas por convite.
-              </p>
+            {isFirstAccess && (
               <button
-                onClick={() => setMode('login')}
-                className="text-sm text-green-600 hover:text-green-700 font-medium"
+                type="button"
+                onClick={() => { setMode('login'); setError(''); }}
+                className="auth-back"
+                aria-label="Voltar para o login"
               >
-                Ir para login
+                <ArrowLeft className="h-5 w-5" />
               </button>
+            )}
+
+            <div className="auth-heading">
+              <h1>{mode === 'login' ? 'Olá!' : mode === 'signup' ? 'Criar conta' : 'Primeiro acesso'}</h1>
+              <p>
+                {mode === 'login' && 'Faça seu login para continuar'}
+                {mode === 'signup' && 'Cadastre-se para começar'}
+                {mode === 'first_access_check' && 'Informe o seu e-mail para validar o convite'}
+                {mode === 'first_access_submit' && 'Crie sua senha para ativar sua conta'}
+              </p>
             </div>
-          ) : (
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {mode === 'login' && (
-                <div className="grid grid-cols-2 gap-1 p-1 bg-slate-100 rounded-lg">
-                  <button type="button" onClick={() => { setLoginType('manager'); setEmail(''); setError(''); }} className={`py-2 rounded-md text-xs font-semibold transition ${loginType === 'manager' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'}`}>Gestor</button>
-                  <button type="button" onClick={() => { setLoginType('professional'); setEmail(''); setError(''); }} className={`py-2 rounded-md text-xs font-semibold transition ${loginType === 'professional' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'}`}>Profissional</button>
-                </div>
-              )}
 
-              {mode === 'signup' && canSignup && (
-                <>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Nome completo</label>
-                    <div className="relative">
-                      <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                      <input
-                        type="text"
-                        value={fullName}
-                        onChange={(e) => setFullName(e.target.value)}
-                        required
-                        className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-600 focus:border-transparent transition"
-                        placeholder="Seu nome"
-                      />
-                    </div>
-                  </div>
+            {error && <div className="auth-error" role="alert">{error}</div>}
 
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Unidade / Filial</label>
-                    <div className="relative">
-                      <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                      <select
-                        value={tenantId}
-                        onChange={(e) => setTenantId(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-600 focus:border-transparent transition appearance-none bg-white"
-                      >
-                        {tenants.map((t) => (
-                          <option key={t.id} value={t.id}>
-                            {t.logo} {t.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                </>
-              )}
-
-              {(mode === 'login' || mode === 'signup' || mode === 'first_access_check' || mode === 'first_access_submit') && (
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">{mode === 'login' && loginType === 'professional' ? 'Telefone' : 'E-mail'}</label>
-                  <div className="relative">
-                    {mode === 'login' && loginType === 'professional' ? <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" /> : <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />}
-                    <input
-                      type={mode === 'login' && loginType === 'professional' ? 'tel' : 'email'}
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                      disabled={mode === 'first_access_submit'}
-                      autoComplete={mode === 'login' && loginType === 'professional' ? 'tel' : 'email'}
-                      className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-600 focus:border-transparent transition disabled:bg-slate-50 disabled:text-slate-500"
-                      placeholder={mode === 'login' && loginType === 'professional' ? '(11) 99999-9999' : 'seu@email.com'}
-                    />
-                  </div>
-                </div>
-              )}
-
-              {mode === 'first_access_submit' && (
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Nome Completo</label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                    <input
-                      type="text"
-                      value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
-                      required
-                      className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-600 focus:border-transparent transition"
-                      placeholder="Ex: João Silva"
-                    />
-                  </div>
-                </div>
-              )}
-
-              {(mode === 'login' || mode === 'signup' || mode === 'first_access_submit') && (
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Senha</label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                    <input
-                      type={showPassword ? 'text' : 'password'}
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                      minLength={6}
-                      autoComplete="current-password"
-                      className="w-full pl-10 pr-10 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-600 focus:border-transparent transition"
-                      placeholder={mode === 'login' ? '••••••••' : 'Mínimo 6 caracteres'}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition"
-                    >
-                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            {!canSignup && mode === 'signup' ? (
+              <div className="auth-empty-state">
+                <p>O cadastro direto está desativado. Contas são criadas por convite.</p>
+                <button type="button" onClick={() => setMode('login')}>Ir para login</button>
+              </div>
+            ) : (
+              <form onSubmit={handleSubmit} className="auth-form">
+                {mode === 'login' && (
+                  <div className="auth-role-switch" role="tablist" aria-label="Tipo de acesso">
+                    <button type="button" role="tab" aria-selected={loginType === 'manager'} onClick={() => { setLoginType('manager'); setEmail(''); setError(''); }} className={loginType === 'manager' ? 'is-active' : ''}>
+                      <Building2 className="h-5 w-5" /> Gestor
+                    </button>
+                    <button type="button" role="tab" aria-selected={loginType === 'professional'} onClick={() => { setLoginType('professional'); setEmail(''); setError(''); }} className={loginType === 'professional' ? 'is-active' : ''}>
+                      <User className="h-5 w-5" /> Profissional
                     </button>
                   </div>
-                </div>
-              )}
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full py-2.5 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white font-medium rounded-lg text-sm transition flex items-center justify-center gap-2 shadow-sm"
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Aguarde...
-                  </>
-                ) : mode === 'first_access_check' ? (
-                  <>Continuar <ArrowRight className="w-4 h-4" /></>
-                ) : mode === 'first_access_submit' ? (
-                  'Ativar Conta e Entrar'
-                ) : mode === 'login' ? (
-                  'Entrar'
-                ) : (
-                  'Criar conta'
                 )}
-              </button>
-            </form>
-          )}
 
-          {mode === 'login' && (
-            <div className="mt-4 text-center">
-              <button
-                onClick={() => { setMode('first_access_check'); setError(''); setPassword(''); }}
-                className="text-sm text-indigo-600 hover:text-indigo-700 font-medium transition flex items-center justify-center gap-1 mx-auto"
-              >
-                Primeiro Acesso? Crie sua senha
-              </button>
-            </div>
-          )}
+                {mode === 'signup' && canSignup && (
+                  <>
+                    <label className="auth-field">
+                      <span>Nome completo</span>
+                      <span className="auth-input-wrap"><User /><input type="text" value={fullName} onChange={(e) => setFullName(e.target.value)} required placeholder="Seu nome" /></span>
+                    </label>
+                    <label className="auth-field">
+                      <span>Unidade / Filial</span>
+                      <span className="auth-input-wrap"><Building2 /><select value={tenantId} onChange={(e) => setTenantId(e.target.value)}>{tenants.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</select></span>
+                    </label>
+                  </>
+                )}
 
-          {canSignup && !isFirstAccess && (
-            <div className="mt-6 text-center">
-              <button onClick={toggleMode} className="text-sm text-green-600 hover:text-green-700 font-medium transition">
-                {mode === 'login' ? 'Não tem conta? Cadastre-se' : 'Já tem conta? Entrar'}
-              </button>
-            </div>
-          )}
+                {(mode === 'login' || mode === 'signup' || isFirstAccess) && (
+                  <label className="auth-field">
+                    <span>{mode === 'login' && loginType === 'professional' ? 'Telefone' : 'E-mail'}</span>
+                    <span className="auth-input-wrap">{mode === 'login' && loginType === 'professional' ? <Phone /> : <Mail />}<input type={mode === 'login' && loginType === 'professional' ? 'tel' : 'email'} value={email} onChange={(e) => setEmail(e.target.value)} required disabled={mode === 'first_access_submit'} autoComplete={mode === 'login' && loginType === 'professional' ? 'tel' : 'email'} placeholder={mode === 'login' && loginType === 'professional' ? '(11) 99999-9999' : 'seu@email.com'} /></span>
+                  </label>
+                )}
+
+                {mode === 'first_access_submit' && (
+                  <label className="auth-field">
+                    <span>Nome completo</span>
+                    <span className="auth-input-wrap"><User /><input type="text" value={fullName} onChange={(e) => setFullName(e.target.value)} required placeholder="Ex: João Silva" /></span>
+                  </label>
+                )}
+
+                {(mode === 'login' || mode === 'signup' || mode === 'first_access_submit') && (
+                  <label className="auth-field">
+                    <span>Senha</span>
+                    <span className="auth-input-wrap"><Lock /><input type={showPassword ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} autoComplete="current-password" placeholder={mode === 'login' ? '••••••••••' : 'Mínimo 6 caracteres'} /><button type="button" className="auth-password-toggle" onClick={() => setShowPassword(!showPassword)} aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}>{showPassword ? <EyeOff /> : <Eye />}</button></span>
+                  </label>
+                )}
+
+                {mode === 'login' && (
+                  <div className="auth-options">
+                    <label><input type="checkbox" /> <span>Lembrar de mim</span></label>
+                    <button type="button" onClick={() => { setMode('first_access_check'); setError(''); setPassword(''); }}>Esqueceu sua senha?</button>
+                  </div>
+                )}
+
+                <button type="submit" disabled={loading} className="auth-submit">
+                  {loading ? <><Loader2 className="h-5 w-5 animate-spin" /> Aguarde...</> : mode === 'first_access_check' ? <>Continuar <ArrowRight className="h-5 w-5" /></> : mode === 'first_access_submit' ? 'Ativar conta e entrar' : mode === 'login' ? <>Entrar <ArrowRight className="h-5 w-5" /></> : 'Criar conta'}
+                </button>
+              </form>
+            )}
+
+            {mode === 'login' && (
+              <>
+                <div className="auth-divider"><span>ou</span></div>
+                <button type="button" className="auth-google" onClick={handleGoogleLogin} disabled={loading}><span className="auth-google-mark">G</span> Entrar com Google</button>
+                <button type="button" className="auth-first-access" onClick={() => { setMode('first_access_check'); setError(''); setPassword(''); }}>Primeiro acesso? <strong>Crie sua conta</strong></button>
+              </>
+            )}
+
+            {canSignup && !isFirstAccess && mode === 'signup' && <button type="button" className="auth-first-access" onClick={toggleMode}>Já tem conta? <strong>Entrar</strong></button>}
+          </div>
         </div>
 
-        <p className="text-center text-xs text-slate-400 mt-6">
-          HomeCare Pro v1.0 — Sistema de Gestão Domiciliar
-        </p>
-      </div>
-    </div>
+        <div className="auth-content-footer"><Heart className="h-5 w-5" /> Tecnologia a serviço de vidas melhores.</div>
+      </section>
+    </main>
   );
 }
