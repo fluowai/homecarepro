@@ -24,7 +24,7 @@ import { ProfessionalStatus, ProfessionalSpecialty } from '../types';
 import { uploadFileToMinio } from '../lib/upload';
 import { toast } from 'sonner';
 import { supabase } from '../lib/supabase';
-import { normalizeBrazilPhone } from '../lib/formatters';
+import { normalizeBrazilPhone, formatPhoneInput, formatPhoneForDisplay } from '../lib/formatters';
 
 export default function ProfessionalsView() {
   const { 
@@ -434,7 +434,7 @@ export default function ProfessionalsView() {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Telefone / WhatsApp</label>
-                      <input type="tel" required value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(11) 98888-8888" className="w-full bg-slate-50 border border-slate-200 rounded-lg text-xs py-2 px-3 text-slate-700 focus:outline-none" />
+                      <input type="tel" required value={formatPhoneForDisplay(phone)} onChange={(e) => setPhone(formatPhoneInput(e.target.value))} placeholder="(11) 98888-8888" className="w-full bg-slate-50 border border-slate-200 rounded-lg text-xs py-2 px-3 text-slate-700 focus:outline-none" />
                     </div>
                     <div>
                       <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">E-mail Corporativo</label>

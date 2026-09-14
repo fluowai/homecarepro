@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Mail, Phone, Lock, User, Building2, Eye, EyeOff, Loader2, Heart, ArrowRight, ArrowLeft } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useHomeCareStore } from '../store';
-import { normalizeBrazilPhone, phoneToVirtualEmail } from '../lib/formatters';
+import { normalizeBrazilPhone, phoneToVirtualEmail, formatPhoneInput, formatPhoneForDisplay } from '../lib/formatters';
 
 type AuthMode = 'login' | 'signup' | 'first_access_check' | 'first_access_submit';
 
@@ -222,7 +222,7 @@ export default function AuthView() {
                 {(mode === 'login' || mode === 'signup' || isFirstAccess) && (
                   <label className="auth-field">
                     <span>{mode === 'login' && loginType === 'professional' ? 'Telefone' : 'E-mail'}</span>
-                    <span className="auth-input-wrap">{mode === 'login' && loginType === 'professional' ? <Phone /> : <Mail />}<input type={mode === 'login' && loginType === 'professional' ? 'tel' : 'email'} value={email} onChange={(e) => setEmail(e.target.value)} required disabled={mode === 'first_access_submit'} autoComplete={mode === 'login' && loginType === 'professional' ? 'tel' : 'email'} placeholder={mode === 'login' && loginType === 'professional' ? '(11) 99999-9999' : 'seu@email.com'} /></span>
+                    <span className="auth-input-wrap">{mode === 'login' && loginType === 'professional' ? <Phone /> : <Mail />}<input type={mode === 'login' && loginType === 'professional' ? 'tel' : 'email'} value={mode === 'login' && loginType === 'professional' ? formatPhoneForDisplay(email) : email} onChange={(e) => setEmail(mode === 'login' && loginType === 'professional' ? formatPhoneInput(e.target.value) : e.target.value)} required disabled={mode === 'first_access_submit'} autoComplete={mode === 'login' && loginType === 'professional' ? 'tel' : 'email'} placeholder={mode === 'login' && loginType === 'professional' ? '(11) 99999-9999' : 'seu@email.com'} /></span>
                   </label>
                 )}
 

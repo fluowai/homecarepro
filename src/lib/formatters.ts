@@ -18,9 +18,36 @@ export function formatWhatsAppNumber(phone: string): string {
       return `+55 (${ddd}) ${part1}-${part2}`;
     }
   }
-
+  
   // Fallback for other international numbers or unrecognized formats
   return `+${numericOnly}`;
+}
+
+export function formatPhoneInput(phone: string): string {
+  if (!phone) return "";
+  
+  // Remove all non-numeric characters
+  const numericOnly = phone.replace(/\D/g, "");
+  
+  // Limit to 11 digits for Brazilian phone (DDD + number)
+  if (numericOnly.length > 11) {
+    return numericOnly.slice(0, 11);
+  }
+  
+  return numericOnly;
+}
+
+export function formatPhoneForDisplay(phone: string): string {
+  if (!phone) return "";
+  
+  // Remove all non-numeric characters
+  const numericOnly = phone.replace(/\D/g, "");
+  
+  if (numericOnly.length === 0) return "";
+  if (numericOnly.length <= 2) return numericOnly;
+  if (numericOnly.length <= 6) return `(${numericOnly.slice(0, 2)}) ${numericOnly.slice(2)}`;
+  if (numericOnly.length <= 10) return `(${numericOnly.slice(0, 2)}) ${numericOnly.slice(2, 6)}-${numericOnly.slice(6)}`;
+  return `(${numericOnly.slice(0, 2)}) ${numericOnly.slice(2, 7)}-${numericOnly.slice(7, 11)}`;
 }
 
 export function normalizeBrazilPhone(phone: string): string {
