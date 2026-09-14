@@ -31,6 +31,7 @@ import { PatientStatus } from '../types';
 import { Patient, PatientResponsible } from '../types';
 import { uploadFileToMinio } from '../lib/upload';
 import { toast } from 'sonner';
+import { findCurrentProfessional, getAssignedPatientIds } from '../lib/professionalContext';
 
 interface PatientsViewProps {
   searchQuery: string;
@@ -52,6 +53,9 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
     currentUserRole,
     professionals,
     visits,
+    contracts,
+    user,
+    profile,
     addVisit,
     deleteVisit
   } = useHomeCareStore();
@@ -169,8 +173,17 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
 
   const isManager = ['mega_admin', 'super_admin', 'admin', 'operator'].includes(currentUserRole);
 
+  const currentProfessional = currentUserRole === 'professional' ? findCurrentProfessional(professionals, user, profile) : null;
+  const assignedPatientIds = currentUserRole === 'professional' ? getAssignedPatientIds(currentProfessional, visits, contracts) : null;
+
   // Filter patients
-  const tenantPatients = patients.filter(p => p.tenantId === activeTenantId);
+  const tenantPatients = patients.filter(p => {
+    if (p.tenantId !== activeTenantId) return false;
+    if (currentUserRole === 'professional') {
+      return assignedPatientIds ? assignedPatientIds.has(p.id) : false;
+    }
+    return true;
+  });
   const filteredPatients = tenantPatients.filter(p => {
     const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           p.diagnostic.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -908,20 +921,28 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
           {/* Header */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <h2 className="text-2xl font-bold text-slate-800 tracking-tight">Gestão de Pacientes Domiciliares</h2>
-              <p className="text-slate-500 text-sm mt-1">Lista unificada de prontuários, planos terapêuticos e monitoramento domiciliar.</p>
+              <h2 className="text-2xl font-bold text-slate-800 tracking-tight">
+                {currentUserRole === 'professional' ? 'Meus Pacientes Atendidos' : 'Gestão de Pacientes Domiciliares'}
+              </h2>
+              <p className="text-slate-500 text-sm mt-1">
+                {currentUserRole === 'professional'
+                  ? 'Lista de pacientes aos quais você está vinculado(a) para atendimento.'
+                  : 'Lista unificada de prontuários, planos terapêuticos e monitoramento domiciliar.'}
+              </p>
             </div>
-            <button
-              onClick={() => {
-                resetPatientForm();
-                setEditingPatientId(null);
-                setShowAddModal(true);
-              }}
-              className="flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-600 text-white font-semibold text-sm rounded-lg transition-all shadow-md shadow-green-100"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Cadastrar Paciente</span>
-            </button>
+            {isManager && (
+              <button
+                onClick={() => {
+                  resetPatientForm();
+                  setEditingPatientId(null);
+                  setShowAddModal(true);
+                }}
+                className="flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-600 text-white font-semibold text-sm rounded-lg transition-all shadow-md shadow-green-100"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Cadastrar Paciente</span>
+              </button>
+            )}
           </div>
 
           {/* Filtering row */}

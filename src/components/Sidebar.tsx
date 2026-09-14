@@ -116,7 +116,7 @@ export default function Sidebar({ currentView, setView, isOpen, onClose }: Sideb
     {
       title: 'COMUNICAÇÃO (WHATSAPP)',
       items: [
-        { id: 'whatsapp_attendances', label: 'Atendimentos', icon: MessageSquare, roles: ['admin', 'professional', 'auditor'] },
+        { id: 'whatsapp_attendances', label: 'Atendimentos', icon: MessageSquare, roles: ['admin', 'operator', 'auditor'] },
         { id: 'whatsapp_connections', label: 'Conexões', icon: Smartphone, roles: ['admin'] },
       ]
     },

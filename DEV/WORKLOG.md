@@ -1,6 +1,11 @@
 # Worklog
 
-## 2026-09-13 — Auditoria e correções de estabilidade
+## 2026-09-14 — Login de profissionais por celular e stack de produção
+- Habilitado login por celular e senha para profissionais via e-mail sintético determinístico (`phoneToVirtualEmail`), contornando o bloqueio nativo de SMS (`phone_provider_disabled`) do Supabase GoTrue.
+- Criada e executada migration `20260914000000_enable_professional_phone_email_login.sql` com backfill para as contas da SC Saúde e atualização da trigger `handle_new_user`.
+- Atualizado provisionamento em `POST /api/professionals/:id/access` e permissões de edição de equipe em `ProfessionalsView`.
+- Ajustada a stack do Portainer / Docker Swarm (`portainer-stack-homecare-filled.yml`) com as chaves VAPID (Web Push & PWA), roteamento Traefik para domínio principal e subdomínios, e healthcheck.
+- Verificação: 97 testes aprovados no Vitest e validação com o Supabase.
 - Corrigido erro de typecheck em `PatientsView`: geração mensal de plantões não deve enviar `tenantId` para `addVisit`, pois o store deriva o tenant autenticado.
 - Tornado o seed de templates de e-mail tolerante a clientes Supabase/test doubles incompletos; o seed opcional não deve atrasar o boot da API.
 - Tornado o mailer resiliente quando filtros PostgREST opcionais (`or`/`is`) não estão disponíveis; nesse caso retorna template ausente sem rejeição assíncrona.
