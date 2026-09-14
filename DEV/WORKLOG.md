@@ -1,5 +1,11 @@
 # Worklog
 
+## 2026-09-13 — Auditoria e correções de estabilidade
+- Corrigido erro de typecheck em `PatientsView`: geração mensal de plantões não deve enviar `tenantId` para `addVisit`, pois o store deriva o tenant autenticado.
+- Tornado o seed de templates de e-mail tolerante a clientes Supabase/test doubles incompletos; o seed opcional não deve atrasar o boot da API.
+- Tornado o mailer resiliente quando filtros PostgREST opcionais (`or`/`is`) não estão disponíveis; nesse caso retorna template ausente sem rejeição assíncrona.
+- Verificação: typecheck aprovado, build frontend aprovado e 94 testes aprovados / 14 RLS ignorados. O build ainda sinaliza bundle inicial de ~808 KB.
+
 ## 2026-09-10 — Contratos com serviços e escala automática
 - Contratos passaram a aceitar descrição operacional e serviços recorrentes com dias, horários, especialidade, profissional vinculado, valor da clínica e valor fixo do profissional.
 - Ao salvar um serviço com profissional vinculado, o store gera os próximos 30 dias de plantões, preservando o valor histórico e evitando duplicidades.

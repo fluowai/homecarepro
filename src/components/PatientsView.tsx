@@ -140,7 +140,6 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
       if (scheduleDays.includes(currentDate.getDay())) {
         const visitDateStr = currentDate.toISOString().split('T')[0];
         addVisit({
-          tenantId: activeTenantId,
           patientId: editingPatientId!,
           professionalId: scheduleProfId,
           date: visitDateStr,

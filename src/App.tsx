@@ -50,6 +50,7 @@ const ApprovalDashboard = lazy(() => import('./components/ApprovalDashboard').th
 const ProfessionalApp = lazy(() => import('./components/ProfessionalApp').then(m => ({ default: m.ProfessionalApp })));
 const ReportsView = lazy(() => import('./components/ReportsView'));
 const CompanyProfileView = lazy(() => import('./components/CompanyProfileView'));
+import AppErrorBoundary from './components/AppErrorBoundary';
 
 function LoadingScreen() {
   return (
@@ -294,6 +295,7 @@ export default function App() {
   const secondaryColor = whitelabelTenant?.secondaryColor;
 
   return (
+    <AppErrorBoundary>
     <div className="min-h-screen bg-gray-50 flex font-sans antialiased text-gray-900">
       <PWAInstallGate />
       {(primaryColor || secondaryColor) && (
@@ -344,5 +346,6 @@ export default function App() {
         </Suspense>
       )}
     </div>
+    </AppErrorBoundary>
   );
 }

@@ -9,7 +9,7 @@ SaaS multi-tenant de gestão de Home Care em fase **pré-produção com hardenin
 - **Remetente por marca**: `sendInviteEmail` usa o remetente da revenda (Resend); config em WhitelabelConfig (`emailFromName/emailFromAddress/supportEmail`).
 - Convites: revenda/clínica criados por Mega Admin/Super Admin; link copiável (`/?invite=token`), conta por e-mail + senha, expira em 7 dias.
 - Cadastro: **invite-only em produção**.
-- Dados: cache em `localStorage` (risco LGPD a mitigar — pendente 2026-09-06).
+- Dados: cache clínico em `sessionStorage` com TTL; legado `localStorage` é removido fora do demo (mitigação LGPD aplicada).
 
 ## Estado atual (2026-08-13)
 SaaS multi-tenant de gestão de Home Care em fase **pré-produção com hardening aplicado**. Deploy Docker Swarm via Traefik em `homecare.wootech.com.br`. Runner de migrations: 13 aplicadas / 0 pendentes. Onboarding por convite implementado e testado. Dados mockados corrigidos. Hardening de segurança, CI, Docker e deploy aplicado (2026-08-13).

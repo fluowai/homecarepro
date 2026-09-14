@@ -325,7 +325,11 @@ export function createApp(options: CreateAppOptions) {
 
   async function seedDefaultTemplates() {
     try {
-      const { data: existing } = await supabaseAdmin.from('email_templates').select('id').not('id', 'like', 'tpl-%');
+      const templateQuery = supabaseAdmin.from('email_templates').select('id');
+      // Lightweight test doubles may not implement the complete PostgREST
+      // filter surface. Seeding is optional and must never delay API startup.
+      if (typeof (templateQuery as { not?: unknown }).not !== 'function') return;
+      const { data: existing } = await (templateQuery as typeof templateQuery & { not: Function }).not('id', 'like', 'tpl-%');
       if (existing && existing.length > 0) return;
 
       const now = new Date().toISOString();

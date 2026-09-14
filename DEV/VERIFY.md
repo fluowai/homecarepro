@@ -1,5 +1,15 @@
 # Verificação
 
+## Verificação 2026-09-13 — Auditoria de estabilidade
+| Item | Resultado |
+|---|---|
+| Typecheck após correções | ✅ passou |
+| Build frontend | ✅ passou; bundle inicial ~808 KB gera alerta de code-splitting |
+| Testes unitários/servidor | ✅ 94 passed / 14 skipped (RLS opt-in) |
+| Geração de plantões em `PatientsView` | ✅ contrato de `addVisit` corrigido |
+| Seed/mailer com cliente parcial | ✅ não bloqueia inicialização nem gera rejeição assíncrona |
+| RLS real e browser E2E | ⚠️ não executados nesta sessão; dependem de credenciais/sessão externa |
+
 ## Verificação 2026-09-10 — Contratos, valores fixos e escala automática
 | Item | Resultado |
 |---|---|
