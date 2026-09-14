@@ -292,7 +292,7 @@ export default function ProfessionalsView() {
                     </div>
                 </div>
 
-                {currentUserRole === 'admin' && (
+                {['admin', 'super_admin', 'mega_admin', 'operator'].includes(currentUserRole) && (
                   <button
                     onClick={() => openEditor(prof)}
                     className="p-1 text-slate-400 hover:text-green-600 rounded transition-colors"
@@ -343,7 +343,7 @@ export default function ProfessionalsView() {
                   <span className="text-[10px] text-slate-400">(Avaliador)</span>
                 </div>
 
-                {currentUserRole === 'admin' && (
+                {['admin', 'super_admin', 'mega_admin'].includes(currentUserRole) && (
                   <button
                     onClick={() => {
                       if (confirm(`Remover o cadastro de ${prof.name}?`)) {

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Mail, Phone, Lock, User, Building2, Eye, EyeOff, Loader2, Heart, ArrowRight, ArrowLeft } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useHomeCareStore } from '../store';
-import { normalizeBrazilPhone } from '../lib/formatters';
+import { normalizeBrazilPhone, phoneToVirtualEmail } from '../lib/formatters';
 
 type AuthMode = 'login' | 'signup' | 'first_access_check' | 'first_access_submit';
 
@@ -99,9 +99,15 @@ export default function AuthView() {
         if (authError) throw authError;
       } else {
         if (loginType === 'professional') {
-          const phone = normalizeBrazilPhone(email);
-          if (!/^\+55\d{10,11}$/.test(phone)) throw new Error('Informe um telefone celular válido com DDD.');
-          const { error: authError } = await supabase.auth.signInWithPassword({ phone, password });
+          const normalized = normalizeBrazilPhone(email);
+          if (!/^\+55\d{10,11}$/.test(normalized)) {
+            throw new Error('Informe um telefone celular válido com DDD (Ex: (11) 99999-9999).');
+          }
+          const virtualEmail = phoneToVirtualEmail(email);
+          const { error: authError } = await supabase.auth.signInWithPassword({
+            email: virtualEmail,
+            password,
+          });
           if (authError) throw authError;
           await init();
           if (useHomeCareStore.getState().currentUserRole !== 'professional') {

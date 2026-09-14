@@ -1348,6 +1348,13 @@ Apenas o objeto JSON valido, sem formatacao Markdown adicional nem blocos de cod
     return digits.startsWith('55') ? `+${digits}` : `+55${digits}`;
   }
 
+  function phoneToVirtualEmail(phone: string) {
+    const digits = String(phone || '').replace(/\D/g, '');
+    if (!digits) return '';
+    const fullDigits = digits.startsWith('55') ? digits : `55${digits}`;
+    return `tel_${fullDigits}@homecarepro.internal`;
+  }
+
   // Provision a professional account without exposing service-role credentials to the browser.
   app.post("/api/professionals/:id/access", requireAuth, globalLimiter, async (req, res) => {
     try {
@@ -1378,29 +1385,48 @@ Apenas o objeto JSON valido, sem formatacao Markdown adicional nem blocos de cod
         return res.status(400).json({ error: "O profissional precisa ter um telefone brasileiro válido." });
       }
 
+      const virtualEmail = phoneToVirtualEmail(professional.phone);
       let userId = professional.user_id as string | null;
+
       if (userId) {
         const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
-          phone,
+          email: virtualEmail,
           password,
-          phone_confirm: true,
-          user_metadata: { full_name: professional.name, tenant_id: professional.tenant_id, role: 'professional' },
+          email_confirm: true,
+          user_metadata: { full_name: professional.name, tenant_id: professional.tenant_id, role: 'professional', phone },
         });
         if (error) throw error;
       } else {
         const { data: created, error } = await supabaseAdmin.auth.admin.createUser({
-          phone,
+          email: virtualEmail,
           password,
-          phone_confirm: true,
-          user_metadata: { full_name: professional.name, tenant_id: professional.tenant_id, role: 'professional' },
+          email_confirm: true,
+          user_metadata: { full_name: professional.name, tenant_id: professional.tenant_id, role: 'professional', phone },
         });
         if (error) {
           if (String(error.message || '').toLowerCase().includes('already')) {
-            return res.status(409).json({ error: "Este telefone já está vinculado a outra conta." });
+            const { data: existingProfile } = await supabaseAdmin
+              .from('user_profiles')
+              .select('id')
+              .eq('email', virtualEmail)
+              .maybeSingle();
+
+            if (existingProfile?.id) {
+              userId = existingProfile.id;
+              await supabaseAdmin.auth.admin.updateUserById(userId, {
+                password,
+                email_confirm: true,
+                user_metadata: { full_name: professional.name, tenant_id: professional.tenant_id, role: 'professional', phone },
+              });
+            } else {
+              return res.status(409).json({ error: "Este telefone já está vinculado a outra conta." });
+            }
+          } else {
+            throw error;
           }
-          throw error;
+        } else {
+          userId = created.user?.id || null;
         }
-        userId = created.user?.id || null;
       }
 
       if (!userId) throw new Error('A conta profissional não foi criada.');
@@ -1409,6 +1435,17 @@ Apenas o objeto JSON valido, sem formatacao Markdown adicional nem blocos de cod
         .update({ user_id: userId })
         .eq('id', professionalId);
       if (linkError) throw linkError;
+
+      // Update user_profiles to match
+      await supabaseAdmin
+        .from('user_profiles')
+        .upsert({
+          id: userId,
+          tenant_id: professional.tenant_id,
+          full_name: professional.name,
+          role: 'professional',
+          email: virtualEmail,
+        });
 
       logEvent('INFO', 'Professional phone access provisioned', { professionalId, userId, tenantId: professional.tenant_id, byUserId: requesterId });
       res.json({ success: true, userId, phone });

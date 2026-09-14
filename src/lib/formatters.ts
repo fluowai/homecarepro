@@ -29,3 +29,10 @@ export function normalizeBrazilPhone(phone: string): string {
   if (digits.startsWith('55')) return `+${digits}`;
   return `+55${digits}`;
 }
+
+export function phoneToVirtualEmail(phone: string): string {
+  const digits = phone.replace(/\D/g, '');
+  if (!digits) return '';
+  const fullDigits = digits.startsWith('55') ? digits : `55${digits}`;
+  return `tel_${fullDigits}@homecarepro.internal`;
+}
