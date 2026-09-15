@@ -138,7 +138,8 @@ export function createApp(options: CreateAppOptions) {
 
   const SUPABASE_URL = process.env.VITE_SUPABASE_URL || "";
   const SUPABASE_WS_URL = SUPABASE_URL.replace(/^https?:/i, "wss:");
-  const MINIO_PUBLIC_ENDPOINT = (process.env.MINIO_PUBLIC_ENDPOINT || process.env.MINIO_ENDPOINT || "https://storage.wootech.com.br").replace(/\/$/, "");
+  const configuredMinioEndpoint = process.env.MINIO_PUBLIC_ENDPOINT || process.env.MINIO_ENDPOINT || "https://storage.wootech.com.br";
+  const MINIO_PUBLIC_ENDPOINT = configuredMinioEndpoint.replace(/^https?:\/\/mypanel\.wootech\.com\.br/i, "https://storage.wootech.com.br").replace(/\/$/, "");
   const APP_BASE_DOMAIN = appBaseDomain || process.env.APP_BASE_DOMAIN || "homecare.wootech.com.br";
 
   const RESERVED_SUBDOMAINS = new Set([
@@ -380,7 +381,7 @@ export function createApp(options: CreateAppOptions) {
         styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
         mediaSrc: ["'self'", "blob:"],
         imgSrc: ["'self'", "data:", "https:"],
-        connectSrc: ["'self'", SUPABASE_URL, SUPABASE_WS_URL, MINIO_PUBLIC_ENDPOINT, "ws://localhost:*", "http://localhost:*"].filter(Boolean),
+        connectSrc: ["'self'", SUPABASE_URL, SUPABASE_WS_URL, MINIO_PUBLIC_ENDPOINT, "https://api.dicebear.com", "ws://localhost:*", "http://localhost:*"].filter(Boolean),
         fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
         objectSrc: ["'none'"],
         frameAncestors: ["'none'"],

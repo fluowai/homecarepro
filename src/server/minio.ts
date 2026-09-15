@@ -3,11 +3,12 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 // The endpoint must be reachable by the browser because the upload uses a
 // presigned PUT URL. Keep credentials server-side only.
-const endpoint = (process.env.MINIO_PUBLIC_ENDPOINT || process.env.MINIO_ENDPOINT || "https://storage.wootech.com.br").replace(/\/$/, "");
+const configuredEndpoint = process.env.MINIO_PUBLIC_ENDPOINT || process.env.MINIO_ENDPOINT || "https://storage.wootech.com.br";
+const endpoint = configuredEndpoint.replace(/^https?:\/\/mypanel\.wootech\.com\.br/i, "https://storage.wootech.com.br").replace(/\/$/, "");
 const region = process.env.MINIO_REGION || "us-east-1"; // MinIO usually ignores this but SDK requires it
 const accessKeyId = process.env.MINIO_ACCESS_KEY || "";
 const secretAccessKey = process.env.MINIO_SECRET_KEY || "";
-const bucketName = process.env.MINIO_BUCKET_NAME || "homecare-uploads";
+const bucketName = process.env.MINIO_BUCKET_NAME === "homecare" ? "homecare-uploads" : (process.env.MINIO_BUCKET_NAME || "homecare-uploads");
 
 if (!accessKeyId || !secretAccessKey) {
   console.warn("[MinIO] MINIO_ACCESS_KEY/MINIO_SECRET_KEY are not configured; uploads will fail until configured.");
