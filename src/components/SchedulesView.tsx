@@ -9,17 +9,19 @@ import {
   X, 
   ClipboardList, 
   CheckCircle, 
-  TrendingUp,
-  AlertCircle,
-  AlertTriangle,
-  ChevronLeft,
-  ChevronRight,
-  Filter
-  ,Pencil, Save
+  TrendingUp, 
+  AlertCircle, 
+  AlertTriangle, 
+  ChevronLeft, 
+  ChevronRight, 
+  Filter, 
+  Pencil, 
+  Save 
 } from 'lucide-react';
 import { useHomeCareStore } from '../store';
 import { VisitStatus } from '../types';
 import { toast } from 'sonner';
+import { findCurrentProfessional, getAssignedPatientIds } from '../lib/professionalContext';
 
 export default function SchedulesView() {
   const { 
@@ -27,6 +29,10 @@ export default function SchedulesView() {
     patients, 
     professionals, 
     visits, 
+    contracts,
+    user,
+    profile,
+    currentUserRole,
     activeTenantId, 
     addVisit, 
     updateVisit, 
@@ -58,10 +64,33 @@ export default function SchedulesView() {
   const [timeEnd, setTimeEnd] = useState('10:00');
   const [value, setValue] = useState(150);
 
+  const currentProfessional = currentUserRole === 'professional' ? findCurrentProfessional(professionals, user, profile) : null;
+  const assignedPatientIds = currentUserRole === 'professional' ? getAssignedPatientIds(currentProfessional, visits, contracts) : null;
+
   // Filters
-  const tenantPatients = patients.filter(p => p.tenantId === activeTenantId && p.status === 'active');
-  const tenantProfessionals = professionals.filter(p => p.tenantId === activeTenantId);
-  const tenantVisits = visits.filter(v => v.tenantId === activeTenantId);
+  const tenantPatients = patients.filter(p => {
+    if (p.tenantId !== activeTenantId || p.status !== 'active') return false;
+    if (currentUserRole === 'professional') {
+      return assignedPatientIds ? assignedPatientIds.has(p.id) : false;
+    }
+    return true;
+  });
+  const tenantProfessionals = professionals.filter(p => {
+    if (p.tenantId !== activeTenantId) return false;
+    if (currentUserRole === 'professional') {
+      return currentProfessional ? p.id === currentProfessional.id : false;
+    }
+    return true;
+  });
+  const tenantVisits = visits.filter(v => {
+    if (v.tenantId !== activeTenantId) return false;
+    if (currentUserRole === 'professional') {
+      const isMyProf = currentProfessional ? v.professionalId === currentProfessional.id : false;
+      const isMyPatient = assignedPatientIds ? assignedPatientIds.has(v.patientId) : false;
+      return isMyProf || isMyPatient;
+    }
+    return true;
+  });
 
   // Filter visits by date and optional professional filter
   const filteredVisits = tenantVisits.filter(v => {

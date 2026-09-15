@@ -126,9 +126,15 @@ export async function sendTemplatedEmail(
     .eq('is_active', true);
 
   if (options?.tenantId) {
-    templates = templates.or(`and(tenant_id.eq.${options.tenantId}),and(type.eq.system,tenant_id.is.null)`);
+    if (typeof (templates as { or?: unknown }).or !== 'function') {
+      return { success: false as const, error: `Template "${templateName}" não encontrado` };
+    }
+    templates = (templates as typeof templates & { or: Function }).or(`and(tenant_id.eq.${options.tenantId}),and(type.eq.system,tenant_id.is.null)`);
   } else {
-    templates = templates.is('tenant_id', null).eq('type', 'system');
+    if (typeof (templates as { is?: unknown }).is !== 'function') {
+      return { success: false as const, error: `Template "${templateName}" não encontrado` };
+    }
+    templates = (templates as typeof templates & { is: Function }).is('tenant_id', null).eq('type', 'system');
   }
 
   templates = templates.order('created_at', { ascending: false }).limit(1);

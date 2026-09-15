@@ -114,6 +114,7 @@ export default function CrmView() {
         cpf: '',
         phone: lead.phone,
         email: lead.email,
+        responsibles: [],
         status: 'active',
         planType: 'Mensal',
         avatar: '',

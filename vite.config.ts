@@ -23,6 +23,16 @@ export default defineConfig(() => {
           navigateFallback: null,
           runtimeCaching: [
             {
+              urlPattern: ({ request }) => request.mode === 'navigate',
+              handler: 'NetworkFirst',
+              options: {
+                cacheName: 'html-cache',
+                networkTimeoutSeconds: 5,
+                expiration: { maxEntries: 10, maxAgeSeconds: 60 * 60 * 24 * 7 },
+                cacheableResponse: { statuses: [0, 200] },
+              },
+            },
+            {
               urlPattern: ({ url }) => url.pathname.startsWith('/api/'),
               handler: 'NetworkFirst',
               options: {
@@ -104,6 +114,12 @@ export default defineConfig(() => {
     build: {
       chunkSizeWarningLimit: 600,
       manifest: true,
+      rollupOptions: { output: { manualChunks: {
+        react: ['react', 'react-dom'],
+        supabase: ['@supabase/supabase-js'],
+        icons: ['lucide-react'],
+        motion: ['motion'],
+      } } },
     },
     server: {
       hmr: process.env.DISABLE_HMR !== 'true',

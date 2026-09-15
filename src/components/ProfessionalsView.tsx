@@ -24,7 +24,7 @@ import { ProfessionalStatus, ProfessionalSpecialty } from '../types';
 import { uploadFileToMinio } from '../lib/upload';
 import { toast } from 'sonner';
 import { supabase } from '../lib/supabase';
-import { normalizeBrazilPhone } from '../lib/formatters';
+import { normalizeBrazilPhone, formatPhoneInput, formatPhoneForDisplay } from '../lib/formatters';
 
 export default function ProfessionalsView() {
   const { 
@@ -42,7 +42,9 @@ export default function ProfessionalsView() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'busy' | 'offline'>('all');
 
   // Form states
-  const [modalTab, setModalTab] = useState<'personal' | 'professional' | 'address' | 'docs'>('personal');
+  const [modalTab, setModalTab] = useState<'personal' | 'professional' | 'address' | 'docs' | 'patients'>('personal');
+  const [attendedPatients, setAttendedPatients] = useState<{patientId: string, shiftValue: number}[]>([]);
+  const { patients } = useHomeCareStore();
   const [name, setName] = useState('');
   const [cpf, setCpf] = useState('');
   const [gender, setGender] = useState<'M' | 'F' | 'O'>('F');
@@ -75,7 +77,7 @@ export default function ProfessionalsView() {
   const resetForm = () => {
     setName(''); setCpf(''); setGender('F'); setSpecialty('Enfermeiro'); setRegistration('');
     setEmail(''); setPhone(''); setStreet(''); setNumber(''); setCity(''); setState('SP'); setZipCode('');
-    setDocsUploaded([]); setDocsFiles({}); setCredentialNotice(''); setAccessPassword(''); setModalTab('personal');
+    setDocsUploaded([]); setDocsFiles({}); setCredentialNotice(''); setAccessPassword(''); setModalTab('personal'); setAttendedPatients([]);
   };
 
   const openEditor = (professional: typeof professionals[number]) => {
@@ -88,6 +90,7 @@ export default function ProfessionalsView() {
     setDocsUploaded(professional.documents.map(d => d.name));
     setDocsFiles(Object.fromEntries(professional.documents.map(d => [d.name, d.url])));
     setCredentialNotice('');
+    setAttendedPatients(professional.attendedPatients || []);
     setModalTab('personal'); setShowAddModal(true);
   };
 
@@ -133,6 +136,7 @@ export default function ProfessionalsView() {
         : 'https://images.unsplash.com/photo-1594824813573-246434de83fb?auto=format&fit=crop&q=80&w=120',
       rating: professionals.find(p => p.id === editingProfessionalId)?.rating ?? 5.0,
       address: { street, number, city, state, zipCode },
+      attendedPatients,
       documents: docsUploaded.map(d => ({ type: 'document', name: d, url: docsFiles[d] || '' }))
     };
     const savedProfessional = editingProfessionalId
@@ -288,7 +292,7 @@ export default function ProfessionalsView() {
                     </div>
                 </div>
 
-                {currentUserRole === 'admin' && (
+                {['admin', 'super_admin', 'mega_admin', 'operator'].includes(currentUserRole) && (
                   <button
                     onClick={() => openEditor(prof)}
                     className="p-1 text-slate-400 hover:text-green-600 rounded transition-colors"
@@ -339,7 +343,7 @@ export default function ProfessionalsView() {
                   <span className="text-[10px] text-slate-400">(Avaliador)</span>
                 </div>
 
-                {currentUserRole === 'admin' && (
+                {['admin', 'super_admin', 'mega_admin'].includes(currentUserRole) && (
                   <button
                     onClick={() => {
                       if (confirm(`Remover o cadastro de ${prof.name}?`)) {
@@ -387,6 +391,7 @@ export default function ProfessionalsView() {
                 { id: 'professional', label: 'Profissional', icon: Award },
                 { id: 'address', label: 'Endereço', icon: MapPin },
                 { id: 'docs', label: 'Documentos', icon: FileText },
+                { id: 'patients', label: 'Pacientes', icon: Users },
               ].map(tab => {
                 const Icon = tab.icon;
                 return (
@@ -429,7 +434,7 @@ export default function ProfessionalsView() {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Telefone / WhatsApp</label>
-                      <input type="tel" required value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(11) 98888-8888" className="w-full bg-slate-50 border border-slate-200 rounded-lg text-xs py-2 px-3 text-slate-700 focus:outline-none" />
+                      <input type="tel" required value={formatPhoneForDisplay(phone)} onChange={(e) => setPhone(formatPhoneInput(e.target.value))} placeholder="(11) 98888-8888" className="w-full bg-slate-50 border border-slate-200 rounded-lg text-xs py-2 px-3 text-slate-700 focus:outline-none" />
                     </div>
                     <div>
                       <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">E-mail Corporativo</label>
@@ -546,6 +551,34 @@ export default function ProfessionalsView() {
                       Gerar Login e Senha para o App
                     </button>
                   </div>
+                </div>
+              )}
+
+              {modalTab === 'patients' && (
+                <div className="space-y-4 animate-fade-in">
+                  <div>
+                    <h4 className="text-sm font-bold text-slate-800">Pacientes atendidos</h4>
+                    <p className="mt-1 text-xs text-slate-500">Vincule pacientes e defina o repasse padrão por plantão. Esse valor será usado como referência no relatório financeiro.</p>
+                  </div>
+                  <div className="space-y-2">
+                    {attendedPatients.map((item, index) => {
+                      const patient = patients.find((candidate) => candidate.id === item.patientId);
+                      return (
+                        <div key={`${item.patientId}-${index}`} className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                          <select value={item.patientId} onChange={(event) => setAttendedPatients((current) => current.map((row, rowIndex) => rowIndex === index ? { ...row, patientId: event.target.value } : row))} className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700">
+                            <option value="">Selecione o paciente</option>
+                            {patients.filter((candidate) => candidate.status === 'active' && (candidate.id === item.patientId || !attendedPatients.some((row, rowIndex) => rowIndex !== index && row.patientId === candidate.id))).map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.name}</option>)}
+                          </select>
+                          <label className="flex shrink-0 items-center gap-1 text-[10px] font-bold uppercase text-slate-400">R$
+                            <input type="number" min="0" step="0.01" value={item.shiftValue} onChange={(event) => setAttendedPatients((current) => current.map((row, rowIndex) => rowIndex === index ? { ...row, shiftValue: Number(event.target.value) } : row))} className="w-24 rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs font-normal text-slate-700" />
+                          </label>
+                          <button type="button" onClick={() => setAttendedPatients((current) => current.filter((_, rowIndex) => rowIndex !== index))} className="p-2 text-slate-400 hover:text-red-600" title={`Remover ${patient?.name || 'paciente'}`}><Trash2 className="h-4 w-4" /></button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <button type="button" onClick={() => setAttendedPatients((current) => [...current, { patientId: '', shiftValue: 0 }])} className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-green-300 bg-green-50 px-3 py-2 text-xs font-bold text-green-700 hover:bg-green-100"><Plus className="h-3.5 w-3.5" />Adicionar paciente</button>
+                  {attendedPatients.length === 0 && <p className="rounded-lg border border-slate-100 bg-slate-50 p-3 text-center text-xs italic text-slate-400">Nenhum paciente vinculado.</p>}
                 </div>
               )}
 

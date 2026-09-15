@@ -75,6 +75,10 @@ BEGIN
         ARRAY['patients', 'professionals', 'visits', 'leads', 'messages',
               'medicines', 'surveys', 'survey_config', 'alert_config']
     LOOP
+        -- A migration 20260727140000 deixou policies "Tenant access" que
+        -- continuam sendo combinadas com OR pelo Postgres. Removê-las evita
+        -- que uma regra histórica enfraqueça o escopo definido abaixo.
+        EXECUTE format('DROP POLICY IF EXISTS "Tenant access" ON public.%I', t_name);
         EXECUTE format('DROP POLICY IF EXISTS "Tenant isolation" ON public.%I', t_name);
         EXECUTE format('
             CREATE POLICY "Tenant isolation" ON public.%I

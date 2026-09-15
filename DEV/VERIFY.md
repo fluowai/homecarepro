@@ -1,5 +1,48 @@
 # Verificação
 
+## Verificação 2026-09-13 — Auditoria de estabilidade
+| Item | Resultado |
+|---|---|
+| Typecheck após correções | ✅ passou |
+| Build frontend | ✅ passou; bundle inicial ~808 KB gera alerta de code-splitting |
+| Testes unitários/servidor | ✅ 94 passed / 14 skipped (RLS opt-in) |
+| Geração de plantões em `PatientsView` | ✅ contrato de `addVisit` corrigido |
+| Seed/mailer com cliente parcial | ✅ não bloqueia inicialização nem gera rejeição assíncrona |
+| RLS real e browser E2E | ⚠️ não executados nesta sessão; dependem de credenciais/sessão externa |
+
+## Verificação 2026-09-10 — Contratos, valores fixos e escala automática
+| Item | Resultado |
+|---|---|
+| Cadastro de serviços no contrato | ✅ campos de recorrência, horário, valores e profissional vinculável |
+| Valor do plantão | ✅ valor fixo do profissional congelado no plantão; sem comissão |
+| Geração automática | ✅ próximos 30 dias, respeitando dias/horários/vigência |
+| Idempotência | ✅ não duplica plantões do mesmo serviço/data |
+| Persistência | ✅ migration expand-only criada; aplicação no Supabase pendente |
+| `npm run typecheck` | ✅ passou |
+| `npm run build` | ✅ passou |
+| `npm test` | ⚠️ iniciado, mas não concluiu nesta execução |
+
+## Verificação 2026-09-09 — Cache de sessão por conta
+| Item | Resultado |
+|---|---|
+| RLS com usuário de clínica/revenda/Mega Admin | ✅ sem leitura cross-tenant; Mega Admin não aparece na árvore da revenda |
+| Limpeza de cache ao trocar/sair da conta | ✅ dados tenant-scoped removidos antes de renderizar a nova sessão |
+| `npm run typecheck` | ✅ passou |
+| `npm test` | ✅ 94 passed / 14 skipped |
+| `npm run build:frontend` | ✅ passou |
+
+## Verificação 2026-09-09 — Isolamento de equipe e correção do usuário
+| Item | Resultado |
+|---|---|
+| `sccuidadores2023@gmail.com` | ✅ `tenant_id` corrigido para `SC SAUDE`; associação antiga removida |
+| Policies legadas `Tenant access` em negócio | ✅ removidas/reestruturadas sem acesso global para `super_admin` |
+| `npm run typecheck` | ✅ passou |
+| `npm test` | ✅ 94 passed / 14 skipped |
+| `RUN_DB_TESTS=1 npm exec vitest -- run tests/rls.integration.test.ts` | ✅ 14/14 passed |
+
+### Regra efetiva
+Clínica lê apenas o próprio tenant; usuário com vínculo secundário lê somente os tenants explicitamente associados; super admin lê sua revenda e descendentes; mega admin permanece global.
+
 ## Verificação 2026-09-09 — Responsáveis do paciente e edição
 | Item | Resultado |
 |---|---|
@@ -152,3 +195,8 @@
 3. **[MÉDIO] Triggers `updated_at`**: Criar triggers para auto-atualizar `updated_at` em tabelas que têm essa coluna (invoices, subscriptions, contracts, proposals, support_tickets, patients, medicine_administrations, assemblies, assembly_votes).
 4. **[BAIXO] `visitToRow` JSONB coords**: A função em store.ts passa coords como string `"lat,lng"` para colunas `jsonb`. Corrigir para passar objeto JSON `{lat, lng}` ou `{type:"Point",coordinates:[lng,lat]}`.
 5. **[BAIXO] `assemblyVoteToRow` missing `tenant_id`**: Adicionar `tenant_id: get().activeTenantId` ao objeto retornado.
+## 2026-09-15 — Implementações baseadas nas referências
+- `node node_modules/typescript/bin/tsc --noEmit` — ✅ passou.
+- `node node_modules/vite/bin/vite.js build` — ✅ passou.
+- `node node_modules/vitest/vitest.mjs run` — ⚠️ bloqueado pelo ambiente: `Access is denied` ao resolver `vite.config.ts`/diretório pai.
+- Validação visual no browser — ⏳ não executada nesta entrega.

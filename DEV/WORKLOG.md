@@ -1,5 +1,34 @@
 # Worklog
 
+## 2026-09-14 — Login de profissionais por celular e stack de produção
+- Habilitado login por celular e senha para profissionais via e-mail sintético determinístico (`phoneToVirtualEmail`), contornando o bloqueio nativo de SMS (`phone_provider_disabled`) do Supabase GoTrue.
+- Criada e executada migration `20260914000000_enable_professional_phone_email_login.sql` com backfill para as contas da SC Saúde e atualização da trigger `handle_new_user`.
+- Atualizado provisionamento em `POST /api/professionals/:id/access` e permissões de edição de equipe em `ProfessionalsView`.
+- Ajustada a stack do Portainer / Docker Swarm (`portainer-stack-homecare-filled.yml`) com as chaves VAPID (Web Push & PWA), roteamento Traefik para domínio principal e subdomínios, e healthcheck.
+- Verificação: 97 testes aprovados no Vitest e validação com o Supabase.
+- Corrigido erro de typecheck em `PatientsView`: geração mensal de plantões não deve enviar `tenantId` para `addVisit`, pois o store deriva o tenant autenticado.
+- Tornado o seed de templates de e-mail tolerante a clientes Supabase/test doubles incompletos; o seed opcional não deve atrasar o boot da API.
+- Tornado o mailer resiliente quando filtros PostgREST opcionais (`or`/`is`) não estão disponíveis; nesse caso retorna template ausente sem rejeição assíncrona.
+- Verificação: typecheck aprovado, build frontend aprovado e 94 testes aprovados / 14 RLS ignorados. O build ainda sinaliza bundle inicial de ~808 KB.
+
+## 2026-09-10 — Contratos com serviços e escala automática
+- Contratos passaram a aceitar descrição operacional e serviços recorrentes com dias, horários, especialidade, profissional vinculado, valor da clínica e valor fixo do profissional.
+- Ao salvar um serviço com profissional vinculado, o store gera os próximos 30 dias de plantões, preservando o valor histórico e evitando duplicidades.
+- Migration expand-only criada: `20260910000000_contract_services_and_auto_schedule.sql`.
+- Verificação: `npm run typecheck` e `npm run build` passaram. A suíte Vitest foi iniciada, mas não concluiu no ambiente desta execução; aplicação da migration no Supabase e validação browser permanecem pendentes.
+
+## 2026-09-09 — Correção de cache entre contas
+- O RLS foi validado com usuários reais: clínica, revenda e Mega Admin retornam somente os tenants autorizados.
+- Corrigido o store para limpar cache tenant-scoped ao iniciar nova sessão, sair ou perder a sessão; o tenant do perfil autenticado passa a ser a origem do tenant ativo.
+- Verificação: typecheck, testes (94 passed / 14 skipped) e build frontend aprovados.
+
+## 2026-09-09 — Isolamento de usuários por clínica/revenda
+- Corrigido o vínculo de `sccuidadores2023@gmail.com`: saiu de `Cooperativa CoopSaúde Mais` e passou a pertencer somente à `SC SAUDE` em `user_profiles`, `user_tenants` e metadata de autenticação.
+- A tela de equipe passou a usar o `tenant_id` do perfil autenticado como raiz, evitando tenant ativo antigo do `localStorage`; super_admin mantém apenas a árvore autorizada.
+- Removidas policies legadas ambíguas e consolidado o escopo como tenant próprio + acesso secundário explícito + árvore do super_admin; nenhum super_admin comum recebe acesso global.
+- Migration aplicada: `20260909010000_harden_legacy_tenant_policies.sql` e `20260909020000_restore_authorized_secondary_access.sql`.
+- Verificação: typecheck passou; suíte existente 94 passed / 14 skipped; RLS real 14/14 passed.
+
 ## 2026-09-08 — Login de profissionais por telefone
 - Adicionado vínculo opcional entre `professionals` e `auth.users` por `user_id`.
 - Profissionais passam a receber acesso com telefone normalizado e senha; gestores continuam usando e-mail.
@@ -257,3 +286,7 @@
 - Persistência criada na coluna `patients.responsibles` via migration `20260909000000_add_patient_responsibles.sql`, aplicada no banco.
 - Corrigido o modal de paciente: ele estava dentro do ramo da lista, então o botão Editar apenas aparecia após Voltar; agora é renderizado fora da condição lista/detalhes.
 - Verificação: typecheck, build frontend e testes existentes executados.
+## 2026-09-15 — PAD, vínculo de pacientes e relatório de repasse
+- Implementada a aba de pacientes no credenciamento de profissionais, com vínculo e valor padrão por plantão persistidos em `attendedPatients`.
+- Relatório profissional passou a separar valor da clínica e repasse devido, usando `baseValue`/valor do plantão e exportando ambas as colunas.
+- Verificação direta: TypeScript e Vite build passaram; Vitest bloqueado por erro de resolução/permissão do ambiente ao carregar `vite.config.ts`.

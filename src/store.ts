@@ -6,6 +6,7 @@ import { triggerFamilyNotification } from './lib/notifications';
 import {
   Patient,
   Professional,
+  ContractService,
   Visit,
   CRMLead,
   Message,
@@ -67,6 +68,10 @@ function patientToRow(p: Patient) {
     insurance_id: p.insuranceId,
     monthly_package_value: p.monthlyPackageValue,
     pad_scope: p.padScope,
+    pad_items: p.padItems ?? [],
+    daily_package_value: p.dailyPackageValue,
+    daily_package_shifts: p.dailyPackageShifts,
+    anamnesis: p.anamnesis,
     avatar: p.avatar,
     diagnostic: p.diagnostic,
     allergies: p.allergies,
@@ -95,6 +100,10 @@ function patientFromRow(r: Record<string, unknown>): Patient {
     insuranceId: r.insurance_id as string | undefined,
     monthlyPackageValue: Number(r.monthly_package_value) || undefined,
     padScope: r.pad_scope as string | undefined,
+    padItems: (r.pad_items ?? []) as Patient['padItems'],
+    dailyPackageValue: r.daily_package_value != null ? Number(r.daily_package_value) : undefined,
+    dailyPackageShifts: r.daily_package_shifts != null ? Number(r.daily_package_shifts) : undefined,
+    anamnesis: (r.anamnesis as any) || undefined,
     avatar: r.avatar as string,
     diagnostic: r.diagnostic as string,
     allergies: (r.allergies ?? []) as string[],
@@ -123,6 +132,7 @@ function professionalToRow(p: Professional) {
     avatar: p.avatar,
     rating: p.rating,
     address: p.address,
+    attended_patients: p.attendedPatients ?? [],
     documents: p.documents,
     stamp_signature_url: p.stampSignatureUrl,
   };
@@ -144,6 +154,7 @@ function professionalFromRow(r: Record<string, unknown>): Professional {
     avatar: r.avatar as string,
     rating: Number(r.rating) || 5.0,
     address: (r.address ?? { street: '', number: '', city: '', state: '', zipCode: '' }) as Professional['address'],
+    attendedPatients: (r.attended_patients ?? []) as Professional['attendedPatients'],
     documents: (r.documents ?? []) as Professional['documents'],
     stampSignatureUrl: r.stamp_signature_url as string | undefined,
   };
@@ -169,6 +180,11 @@ function visitToRow(v: Visit) {
     check_out_photo: v.checkOutPhoto ?? null,
     report: v.report ?? '',
     value: v.value,
+    base_value: v.baseValue ?? null,
+    contract_id: v.contractId ?? null,
+    contract_service_id: v.contractServiceId ?? null,
+    billing_value: v.billingValue ?? null,
+    generated_from_contract: v.generatedFromContract ?? false,
   };
 }
 
@@ -188,6 +204,11 @@ function visitFromRow(r: Record<string, unknown>): Visit {
     checkOutLocation: (r.check_out_location as string) ?? undefined,
     checkInCoords: r.check_in_coords ? { lat: Number((r.check_in_coords as string).split(',')[0]), lng: Number((r.check_in_coords as string).split(',')[1]) } : undefined,
     checkOutCoords: r.check_out_coords ? { lat: Number((r.check_out_coords as string).split(',')[0]), lng: Number((r.check_out_coords as string).split(',')[1]) } : undefined,
+    baseValue: r.base_value != null ? Number(r.base_value) : undefined,
+    contractId: (r.contract_id as string) || undefined,
+    contractServiceId: (r.contract_service_id as string) || undefined,
+    billingValue: r.billing_value != null ? Number(r.billing_value) : undefined,
+    generatedFromContract: Boolean(r.generated_from_contract),
     checkInPhoto: (r.check_in_photo as string) ?? undefined,
     checkOutPhoto: (r.check_out_photo as string) ?? undefined,
     report: (r.report as string) || undefined,
@@ -391,6 +412,8 @@ function contractToRow(c: Contract) {
     start_date: c.startDate ?? null,
     end_date: c.endDate ?? null,
     value: c.value ?? null,
+    schedule_description: c.scheduleDescription ?? null,
+    services: c.services ?? [],
   };
 }
 
@@ -406,6 +429,8 @@ function contractFromRow(r: Record<string, unknown>): Contract {
     startDate: (r.start_date as string) || undefined,
     endDate: (r.end_date as string) || undefined,
     value: r.value != null ? Number(r.value) : undefined,
+    scheduleDescription: (r.schedule_description as string) || undefined,
+    services: Array.isArray(r.services) ? r.services as ContractService[] : [],
     createdAt: (r.created_at as string) || new Date().toISOString(),
     updatedAt: (r.updated_at as string) || new Date().toISOString(),
   };
@@ -625,9 +650,10 @@ interface HomeCareState {
   requestCoverage: (visitId: string) => void;
 
   // Contract Actions
-  addContract: (contract: Omit<Contract, 'id' | 'tenantId' | 'createdAt' | 'updatedAt'>) => void;
+  addContract: (contract: Omit<Contract, 'id' | 'tenantId' | 'createdAt' | 'updatedAt'>) => Contract;
   updateContract: (id: string, data: Partial<Contract>) => void;
   deleteContract: (id: string) => void;
+  generateContractSchedule: (contractId: string, serviceId: string, days?: number) => Promise<{ created: number; skipped: number }>;
 
   // Invoice Actions
   addInvoice: (invoice: Omit<Invoice, 'id' | 'tenantId' | 'createdAt' | 'updatedAt'>) => Promise<Invoice | null>;
@@ -678,6 +704,20 @@ const saveToStorage = <T,>(key: string, value: T) => {
     console.error(`Error saving ${key} to storage`, err);
   }
 };
+
+const TENANT_SCOPED_STORAGE_KEYS = [
+  'activeTenantId', 'tenants', 'patients', 'professionals', 'insurances',
+  'visits', 'leads', 'messages', 'medicines', 'surveys', 'surveyConfig',
+  'alertConfig', 'resolvedAlertIds', 'assemblies', 'assemblyVotes',
+  'contracts', 'invoices', 'emailTemplates',
+] as const;
+
+function clearTenantScopedCache() {
+  if (typeof window === 'undefined') return;
+  for (const key of TENANT_SCOPED_STORAGE_KEYS) {
+    sessionStorage.removeItem(`homecare_pro_${key}`);
+  }
+}
 
 const isDemoModeEnabled = () => {
   if (isSupabaseConfigured) return false;
@@ -741,7 +781,27 @@ function registerAuthListener() {
       return;
     }
     if (event === 'SIGNED_OUT' || !session) {
-      useHomeCareStore.setState({ user: null, profile: null, isAuthenticated: false });
+      clearTenantScopedCache();
+      useHomeCareStore.setState({
+        user: null,
+        profile: null,
+        isAuthenticated: false,
+        activeTenantId: '',
+        tenants: [],
+        patients: [],
+        professionals: [],
+        insurances: [],
+        visits: [],
+        leads: [],
+        messages: [],
+        medicines: [],
+        surveys: [],
+        assemblies: [],
+        assemblyVotes: [],
+        contracts: [],
+        invoices: [],
+        emailTemplates: [],
+      });
     }
   });
 }
@@ -889,6 +949,28 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
       if (profileError) throw profileError;
 
       const profileTenantId = profile.tenant_id;
+
+      // O cache da sessão anterior não pode aparecer enquanto a nova conta
+      // ainda carrega seus dados. O RLS protege o banco, mas não protege um
+      // estado antigo já renderizado no navegador.
+      clearTenantScopedCache();
+      set({
+        activeTenantId: profileTenantId,
+        tenants: [],
+        patients: [],
+        professionals: [],
+        insurances: [],
+        visits: [],
+        leads: [],
+        messages: [],
+        medicines: [],
+        surveys: [],
+        assemblies: [],
+        assemblyVotes: [],
+        contracts: [],
+        invoices: [],
+        emailTemplates: [],
+      });
 
       // Determine the active tenant: prioritize subdomain context over profile
       const currentHostname = typeof window !== 'undefined' ? window.location.hostname : '';
@@ -1065,7 +1147,27 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
     if (isSupabaseConfigured) {
       await supabase.auth.signOut();
     }
-    set({ user: null, profile: null, isAuthenticated: false });
+    clearTenantScopedCache();
+    set({
+      user: null,
+      profile: null,
+      isAuthenticated: false,
+      activeTenantId: '',
+      tenants: [],
+      patients: [],
+      professionals: [],
+      insurances: [],
+      visits: [],
+      leads: [],
+      messages: [],
+      medicines: [],
+      surveys: [],
+      assemblies: [],
+      assemblyVotes: [],
+      contracts: [],
+      invoices: [],
+      emailTemplates: [],
+    });
     window.location.href = '/login';
   },
 
@@ -1938,6 +2040,7 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
     set({ contracts: updated });
     saveToStorage('contracts', updated);
     upsertRow('contracts', contractToRow(newContract));
+    return newContract;
   },
 
   updateContract: (id, data) => {
@@ -1954,6 +2057,70 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
     set({ contracts: updated });
     saveToStorage('contracts', updated);
     deleteRow('contracts', id);
+  },
+
+  generateContractSchedule: async (contractId, serviceId, days = 30) => {
+    const contract = get().contracts.find((item) => item.id === contractId);
+    const service = contract?.services?.find((item) => item.id === serviceId);
+    if (!contract || !service?.professionalId || !service.active) return { created: 0, skipped: 0 };
+
+    const today = new Date();
+    const formatDate = (date: Date) => {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+    const start = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const contractStart = service.startDate || contract.startDate;
+    if (contractStart && contractStart > formatDate(start)) {
+      const [year, month, day] = contractStart.split('-').map(Number);
+      start.setFullYear(year, month - 1, day);
+    }
+    const contractEnd = service.endDate || contract.endDate;
+    const createdVisits: Visit[] = [];
+    let skipped = 0;
+
+    for (let offset = 0; offset < days; offset += 1) {
+      const date = new Date(start);
+      date.setDate(start.getDate() + offset);
+      const dateString = formatDate(date);
+      if (contractEnd && dateString > contractEnd) break;
+      if (!service.daysOfWeek.includes(date.getDay())) continue;
+
+      const id = `visit-${service.id}-${dateString}`;
+      const exists = get().visits.some((visit) => visit.id === id || (
+        visit.contractServiceId === service.id && visit.date === dateString && visit.status !== 'cancelada'
+      ));
+      if (exists) {
+        skipped += 1;
+        continue;
+      }
+      createdVisits.push({
+        id,
+        tenantId: get().activeTenantId,
+        patientId: contract.patientId,
+        professionalId: service.professionalId,
+        date: dateString,
+        timeStart: service.timeStart,
+        timeEnd: service.timeEnd,
+        status: 'agendada',
+        value: service.professionalValue,
+        baseValue: service.professionalValue,
+        billingValue: service.billingValue,
+        contractId: contract.id,
+        contractServiceId: service.id,
+        generatedFromContract: true,
+      });
+    }
+
+    if (createdVisits.length > 0) {
+      const updated = [...get().visits, ...createdVisits];
+      set({ visits: updated });
+      saveToStorage('visits', updated);
+      await Promise.all(createdVisits.map((visit) => upsertRow('visits', visitToRow(visit))));
+    }
+    return { created: createdVisits.length, skipped };
   },
 
   // ── Invoice Actions ────────────────────────────────────────────

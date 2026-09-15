@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { useHomeCareStore } from '../store';
 import AITriageWidget from './AITriageWidget';
+import { findCurrentProfessional, getAssignedPatientIds } from '../lib/professionalContext';
 
 interface DashboardViewProps {
   setView: (view: string) => void;
@@ -19,12 +20,35 @@ interface DashboardViewProps {
 }
 
 export default function DashboardView({ setView, searchQuery }: DashboardViewProps) {
-  const { patients, professionals, visits, activeTenantId, leads, getCalculatedAlerts } = useHomeCareStore();
+  const { patients, professionals, visits, contracts, user, profile, currentUserRole, activeTenantId, leads, getCalculatedAlerts } = useHomeCareStore();
+
+  const currentProfessional = currentUserRole === 'professional' ? findCurrentProfessional(professionals, user, profile) : null;
+  const assignedPatientIds = currentUserRole === 'professional' ? getAssignedPatientIds(currentProfessional, visits, contracts) : null;
 
   // Filter based on active unit (Tenant)
-  const tenantPatients = patients.filter(p => p.tenantId === activeTenantId);
-  const tenantProfessionals = professionals.filter(p => p.tenantId === activeTenantId);
-  const tenantVisits = visits.filter(v => v.tenantId === activeTenantId);
+  const tenantPatients = patients.filter(p => {
+    if (p.tenantId !== activeTenantId) return false;
+    if (currentUserRole === 'professional') {
+      return assignedPatientIds ? assignedPatientIds.has(p.id) : false;
+    }
+    return true;
+  });
+  const tenantProfessionals = professionals.filter(p => {
+    if (p.tenantId !== activeTenantId) return false;
+    if (currentUserRole === 'professional') {
+      return currentProfessional ? p.id === currentProfessional.id : false;
+    }
+    return true;
+  });
+  const tenantVisits = visits.filter(v => {
+    if (v.tenantId !== activeTenantId) return false;
+    if (currentUserRole === 'professional') {
+      const isMyProf = currentProfessional ? v.professionalId === currentProfessional.id : false;
+      const isMyPatient = assignedPatientIds ? assignedPatientIds.has(v.patientId) : false;
+      return isMyProf || isMyPatient;
+    }
+    return true;
+  });
   const tenantLeads = leads.filter(l => l.tenantId === activeTenantId);
 
   // Today's date string

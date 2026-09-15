@@ -98,6 +98,48 @@ export interface TimelineEvent {
   };
 }
 
+export interface PadItem {
+  specialty: string;
+  quantity: number;
+}
+
+export interface AttendedPatient {
+  patientId: string;
+  shiftValue: number;
+}
+
+
+export interface Anamnesis {
+  conditions: {
+    parkinson?: boolean;
+    hypertension?: boolean;
+    diabetes?: boolean;
+    alzheimer?: boolean;
+    osteoporosis?: boolean;
+    cancer?: boolean;
+    fractured?: boolean;
+  };
+  mobility: {
+    needsHelp?: boolean;
+    usesObjects?: string[];
+  };
+  careNeeds: {
+    bathHelp?: boolean;
+    bathLocation?: string;
+    diaper?: boolean;
+    constipation?: boolean;
+  };
+  history: {
+    falls?: boolean;
+    recentFalls?: string;
+  };
+  nursingDiagnostics?: string[];
+  expectedResults?: string[];
+  nursingInterventions?: string[];
+  medicalHistory?: string;
+  physicalExam?: string;
+}
+
 export interface Patient {
   id: string;
   tenantId: string;
@@ -113,6 +155,9 @@ export interface Patient {
   insuranceId?: string;
   monthlyPackageValue?: number;
   padScope?: string;
+  padItems?: PadItem[];
+  dailyPackageValue?: number;
+  dailyPackageShifts?: number;
   contractDuration?: string;
   avatar: string;
   diagnostic: string;
@@ -133,6 +178,7 @@ export interface Patient {
     state: string;
     zipCode: string;
   };
+  anamnesis?: Anamnesis;
   summaryAi?: string;
 }
 
@@ -181,6 +227,7 @@ export interface Professional {
   score?: number;
   tier?: 'Bronze' | 'Prata' | 'Ouro' | 'Diamante';
   balance?: number;
+  attendedPatients?: AttendedPatient[];
 }
 
 export interface Visit {
@@ -204,6 +251,10 @@ export interface Visit {
   value: number;
   baseValue?: number;
   isCoverageRequested?: boolean;
+  contractId?: string;
+  contractServiceId?: string;
+  billingValue?: number;
+  generatedFromContract?: boolean;
 }
 
 export interface CRMLead {
@@ -375,8 +426,26 @@ export interface Contract {
   startDate?: string;
   endDate?: string;
   value?: number;
+  scheduleDescription?: string;
+  services?: ContractService[];
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ContractService {
+  id: string;
+  name: string;
+  description?: string;
+  specialty: ProfessionalSpecialty;
+  daysOfWeek: number[];
+  timeStart: string;
+  timeEnd: string;
+  billingValue: number;
+  professionalValue: number;
+  professionalId?: string;
+  startDate?: string;
+  endDate?: string;
+  active: boolean;
 }
 
 export interface Invoice {

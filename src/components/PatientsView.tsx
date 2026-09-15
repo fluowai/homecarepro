@@ -4,7 +4,8 @@ import {
   Search, 
   ChevronRight, 
   FileText, 
-  Clock, 
+  Clock,
+  Calendar as CalendarIcon, 
   MapPin, 
   Activity, 
   HeartHandshake, 
@@ -15,6 +16,7 @@ import {
   AlertTriangle,
   FileCheck2,
   Trash2,
+  CalendarDays,
   ArrowLeft,
   Users,
   Pill,
@@ -29,12 +31,13 @@ import { PatientStatus } from '../types';
 import { Patient, PatientResponsible } from '../types';
 import { uploadFileToMinio } from '../lib/upload';
 import { toast } from 'sonner';
+import { findCurrentProfessional, getAssignedPatientIds } from '../lib/professionalContext';
 
 interface PatientsViewProps {
   searchQuery: string;
 }
 
-type TabType = 'info' | 'clinical' | 'inventory' | 'files' | 'timeline' | 'ai';
+type TabType = 'info' | 'anamnesis' | 'clinical' | 'inventory' | 'files' | 'timeline' | 'schedules' | 'ai';
 
 export default function PatientsView({ searchQuery }: PatientsViewProps) {
   const { 
@@ -47,13 +50,29 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
     addTimelineEvent,
     generateAiSummary,
     insurances,
-    currentUserRole
+    currentUserRole,
+    professionals,
+    visits,
+    contracts,
+    user,
+    profile,
+    addVisit,
+    deleteVisit
   } = useHomeCareStore();
 
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>('info');
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingPatientId, setEditingPatientId] = useState<string | null>(null);
+
+  // Schedule Generator states
+  const [scheduleMonth, setScheduleMonth] = useState(new Date().toISOString().slice(0, 7)); // YYYY-MM
+  const [scheduleProfId, setScheduleProfId] = useState('');
+  const [scheduleDays, setScheduleDays] = useState<number[]>([]);
+  const [scheduleTimeStart, setScheduleTimeStart] = useState('08:00');
+  const [scheduleTimeEnd, setScheduleTimeEnd] = useState('20:00');
+  const [scheduleValue, setScheduleValue] = useState(150);
+
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
 
   // AI loading and output
@@ -69,6 +88,9 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
   const [email, setEmail] = useState('');
   const [planType, setPlanType] = useState('Particular');
   const [insuranceId, setInsuranceId] = useState('');
+  const [padItems, setPadItems] = useState<{ specialty: string; quantity: number }[]>([]);
+  const [dailyPackageValue, setDailyPackageValue] = useState<number | ''>('');
+  const [dailyPackageShifts, setDailyPackageShifts] = useState<number | ''>('');
   const [monthlyPackageValue, setMonthlyPackageValue] = useState<number | ''>('');
   const [padScope, setPadScope] = useState('');
   const [contractDuration, setContractDuration] = useState('');
@@ -82,6 +104,19 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
   const [zipCode, setZipCode] = useState('');
   const [responsibles, setResponsibles] = useState<PatientResponsible[]>([{ name: '', phone: '' }]);
 
+  // Anamnesis state
+  const [anamnesis, setAnamnesis] = useState<any>({
+    conditions: {},
+    mobility: {},
+    careNeeds: {},
+    history: {},
+    nursingDiagnostics: [],
+    expectedResults: [],
+    nursingInterventions: [],
+    medicalHistory: '',
+    physicalExam: ''
+  });
+
   // Manual event adding
   const [eventTitle, setEventTitle] = useState('');
   const [eventType, setEventType] = useState<'clinical' | 'visit' | 'system' | 'billing'>('clinical');
@@ -93,10 +128,62 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
 
+  const handleGenerateSchedules = () => {
+    if (!scheduleProfId || scheduleDays.length === 0) {
+      toast.error('Selecione o profissional e os dias da semana.');
+      return;
+    }
+    
+    const [year, month] = scheduleMonth.split('-').map(Number);
+    const date = new Date(year, month - 1, 1);
+    const lastDay = new Date(year, month, 0).getDate();
+    let count = 0;
+
+    for (let day = 1; day <= lastDay; day++) {
+      const currentDate = new Date(year, month - 1, day);
+      if (scheduleDays.includes(currentDate.getDay())) {
+        const visitDateStr = currentDate.toISOString().split('T')[0];
+        addVisit({
+          patientId: editingPatientId!,
+          professionalId: scheduleProfId,
+          date: visitDateStr,
+          timeStart: scheduleTimeStart,
+          timeEnd: scheduleTimeEnd,
+          status: 'agendada',
+          value: scheduleValue
+        });
+        count++;
+      }
+    }
+    
+    toast.success(`${count} plantões gerados com sucesso para ${scheduleMonth}!`);
+    setScheduleDays([]);
+    setScheduleProfId('');
+  };
+
+  const patientVisits = visits.filter(v => v.patientId === editingPatientId).sort((a, b) => a.date.localeCompare(b.date));
+  const tenantProfessionals = professionals.filter(p => p.tenantId === activeTenantId);
+
+  const handleDeleteVisit = (visitId: string) => {
+    if (confirm('Tem certeza que deseja cancelar este plantão?')) {
+      deleteVisit(visitId);
+      toast.success('Plantão cancelado.');
+    }
+  };
+
   const isManager = ['mega_admin', 'super_admin', 'admin', 'operator'].includes(currentUserRole);
 
+  const currentProfessional = currentUserRole === 'professional' ? findCurrentProfessional(professionals, user, profile) : null;
+  const assignedPatientIds = currentUserRole === 'professional' ? getAssignedPatientIds(currentProfessional, visits, contracts) : null;
+
   // Filter patients
-  const tenantPatients = patients.filter(p => p.tenantId === activeTenantId);
+  const tenantPatients = patients.filter(p => {
+    if (p.tenantId !== activeTenantId) return false;
+    if (currentUserRole === 'professional') {
+      return assignedPatientIds ? assignedPatientIds.has(p.id) : false;
+    }
+    return true;
+  });
   const filteredPatients = tenantPatients.filter(p => {
     const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           p.diagnostic.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -119,6 +206,9 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
     setInsuranceId('');
     setMonthlyPackageValue('');
     setPadScope('');
+    setPadItems([]);
+    setDailyPackageValue('');
+    setDailyPackageShifts('');
     setContractDuration('');
     setDiagnostic('');
     setAllergiesText('');
@@ -129,6 +219,17 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
     setState('SP');
     setZipCode('');
     setResponsibles([{ name: '', phone: '' }]);
+    setAnamnesis({
+      conditions: {},
+      mobility: {},
+      careNeeds: {},
+      history: {},
+      nursingDiagnostics: [],
+      expectedResults: [],
+      nursingInterventions: [],
+      medicalHistory: '',
+      physicalExam: ''
+    });
   };
 
   const openPatientEditor = (patient: Patient) => {
@@ -143,6 +244,9 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
     setInsuranceId(patient.insuranceId || '');
     setMonthlyPackageValue(patient.monthlyPackageValue ?? '');
     setPadScope(patient.padScope || '');
+    setPadItems(patient.padItems || []);
+    setDailyPackageValue(patient.dailyPackageValue ?? '');
+    setDailyPackageShifts(patient.dailyPackageShifts ?? '');
     setContractDuration(patient.contractDuration || '');
     setDiagnostic(patient.diagnostic);
     setAllergiesText(patient.allergies.join(', '));
@@ -153,6 +257,17 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
     setState(patient.address.state);
     setZipCode(patient.address.zipCode);
     setResponsibles(patient.responsibles?.length ? patient.responsibles : [{ name: '', phone: '' }]);
+    setAnamnesis(patient.anamnesis || {
+      conditions: {},
+      mobility: {},
+      careNeeds: {},
+      history: {},
+      nursingDiagnostics: [],
+      expectedResults: [],
+      nursingInterventions: [],
+      medicalHistory: '',
+      physicalExam: ''
+    });
     setActiveTab('info');
     setShowAddModal(true);
   };
@@ -182,6 +297,9 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
       insuranceId,
       monthlyPackageValue: Number(monthlyPackageValue) || undefined,
       padScope,
+      padItems,
+      dailyPackageValue: Number(dailyPackageValue) || undefined,
+      dailyPackageShifts: Number(dailyPackageShifts) || undefined,
       contractDuration,
       avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(name)}&backgroundColor=059669`,
       diagnostic,
@@ -803,20 +921,28 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
           {/* Header */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <h2 className="text-2xl font-bold text-slate-800 tracking-tight">Gestão de Pacientes Domiciliares</h2>
-              <p className="text-slate-500 text-sm mt-1">Lista unificada de prontuários, planos terapêuticos e monitoramento domiciliar.</p>
+              <h2 className="text-2xl font-bold text-slate-800 tracking-tight">
+                {currentUserRole === 'professional' ? 'Meus Pacientes Atendidos' : 'Gestão de Pacientes Domiciliares'}
+              </h2>
+              <p className="text-slate-500 text-sm mt-1">
+                {currentUserRole === 'professional'
+                  ? 'Lista de pacientes aos quais você está vinculado(a) para atendimento.'
+                  : 'Lista unificada de prontuários, planos terapêuticos e monitoramento domiciliar.'}
+              </p>
             </div>
-            <button
-              onClick={() => {
-                resetPatientForm();
-                setEditingPatientId(null);
-                setShowAddModal(true);
-              }}
-              className="flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-600 text-white font-semibold text-sm rounded-lg transition-all shadow-md shadow-green-100"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Cadastrar Paciente</span>
-            </button>
+            {isManager && (
+              <button
+                onClick={() => {
+                  resetPatientForm();
+                  setEditingPatientId(null);
+                  setShowAddModal(true);
+                }}
+                className="flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-600 text-white font-semibold text-sm rounded-lg transition-all shadow-md shadow-green-100"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Cadastrar Paciente</span>
+              </button>
+            )}
           </div>
 
           {/* Filtering row */}
@@ -1057,12 +1183,22 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
                         </select>
                       </div>
                       <div>
-                        <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Valor Mensal (R$)</label>
+                        <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Pacote Diário (R$)</label>
                         <input
                           type="number"
-                          value={monthlyPackageValue}
-                          onChange={(e) => setMonthlyPackageValue(e.target.value ? Number(e.target.value) : '')}
-                          placeholder="Ex: 5000"
+                          value={dailyPackageValue}
+                          onChange={(e) => setDailyPackageValue(e.target.value ? Number(e.target.value) : '')}
+                          placeholder="Valor Diário (Ex: 150)"
+                          className="w-full bg-slate-50 border border-slate-200 rounded-lg text-xs px-3 py-2 text-slate-700 focus:outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Qtd Plantões/Mês</label>
+                        <input
+                          type="number"
+                          value={dailyPackageShifts}
+                          onChange={(e) => setDailyPackageShifts(e.target.value ? Number(e.target.value) : '')}
+                          placeholder="Ex: 30"
                           className="w-full bg-slate-50 border border-slate-200 rounded-lg text-xs px-3 py-2 text-slate-700 focus:outline-none"
                         />
                       </div>
@@ -1077,14 +1213,64 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
                         />
                       </div>
                       <div className="md:col-span-2">
-                        <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Descrição do PAD (Plano de Atenção Domiciliar)</label>
-                        <input
-                          type="text"
-                          value={padScope}
-                          onChange={(e) => setPadScope(e.target.value)}
-                          placeholder="Ex: Fisio 3x semana, Fono 2x semana, Téc Enfermagem 12h diurnas"
-                          className="w-full bg-slate-50 border border-slate-200 rounded-lg text-xs px-3 py-2 text-slate-700 focus:outline-none"
-                        />
+                        <div className="flex items-center justify-between mb-2">
+                          <label className="text-[10px] font-bold text-slate-400 uppercase">PAD (Especialidades)</label>
+                          <button
+                            type="button"
+                            onClick={() => setPadItems([...padItems, { specialty: 'Enfermeiro', quantity: 1 }])}
+                            className="inline-flex items-center gap-1 text-[10px] font-bold text-green-600 hover:text-green-700"
+                          >
+                            <PlusCircle className="w-3 h-3" />
+                            Adicionar outra especialidade
+                          </button>
+                        </div>
+                        <div className="space-y-2">
+                          {padItems.length === 0 && <p className="text-xs text-slate-400 italic bg-slate-50 p-2 rounded-lg border border-slate-100">Nenhuma especialidade informada.</p>}
+                          {padItems.map((item, idx) => (
+                            <div key={idx} className="flex gap-2 items-center">
+                              <select
+                                value={item.specialty}
+                                onChange={(e) => {
+                                  const newItems = [...padItems];
+                                  newItems[idx].specialty = e.target.value;
+                                  setPadItems(newItems);
+                                }}
+                                className="flex-1 bg-slate-50 border border-slate-200 rounded-lg text-xs px-2 py-2 text-slate-700 focus:outline-none"
+                              >
+                                <option value="Enfermeiro">Enfermeiro (Enfermagem Geral)</option>
+                                <option value="Técnico de Enfermagem">Técnico de Enfermagem</option>
+                                <option value="Auxiliar de Enfermagem">Auxiliar de Enfermagem</option>
+                                <option value="Fisioterapeuta">Fisioterapeuta (Motora / Respiratória)</option>
+                                <option value="Fonoaudiólogo">Fonoaudiólogo</option>
+                                <option value="Médico">Médico (Geriatra / Assistente)</option>
+                                <option value="Nutricionista">Nutricionista</option>
+                                <option value="Psicólogo">Psicólogo</option>
+                                <option value="Terapeuta Ocupacional">Terapeuta Ocupacional</option>
+                                <option value="Assistente Social">Assistente Social</option>
+                                <option value="Cuidador de Idosos">Cuidador de Idosos</option>
+                              </select>
+                              <input
+                                type="number"
+                                min="1"
+                                value={item.quantity}
+                                onChange={(e) => {
+                                  const newItems = [...padItems];
+                                  newItems[idx].quantity = Number(e.target.value);
+                                  setPadItems(newItems);
+                                }}
+                                placeholder="Qtd"
+                                className="w-24 bg-slate-50 border border-slate-200 rounded-lg text-xs px-2 py-2 text-slate-700 focus:outline-none"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setPadItems(padItems.filter((_, i) => i !== idx))}
+                                className="p-2 text-slate-400 hover:text-red-500 rounded-lg bg-slate-50 border border-slate-200"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                       <div className="md:col-span-2">
                         <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Alergias (separadas por vírgula)</label>

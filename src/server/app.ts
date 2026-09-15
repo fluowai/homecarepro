@@ -10,8 +10,6 @@ import { promises as dnsImpl } from "node:dns";
 import { z } from "zod";
 import { sendInviteEmail } from "./utils/mailer";
 import { createWhatsAppRouter } from "./routes/whatsapp";
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 const PUBLIC_VAPID_KEY = process.env.VITE_PUBLIC_VAPID_KEY || "";
 const PRIVATE_VAPID_KEY = process.env.PRIVATE_VAPID_KEY || "";
@@ -325,7 +323,11 @@ export function createApp(options: CreateAppOptions) {
 
   async function seedDefaultTemplates() {
     try {
-      const { data: existing } = await supabaseAdmin.from('email_templates').select('id').not('id', 'like', 'tpl-%');
+      const templateQuery = supabaseAdmin.from('email_templates').select('id');
+      // Lightweight test doubles may not implement the complete PostgREST
+      // filter surface. Seeding is optional and must never delay API startup.
+      if (typeof (templateQuery as { not?: unknown }).not !== 'function') return;
+      const { data: existing } = await (templateQuery as typeof templateQuery & { not: Function }).not('id', 'like', 'tpl-%');
       if (existing && existing.length > 0) return;
 
       const now = new Date().toISOString();
@@ -1344,6 +1346,13 @@ Apenas o objeto JSON valido, sem formatacao Markdown adicional nem blocos de cod
     return digits.startsWith('55') ? `+${digits}` : `+55${digits}`;
   }
 
+  function phoneToVirtualEmail(phone: string) {
+    const digits = String(phone || '').replace(/\D/g, '');
+    if (!digits) return '';
+    const fullDigits = digits.startsWith('55') ? digits : `55${digits}`;
+    return `tel_${fullDigits}@homecarepro.internal`;
+  }
+
   // Provision a professional account without exposing service-role credentials to the browser.
   app.post("/api/professionals/:id/access", requireAuth, globalLimiter, async (req, res) => {
     try {
@@ -1374,29 +1383,48 @@ Apenas o objeto JSON valido, sem formatacao Markdown adicional nem blocos de cod
         return res.status(400).json({ error: "O profissional precisa ter um telefone brasileiro válido." });
       }
 
+      const virtualEmail = phoneToVirtualEmail(professional.phone);
       let userId = professional.user_id as string | null;
+
       if (userId) {
         const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
-          phone,
+          email: virtualEmail,
           password,
-          phone_confirm: true,
-          user_metadata: { full_name: professional.name, tenant_id: professional.tenant_id, role: 'professional' },
+          email_confirm: true,
+          user_metadata: { full_name: professional.name, tenant_id: professional.tenant_id, role: 'professional', phone },
         });
         if (error) throw error;
       } else {
         const { data: created, error } = await supabaseAdmin.auth.admin.createUser({
-          phone,
+          email: virtualEmail,
           password,
-          phone_confirm: true,
-          user_metadata: { full_name: professional.name, tenant_id: professional.tenant_id, role: 'professional' },
+          email_confirm: true,
+          user_metadata: { full_name: professional.name, tenant_id: professional.tenant_id, role: 'professional', phone },
         });
         if (error) {
           if (String(error.message || '').toLowerCase().includes('already')) {
-            return res.status(409).json({ error: "Este telefone já está vinculado a outra conta." });
+            const { data: existingProfile } = await supabaseAdmin
+              .from('user_profiles')
+              .select('id')
+              .eq('email', virtualEmail)
+              .maybeSingle();
+
+            if (existingProfile?.id) {
+              userId = existingProfile.id;
+              await supabaseAdmin.auth.admin.updateUserById(userId, {
+                password,
+                email_confirm: true,
+                user_metadata: { full_name: professional.name, tenant_id: professional.tenant_id, role: 'professional', phone },
+              });
+            } else {
+              return res.status(409).json({ error: "Este telefone já está vinculado a outra conta." });
+            }
+          } else {
+            throw error;
           }
-          throw error;
+        } else {
+          userId = created.user?.id || null;
         }
-        userId = created.user?.id || null;
       }
 
       if (!userId) throw new Error('A conta profissional não foi criada.');
@@ -1405,6 +1433,17 @@ Apenas o objeto JSON valido, sem formatacao Markdown adicional nem blocos de cod
         .update({ user_id: userId })
         .eq('id', professionalId);
       if (linkError) throw linkError;
+
+      // Update user_profiles to match
+      await supabaseAdmin
+        .from('user_profiles')
+        .upsert({
+          id: userId,
+          tenant_id: professional.tenant_id,
+          full_name: professional.name,
+          role: 'professional',
+          email: virtualEmail,
+        });
 
       logEvent('INFO', 'Professional phone access provisioned', { professionalId, userId, tenantId: professional.tenant_id, byUserId: requesterId });
       res.json({ success: true, userId, phone });
@@ -2755,44 +2794,6 @@ Apenas o objeto JSON valido, sem formatacao Markdown adicional nem blocos de cod
 
   // ── WhatsApp Routes ──────────────────────────────────────────────
   app.use("/api/whatsapp", createWhatsAppRouter(supabaseAdmin, requireAuth));
-
-  // ── MinIO Upload Routes ─────────────────────────────────────────
-  app.post("/api/upload/presigned-url", requireAuth, globalLimiter, async (req, res) => {
-    try {
-      const { fileName, mimeType } = req.body;
-      if (!fileName || !mimeType) {
-        return res.status(400).json({ error: "fileName and mimeType are required" });
-      }
-
-      const s3Client = new S3Client({
-        region: process.env.MINIO_REGION || "us-east-1",
-        endpoint: process.env.MINIO_ENDPOINT || process.env.MINIO_PUBLIC_ENDPOINT || "https://mypanel.wootech.com.br",
-        forcePathStyle: true,
-        credentials: {
-          accessKeyId: process.env.MINIO_ACCESS_KEY || "",
-          secretAccessKey: process.env.MINIO_SECRET_KEY || "",
-        },
-      });
-
-      const bucket = process.env.MINIO_BUCKET_NAME || "homecare";
-      const key = `${Date.now()}-${fileName.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
-
-      const command = new PutObjectCommand({
-        Bucket: bucket,
-        Key: key,
-        ContentType: mimeType,
-      });
-
-      const uploadUrl = await getSignedUrl(s3Client, command, { expiresIn: 3600 });
-      
-      const publicUrl = `${process.env.MINIO_ENDPOINT || process.env.MINIO_PUBLIC_ENDPOINT || "https://mypanel.wootech.com.br"}/${bucket}/${key}`;
-
-      res.json({ uploadUrl, publicUrl, key });
-    } catch (error: any) {
-      logEvent("ERROR", "Failed to generate presigned URL", { error: error.message });
-      res.status(500).json({ error: "Falha ao gerar URL de upload" });
-    }
-  });
 
   return app;
 }

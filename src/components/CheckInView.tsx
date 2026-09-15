@@ -24,12 +24,17 @@ import {
 import { useHomeCareStore } from '../store';
 import { uploadFileToMinio } from '../lib/upload';
 import { toast } from 'sonner';
+import { findCurrentProfessional, getAssignedPatientIds } from '../lib/professionalContext';
 
 export default function CheckInView() {
   const { 
     patients, 
     professionals, 
     visits, 
+    contracts,
+    user,
+    profile,
+    currentUserRole,
     activeTenantId, 
     checkInVisit, 
     checkOutVisit,
@@ -44,6 +49,9 @@ export default function CheckInView() {
     syncOfflineData,
     clearOfflineQueue
   } = useHomeCareStore();
+
+  const currentProfessional = currentUserRole === 'professional' ? findCurrentProfessional(professionals, user, profile) : null;
+  const assignedPatientIds = currentUserRole === 'professional' ? getAssignedPatientIds(currentProfessional, visits, contracts) : null;
 
   const [selectedVisitId, setSelectedVisitId] = useState<string>('');
   const [isJourneyOpen, setIsJourneyOpen] = useState(false);
@@ -78,7 +86,15 @@ export default function CheckInView() {
 
   // Filters for today's visits
   const todayStr = new Date().toISOString().split('T')[0];
-  const tenantVisits = visits.filter(v => v.tenantId === activeTenantId && v.date === todayStr);
+  const tenantVisits = visits.filter(v => {
+    if (v.tenantId !== activeTenantId || v.date !== todayStr) return false;
+    if (currentUserRole === 'professional') {
+      const isMyProf = currentProfessional ? v.professionalId === currentProfessional.id : false;
+      const isMyPatient = assignedPatientIds ? assignedPatientIds.has(v.patientId) : false;
+      return isMyProf || isMyPatient;
+    }
+    return true;
+  });
 
   const pendingVisits = tenantVisits.filter(v => v.status === 'agendada');
   const activeOrDoneVisits = tenantVisits.filter(v => v.status === 'em_andamento' || v.status === 'concluida');
@@ -236,15 +252,6 @@ ${rawNotes}
       return;
     }
 
-    // Deduct medicines used
-    usedMeds.forEach(item => {
-      consumeMedicine(item.id, item.qty);
-      const visit = visits.find(v => v.id === selectedVisitId);
-      if (visit) {
-        consumePatientInventory(visit.patientId, item.id, item.qty);
-      }
-    });
-
     const coords = await getCurrentPosition();
     if (!coords) {
       toast.error("Não foi possível obter a localização GPS no check-out. Verifique as permissões de localização do navegador.");
@@ -272,6 +279,14 @@ ${rawNotes}
     }
     
     checkOutVisit(selectedVisitId, locationStr, finalReport, { pa, fc, temp, sat }, rawNotes, usedMeds, coords, photoUrl);
+
+    // Deduct medicines only after all checkout validations and persistence
+    // inputs have succeeded, avoiding inventory loss on a failed GPS/photo step.
+    usedMeds.forEach(item => {
+      consumeMedicine(item.id, item.qty);
+      const visit = visits.find(v => v.id === selectedVisitId);
+      if (visit) consumePatientInventory(visit.patientId, item.id, item.qty);
+    });
     
     // Clear bedside states
     setRawNotes('');

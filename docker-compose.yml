@@ -28,6 +28,12 @@ services:
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - ASAAS_API_KEY=${ASAAS_API_KEY}
       - ASAAS_WEBHOOK_TOKEN=${ASAAS_WEBHOOK_TOKEN}
+      - MINIO_ENDPOINT=${MINIO_ENDPOINT:-https://storage.wootech.com.br}
+      - MINIO_PUBLIC_ENDPOINT=${MINIO_PUBLIC_ENDPOINT:-https://storage.wootech.com.br}
+      - MINIO_REGION=${MINIO_REGION:-us-east-1}
+      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY}
+      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY}
+      - MINIO_BUCKET_NAME=${MINIO_BUCKET_NAME:-homecare-uploads}
     networks:
       - homecarepro-network
     healthcheck:

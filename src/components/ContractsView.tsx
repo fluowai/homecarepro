@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { FileText, Plus, Search, FileSignature, CheckCircle2, AlertCircle, Eye, Download, X, Pencil, Save } from 'lucide-react';
 import { useHomeCareStore } from '../store';
-import { Contract } from '../types';
+import { Contract, ContractService, ProfessionalSpecialty } from '../types';
 
 export default function ContractsView() {
-  const { patients, contracts, activeTenantId, addContract, updateContract, deleteContract } = useHomeCareStore();
+  const { patients, professionals, contracts, activeTenantId, addContract, updateContract, deleteContract, generateContractSchedule } = useHomeCareStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [showNewModal, setShowNewModal] = useState(false);
   const [editingContractId, setEditingContractId] = useState<string | null>(null);
@@ -17,6 +17,8 @@ export default function ContractsView() {
   const [formStart, setFormStart] = useState('');
   const [formEnd, setFormEnd] = useState('');
   const [formValue, setFormValue] = useState('');
+  const [formScheduleDescription, setFormScheduleDescription] = useState('');
+  const [formServices, setFormServices] = useState<ContractService[]>([]);
 
   const tenantPatients = patients.filter(p => p.tenantId === activeTenantId);
   const tenantContracts = contracts.filter(c => c.tenantId === activeTenantId);
@@ -29,12 +31,14 @@ export default function ContractsView() {
 
   const resetForm = () => {
     setFormPatientId(''); setFormTitle(''); setFormStatus('draft'); setFormStart(''); setFormEnd(''); setFormValue('');
+    setFormScheduleDescription(''); setFormServices([]);
   };
 
   const openEditor = (contract: Contract) => {
     setEditingContractId(contract.id); setFormPatientId(contract.patientId); setFormTitle(contract.title);
     setFormStatus(contract.status); setFormStart(contract.startDate || ''); setFormEnd(contract.endDate || '');
-    setFormValue(contract.value?.toString() || ''); setShowNewModal(true);
+    setFormValue(contract.value?.toString() || ''); setFormScheduleDescription(contract.scheduleDescription || '');
+    setFormServices(contract.services || []); setShowNewModal(true);
   };
 
   const getStatusInfo = (status: string) => {
@@ -47,7 +51,7 @@ export default function ContractsView() {
     }
   };
 
-  const handleCreateContract = (e: React.FormEvent) => {
+  const handleCreateContract = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formPatientId) return;
     const patient = tenantPatients.find(p => p.id === formPatientId);
@@ -58,12 +62,33 @@ export default function ContractsView() {
       startDate: formStart || undefined,
       endDate: formEnd || undefined,
       value: formValue ? Number(formValue) : undefined,
+      scheduleDescription: formScheduleDescription.trim() || undefined,
+      services: formServices,
     };
+    const savedContract = editingContractId
+      ? ({ ...contracts.find(c => c.id === editingContractId), ...contractData, id: editingContractId } as Contract)
+      : addContract(contractData);
     if (editingContractId) updateContract(editingContractId, contractData);
-    else addContract(contractData);
+    for (const service of formServices) {
+      if (service.professionalId && service.active) await generateContractSchedule(savedContract.id, service.id);
+    }
     setShowNewModal(false);
     resetForm(); setEditingContractId(null);
   };
+
+  const addService = () => setFormServices(current => [...current, {
+    id: `service-${Date.now()}-${current.length}`,
+    name: '', specialty: 'Cuidador de Idosos', daysOfWeek: [1, 2, 3, 4, 5],
+    timeStart: '08:00', timeEnd: '20:00', billingValue: 0, professionalValue: 0, active: true,
+  }]);
+
+  const updateService = (id: string, data: Partial<ContractService>) =>
+    setFormServices(current => current.map(service => service.id === id ? { ...service, ...data } : service));
+
+  const removeService = (id: string) => setFormServices(current => current.filter(service => service.id !== id));
+
+  const specialtyOptions: ProfessionalSpecialty[] = ['Enfermeiro', 'Técnico de Enfermagem', 'Auxiliar de Enfermagem', 'Cuidador de Idosos', 'Médico', 'Fisioterapeuta', 'Fonoaudiólogo', 'Nutricionista', 'Psicólogo', 'Terapeuta Ocupacional', 'Assistente Social'];
+  const dayOptions = [{ value: 1, label: 'Seg' }, { value: 2, label: 'Ter' }, { value: 3, label: 'Qua' }, { value: 4, label: 'Qui' }, { value: 5, label: 'Sex' }, { value: 6, label: 'Sáb' }, { value: 0, label: 'Dom' }];
 
   const handleDownloadContract = (c: Contract) => {
     const patient = patients.find(p => p.id === c.patientId);
@@ -74,6 +99,8 @@ export default function ContractsView() {
       `Título: ${c.title}`,
       `Vigência: ${c.startDate || '—'} a ${c.endDate || '—'}`,
       `Valor Mensal: R$ ${(c.value ?? 0).toFixed(2)}`,
+      `Serviços cadastrados: ${c.services?.length ?? 0}`,
+      ...(c.services || []).map(service => `- ${service.name || 'Serviço'}: R$ ${service.professionalValue.toFixed(2)} por plantão${service.professionalId ? ' (profissional vinculado)' : ''}`),
       `Status: ${getStatusInfo(c.status).label}`,
       '',
       'Este arquivo é um extrato de resumo do contrato. O documento oficial',
@@ -203,7 +230,7 @@ export default function ContractsView() {
 
       {showNewModal && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-30 p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full border border-slate-200 shadow-2xl">
+          <div className="bg-white rounded-2xl max-w-3xl w-full max-h-[92vh] overflow-y-auto border border-slate-200 shadow-2xl">
             <div className="p-6 border-b border-slate-100 flex items-center justify-between">
               <h3 className="font-bold text-base text-slate-800">{editingContractId ? 'Editar Contrato' : 'Novo Contrato'}</h3>
               <button onClick={() => { resetForm(); setEditingContractId(null); setShowNewModal(false); }} className="p-1.5 text-slate-400 hover:bg-slate-50 rounded-lg"><X className="w-5 h-5" /></button>
@@ -218,6 +245,49 @@ export default function ContractsView() {
                 <option value="draft">Rascunho</option><option value="pending_signature">Aguardando Assinatura</option><option value="active">Vigente</option><option value="terminated">Encerrado</option>
               </select>
               <div className="grid grid-cols-3 gap-3"><input type="date" value={formStart} onChange={e => setFormStart(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-lg text-sm px-2 py-2" /><input type="date" value={formEnd} onChange={e => setFormEnd(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-lg text-sm px-2 py-2" /><input type="number" min="0" value={formValue} onChange={e => setFormValue(e.target.value)} placeholder="Valor mensal" className="bg-slate-50 border border-slate-200 rounded-lg text-sm px-2 py-2" /></div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1">Descrição da escala e regras operacionais</label>
+                <textarea value={formScheduleDescription} onChange={e => setFormScheduleDescription(e.target.value)} rows={2} placeholder="Ex.: atendimento domiciliar todos os dias, cobertura de 12 horas..." className="w-full bg-slate-50 border border-slate-200 rounded-lg text-sm px-3 py-2 resize-y" />
+              </div>
+
+              <div className="border-t border-slate-100 pt-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="font-bold text-sm text-slate-800">Serviços e regras de plantão</h4>
+                    <p className="text-xs text-slate-500">O valor do profissional é fixo por plantão, sem comissão.</p>
+                  </div>
+                  <button type="button" onClick={addService} className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-green-700 bg-green-50 rounded-lg hover:bg-green-100"><Plus className="w-3.5 h-3.5" />Adicionar serviço</button>
+                </div>
+                {formServices.length === 0 && <div className="rounded-lg border border-dashed border-slate-200 p-4 text-center text-xs text-slate-400">Nenhum serviço cadastrado. Adicione um serviço para gerar a escala automaticamente.</div>}
+                {formServices.map(service => (
+                  <div key={service.id} className="rounded-xl border border-slate-200 bg-slate-50/70 p-4 space-y-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 flex-1">
+                        <input required value={service.name} onChange={e => updateService(service.id, { name: e.target.value })} placeholder="Nome do serviço" className="bg-white border border-slate-200 rounded-lg text-sm px-3 py-2" />
+                        <select value={service.specialty} onChange={e => updateService(service.id, { specialty: e.target.value as ProfessionalSpecialty })} className="bg-white border border-slate-200 rounded-lg text-sm px-3 py-2">
+                          {specialtyOptions.map(option => <option key={option} value={option}>{option}</option>)}
+                        </select>
+                      </div>
+                      <button type="button" onClick={() => removeService(service.id)} className="p-2 text-slate-400 hover:text-red-600" title="Remover serviço"><X className="w-4 h-4" /></button>
+                    </div>
+                    <textarea value={service.description || ''} onChange={e => updateService(service.id, { description: e.target.value })} rows={2} placeholder="Descrição do serviço" className="w-full bg-white border border-slate-200 rounded-lg text-sm px-3 py-2 resize-y" />
+                    <div className="flex flex-wrap gap-1.5">
+                      {dayOptions.map(day => <button type="button" key={day.value} onClick={() => updateService(service.id, { daysOfWeek: service.daysOfWeek.includes(day.value) ? service.daysOfWeek.filter(value => value !== day.value) : [...service.daysOfWeek, day.value] })} className={`px-2.5 py-1 rounded-md text-[11px] font-bold border ${service.daysOfWeek.includes(day.value) ? 'bg-green-600 text-white border-green-600' : 'bg-white text-slate-500 border-slate-200'}`}>{day.label}</button>)}
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                      <input type="time" value={service.timeStart} onChange={e => updateService(service.id, { timeStart: e.target.value })} className="bg-white border border-slate-200 rounded-lg text-sm px-2 py-2" />
+                      <input type="time" value={service.timeEnd} onChange={e => updateService(service.id, { timeEnd: e.target.value })} className="bg-white border border-slate-200 rounded-lg text-sm px-2 py-2" />
+                      <input type="number" min="0" step="0.01" value={service.billingValue} onChange={e => updateService(service.id, { billingValue: Number(e.target.value) })} placeholder="Valor clínica" className="bg-white border border-slate-200 rounded-lg text-sm px-2 py-2" />
+                      <input required type="number" min="0" step="0.01" value={service.professionalValue} onChange={e => updateService(service.id, { professionalValue: Number(e.target.value) })} placeholder="Valor plantão" className="bg-white border border-slate-200 rounded-lg text-sm px-2 py-2" />
+                      <select value={service.professionalId || ''} onChange={e => updateService(service.id, { professionalId: e.target.value || undefined })} className="bg-white border border-slate-200 rounded-lg text-sm px-2 py-2">
+                        <option value="">Vincular profissional</option>
+                        {professionals.filter(p => p.tenantId === activeTenantId && (p.specialty === service.specialty || !service.specialty)).map(professional => <option key={professional.id} value={professional.id}>{professional.name}</option>)}
+                      </select>
+                    </div>
+                    {service.professionalId && <p className="text-[11px] text-green-700 bg-green-50 rounded-lg px-3 py-2">Ao salvar, serão gerados os próximos 30 dias de escala conforme os dias e horários selecionados.</p>}
+                  </div>
+                ))}
+              </div>
               <div className="flex justify-end gap-3 border-t border-slate-100 pt-4"><button type="button" onClick={() => { resetForm(); setEditingContractId(null); setShowNewModal(false); }} className="px-4 py-2 border border-slate-200 rounded-lg text-sm">Cancelar</button><button type="submit" className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-bold flex items-center gap-1.5"><Save className="w-4 h-4" />Salvar</button></div>
             </form>
           </div>
@@ -255,6 +325,10 @@ export default function ContractsView() {
                   <span className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Fim</span>
                   <span className="text-slate-700">{viewing.endDate || '—'}</span>
                 </div>
+              </div>
+              <div>
+                <span className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Serviços e plantões</span>
+                {viewing.services?.length ? <div className="space-y-2">{viewing.services.map(service => <div key={service.id} className="rounded-lg bg-slate-50 border border-slate-100 p-3 text-xs"><div className="font-bold text-slate-800">{service.name || 'Serviço'} {service.professionalId ? '• profissional vinculado' : '• sem profissional'}</div><div className="text-slate-500 mt-1">{service.timeStart}–{service.timeEnd} · R$ {service.professionalValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} por plantão</div></div>)}</div> : <span className="text-slate-500">Nenhum serviço cadastrado.</span>}
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
