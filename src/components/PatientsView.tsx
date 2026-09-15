@@ -654,6 +654,8 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
                           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Responsável {index + 1}</span>
                           <p className="text-slate-700 text-sm font-medium mt-1">{responsible.name || 'Nome não informado'}</p>
                           <p className="text-slate-500 text-xs mt-1">{responsible.phone || 'Telefone não informado'}</p>
+                          {responsible.cpf && <p className="text-slate-500 text-xs mt-1">CPF: {responsible.cpf}</p>}
+                          {responsible.email && <p className="text-slate-500 text-xs mt-1">E-mail: {responsible.email}</p>}
                         </div>
                       ))}
                     </div>

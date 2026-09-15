@@ -54,6 +54,8 @@ export interface PatientFamilyLink {
 export interface PatientResponsible {
   name: string;
   phone: string;
+  cpf?: string;
+  email?: string;
 }
 
 export interface UserTenant {
