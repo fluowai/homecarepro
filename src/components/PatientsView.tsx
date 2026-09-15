@@ -608,6 +608,7 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
             {[
               { id: 'info', label: 'Contato', icon: MapPin },
               { id: 'clinical', label: 'Clínico', icon: Activity },
+              { id: 'anamnesis', label: 'Prontuário integral', icon: FileText },
               { id: 'inventory', label: 'Farmácia Domiciliar', icon: Pill },
               { id: 'files', label: 'Anexos', icon: Paperclip },
               { id: 'timeline', label: 'Histórico', icon: Clock },
@@ -718,6 +719,26 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
                     <p className="text-slate-400 text-xs">Nenhum medicamento de uso contínuo cadastrado.</p>
                   )}
                 </div>
+              </div>
+            )}
+
+            {/* FULL SOURCE RECORD TAB */}
+            {activeTab === 'anamnesis' && (
+              <div className="space-y-5">
+                <div>
+                  <h3 className="font-bold text-slate-800 text-sm uppercase tracking-wide">Conteúdo integral dos prontuários</h3>
+                  <p className="text-xs text-slate-500 mt-1">Transcrição preservada dos documentos-fonte associados a esta ficha.</p>
+                </div>
+                {(selectedPatient.anamnesis as any)?.source_documents?.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {(selectedPatient.anamnesis as any).source_documents.map((documentName: string) => (
+                      <span key={documentName} className="px-2.5 py-1 rounded-lg bg-green-50 border border-green-100 text-green-700 text-[11px] font-semibold">{documentName}</span>
+                    ))}
+                  </div>
+                )}
+                <pre className="whitespace-pre-wrap break-words max-h-[680px] overflow-auto rounded-xl border border-slate-200 bg-slate-50 p-4 text-xs leading-5 text-slate-700 font-sans">
+                  {(selectedPatient.anamnesis as any)?.full_document_content || 'Nenhum conteúdo integral foi registrado nesta ficha.'}
+                </pre>
               </div>
             )}
 
