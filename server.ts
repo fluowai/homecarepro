@@ -9,7 +9,8 @@ import { createApp, logEvent } from "./src/server/app";
 
 // ── Environment Validation ──────────────────────────────────────
 dotenv.config();
-dotenv.config({ path: '.env.production' });
+// Production values must override local .env values (especially storage endpoints).
+dotenv.config({ path: '.env.production', override: true });
 
 const REQUIRED_ENV_VARS = [
   "SUPABASE_SERVICE_ROLE_KEY",

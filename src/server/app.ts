@@ -75,6 +75,12 @@ const triageSchema = z.object({
   mainCondition: z.string().min(1).optional(),
 });
 
+const extractPdfSchema = z.object({
+  pdfBase64: z.string().min(1),
+  mimeType: z.string().optional().default("application/pdf"),
+  patientId: z.string().optional(),
+});
+
 const emailTemplateSchema = z.object({
   name: z.string().min(1),
   type: z.enum(['system', 'tenant']).optional().default('tenant'),
@@ -132,6 +138,7 @@ export function createApp(options: CreateAppOptions) {
 
   const SUPABASE_URL = process.env.VITE_SUPABASE_URL || "";
   const SUPABASE_WS_URL = SUPABASE_URL.replace(/^https?:/i, "wss:");
+  const MINIO_PUBLIC_ENDPOINT = (process.env.MINIO_PUBLIC_ENDPOINT || process.env.MINIO_ENDPOINT || "https://storage.wootech.com.br").replace(/\/$/, "");
   const APP_BASE_DOMAIN = appBaseDomain || process.env.APP_BASE_DOMAIN || "homecare.wootech.com.br";
 
   const RESERVED_SUBDOMAINS = new Set([
@@ -373,7 +380,7 @@ export function createApp(options: CreateAppOptions) {
         styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
         mediaSrc: ["'self'", "blob:"],
         imgSrc: ["'self'", "data:", "https:"],
-        connectSrc: ["'self'", SUPABASE_URL, SUPABASE_WS_URL, "ws://localhost:*", "http://localhost:*"].filter(Boolean),
+        connectSrc: ["'self'", SUPABASE_URL, SUPABASE_WS_URL, MINIO_PUBLIC_ENDPOINT, "ws://localhost:*", "http://localhost:*"].filter(Boolean),
         fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
         objectSrc: ["'none'"],
         frameAncestors: ["'none'"],
