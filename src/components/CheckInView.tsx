@@ -252,15 +252,6 @@ ${rawNotes}
       return;
     }
 
-    // Deduct medicines used
-    usedMeds.forEach(item => {
-      consumeMedicine(item.id, item.qty);
-      const visit = visits.find(v => v.id === selectedVisitId);
-      if (visit) {
-        consumePatientInventory(visit.patientId, item.id, item.qty);
-      }
-    });
-
     const coords = await getCurrentPosition();
     if (!coords) {
       toast.error("Não foi possível obter a localização GPS no check-out. Verifique as permissões de localização do navegador.");
@@ -288,6 +279,14 @@ ${rawNotes}
     }
     
     checkOutVisit(selectedVisitId, locationStr, finalReport, { pa, fc, temp, sat }, rawNotes, usedMeds, coords, photoUrl);
+
+    // Deduct medicines only after all checkout validations and persistence
+    // inputs have succeeded, avoiding inventory loss on a failed GPS/photo step.
+    usedMeds.forEach(item => {
+      consumeMedicine(item.id, item.qty);
+      const visit = visits.find(v => v.id === selectedVisitId);
+      if (visit) consumePatientInventory(visit.patientId, item.id, item.qty);
+    });
     
     // Clear bedside states
     setRawNotes('');

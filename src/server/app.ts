@@ -10,8 +10,6 @@ import { promises as dnsImpl } from "node:dns";
 import { z } from "zod";
 import { sendInviteEmail } from "./utils/mailer";
 import { createWhatsAppRouter } from "./routes/whatsapp";
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 const PUBLIC_VAPID_KEY = process.env.VITE_PUBLIC_VAPID_KEY || "";
 const PRIVATE_VAPID_KEY = process.env.PRIVATE_VAPID_KEY || "";
@@ -2796,44 +2794,6 @@ Apenas o objeto JSON valido, sem formatacao Markdown adicional nem blocos de cod
 
   // ── WhatsApp Routes ──────────────────────────────────────────────
   app.use("/api/whatsapp", createWhatsAppRouter(supabaseAdmin, requireAuth));
-
-  // ── MinIO Upload Routes ─────────────────────────────────────────
-  app.post("/api/upload/presigned-url", requireAuth, globalLimiter, async (req, res) => {
-    try {
-      const { fileName, mimeType } = req.body;
-      if (!fileName || !mimeType) {
-        return res.status(400).json({ error: "fileName and mimeType are required" });
-      }
-
-      const s3Client = new S3Client({
-        region: process.env.MINIO_REGION || "us-east-1",
-        endpoint: process.env.MINIO_ENDPOINT || process.env.MINIO_PUBLIC_ENDPOINT || "https://mypanel.wootech.com.br",
-        forcePathStyle: true,
-        credentials: {
-          accessKeyId: process.env.MINIO_ACCESS_KEY || "",
-          secretAccessKey: process.env.MINIO_SECRET_KEY || "",
-        },
-      });
-
-      const bucket = process.env.MINIO_BUCKET_NAME || "homecare";
-      const key = `${Date.now()}-${fileName.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
-
-      const command = new PutObjectCommand({
-        Bucket: bucket,
-        Key: key,
-        ContentType: mimeType,
-      });
-
-      const uploadUrl = await getSignedUrl(s3Client, command, { expiresIn: 3600 });
-      
-      const publicUrl = `${process.env.MINIO_ENDPOINT || process.env.MINIO_PUBLIC_ENDPOINT || "https://mypanel.wootech.com.br"}/${bucket}/${key}`;
-
-      res.json({ uploadUrl, publicUrl, key });
-    } catch (error: any) {
-      logEvent("ERROR", "Failed to generate presigned URL", { error: error.message });
-      res.status(500).json({ error: "Falha ao gerar URL de upload" });
-    }
-  });
 
   return app;
 }

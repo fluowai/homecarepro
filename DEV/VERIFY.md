@@ -195,3 +195,8 @@ Clínica lê apenas o próprio tenant; usuário com vínculo secundário lê som
 3. **[MÉDIO] Triggers `updated_at`**: Criar triggers para auto-atualizar `updated_at` em tabelas que têm essa coluna (invoices, subscriptions, contracts, proposals, support_tickets, patients, medicine_administrations, assemblies, assembly_votes).
 4. **[BAIXO] `visitToRow` JSONB coords**: A função em store.ts passa coords como string `"lat,lng"` para colunas `jsonb`. Corrigir para passar objeto JSON `{lat, lng}` ou `{type:"Point",coordinates:[lng,lat]}`.
 5. **[BAIXO] `assemblyVoteToRow` missing `tenant_id`**: Adicionar `tenant_id: get().activeTenantId` ao objeto retornado.
+## 2026-09-15 — Implementações baseadas nas referências
+- `node node_modules/typescript/bin/tsc --noEmit` — ✅ passou.
+- `node node_modules/vite/bin/vite.js build` — ✅ passou.
+- `node node_modules/vitest/vitest.mjs run` — ⚠️ bloqueado pelo ambiente: `Access is denied` ao resolver `vite.config.ts`/diretório pai.
+- Validação visual no browser — ⏳ não executada nesta entrega.

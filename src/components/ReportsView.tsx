@@ -31,27 +31,29 @@ export default function ReportsView() {
           return new Date(`${visit.date}T00:00:00`).getTime() >= cutoff.getTime();
         });
         const completed = professionalVisits.filter((visit) => visit.status === 'concluida');
-        const value = completed.reduce((total, visit) => total + (visit.value || 0), 0);
-        return { professional, total: professionalVisits.length, completed: completed.length, value };
+        const value = completed.reduce((total, visit) => total + (visit.billingValue ?? visit.value ?? 0), 0);
+        const payout = completed.reduce((total, visit) => total + (visit.baseValue ?? visit.value ?? 0), 0);
+        return { professional, total: professionalVisits.length, completed: completed.length, value, payout };
       });
   }, [period, professionalId, tenantProfessionals, tenantVisits]);
 
   const totals = reportRows.reduce((acc, row) => ({
     professionals: acc.professionals + 1,
     visits: acc.visits + row.completed,
-    value: acc.value + row.value,
+    value: acc.value + row.payout,
   }), { professionals: 0, visits: 0, value: 0 });
 
   const exportReport = () => {
     downloadCsv(`relatorio-profissionais-${new Date().toISOString().slice(0, 10)}.csv`, [
-      ['Profissional', 'Especialidade', 'Registro', 'Visitas concluídas', 'Visitas no período', 'Valor gerado'],
-      ...reportRows.map(({ professional, total, completed, value }) => [
+      ['Profissional', 'Especialidade', 'Registro', 'Visitas concluídas', 'Visitas no período', 'Valor clínica', 'Repasse profissional'],
+      ...reportRows.map(({ professional, total, completed, value, payout }) => [
         professional.name,
         professional.specialty,
         professional.registration,
         String(completed),
         String(total),
         value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
+        payout.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
       ]),
     ]);
   };
@@ -61,7 +63,7 @@ export default function ReportsView() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-slate-800">Relatórios profissionais</h2>
-          <p className="mt-1 text-sm text-slate-500">Produção dos profissionais baseada nas visitas registradas no período selecionado.</p>
+          <p className="mt-1 text-sm text-slate-500">Repasse devido ao profissional com base nos atendimentos concluídos no período.</p>
         </div>
         <button onClick={exportReport} className="flex items-center justify-center gap-2 rounded-lg bg-slate-800 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-900">
           <Download className="h-4 w-4" /> Exportar CSV
@@ -71,7 +73,7 @@ export default function ReportsView() {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="rounded-2xl border border-slate-200 bg-white p-5"><div className="flex items-center justify-between text-xs font-semibold uppercase text-slate-500">Profissionais <Users className="h-4 w-4 text-indigo-600" /></div><strong className="mt-3 block text-2xl text-slate-900">{totals.professionals}</strong></div>
         <div className="rounded-2xl border border-slate-200 bg-white p-5"><div className="flex items-center justify-between text-xs font-semibold uppercase text-slate-500">Visitas concluídas <CalendarCheck className="h-4 w-4 text-emerald-600" /></div><strong className="mt-3 block text-2xl text-slate-900">{totals.visits}</strong></div>
-        <div className="rounded-2xl border border-slate-200 bg-white p-5"><div className="flex items-center justify-between text-xs font-semibold uppercase text-slate-500">Valor produzido <DollarSign className="h-4 w-4 text-amber-600" /></div><strong className="mt-3 block text-2xl text-slate-900">{totals.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</strong></div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-5"><div className="flex items-center justify-between text-xs font-semibold uppercase text-slate-500">Repasse profissional <DollarSign className="h-4 w-4 text-amber-600" /></div><strong className="mt-3 block text-2xl text-slate-900">{totals.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</strong></div>
       </div>
 
       <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:flex-row">
@@ -85,7 +87,7 @@ export default function ReportsView() {
 
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
         <div className="flex items-center gap-2 border-b border-slate-100 p-5"><FileBarChart className="h-5 w-5 text-indigo-600" /><h3 className="font-bold text-slate-800">Desempenho por profissional</h3></div>
-        <div className="overflow-x-auto"><table className="min-w-full text-left text-sm"><thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-5 py-3">Profissional</th><th className="px-5 py-3">Especialidade</th><th className="px-5 py-3">Concluídas</th><th className="px-5 py-3">No período</th><th className="px-5 py-3">Valor</th></tr></thead><tbody className="divide-y divide-slate-100">{reportRows.length === 0 ? <tr><td colSpan={5} className="px-5 py-10 text-center text-slate-400">Nenhum profissional encontrado para este filtro.</td></tr> : reportRows.map(({ professional, total, completed, value }) => <tr key={professional.id} className="hover:bg-slate-50"><td className="px-5 py-4 font-semibold text-slate-800">{professional.name}<span className="block text-xs font-normal text-slate-400">{professional.registration}</span></td><td className="px-5 py-4 text-slate-600">{professional.specialty}</td><td className="px-5 py-4 font-semibold text-emerald-700">{completed}</td><td className="px-5 py-4 text-slate-600">{total}</td><td className="px-5 py-4 font-semibold text-slate-800">{value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td></tr>)}</tbody></table></div>
+        <div className="overflow-x-auto"><table className="min-w-full text-left text-sm"><thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-5 py-3">Profissional</th><th className="px-5 py-3">Especialidade</th><th className="px-5 py-3">Concluídas</th><th className="px-5 py-3">No período</th><th className="px-5 py-3">Valor clínica</th><th className="px-5 py-3">Repasse</th></tr></thead><tbody className="divide-y divide-slate-100">{reportRows.length === 0 ? <tr><td colSpan={6} className="px-5 py-10 text-center text-slate-400">Nenhum profissional encontrado para este filtro.</td></tr> : reportRows.map(({ professional, total, completed, value, payout }) => <tr key={professional.id} className="hover:bg-slate-50"><td className="px-5 py-4 font-semibold text-slate-800">{professional.name}<span className="block text-xs font-normal text-slate-400">{professional.registration}</span></td><td className="px-5 py-4 text-slate-600">{professional.specialty}</td><td className="px-5 py-4 font-semibold text-emerald-700">{completed}</td><td className="px-5 py-4 text-slate-600">{total}</td><td className="px-5 py-4 text-slate-600">{value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td><td className="px-5 py-4 font-semibold text-slate-800">{payout.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td></tr>)}</tbody></table></div>
       </div>
     </div>
   );

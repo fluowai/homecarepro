@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Camera, MapPin, CheckCircle, Wallet, Clock, User, ChevronRight, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { MapPin, CheckCircle, Wallet, Clock, User, ChevronRight, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { useHomeCareStore } from '../store';
 import { toast } from 'sonner';
 import { uploadFileToMinio } from '../lib/upload';
@@ -52,8 +52,7 @@ export function ProfessionalApp() {
     setIsCheckingIn(visitId);
     
     if (!navigator.geolocation) {
-      checkInVisit(visitId, 'Localização manual');
-      toast.success('Check-in realizado!');
+      toast.error('Este dispositivo não oferece localização GPS. O check-in não foi registrado.');
       setIsCheckingIn(null);
       return;
     }
@@ -66,8 +65,9 @@ export function ProfessionalApp() {
         setIsCheckingIn(null);
       },
       (error) => {
-        checkInVisit(visitId, 'Check-in (sem GPS)');
-        toast.success('Check-in registrado!');
+        toast.error(error.code === error.PERMISSION_DENIED
+          ? 'Permita o acesso à localização para realizar o check-in.'
+          : 'Não foi possível obter sua localização. Tente novamente em um local aberto.');
         setIsCheckingIn(null);
       },
       { enableHighAccuracy: true, timeout: 8000 }
@@ -155,7 +155,7 @@ export function ProfessionalApp() {
                           'Iniciando...'
                         ) : (
                           <>
-                            <Camera className="w-5 h-5" /> Fazer Check-in
+                            <MapPin className="w-5 h-5" /> Fazer Check-in com GPS
                           </>
                         )}
                       </button>

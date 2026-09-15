@@ -286,3 +286,7 @@
 - Persistência criada na coluna `patients.responsibles` via migration `20260909000000_add_patient_responsibles.sql`, aplicada no banco.
 - Corrigido o modal de paciente: ele estava dentro do ramo da lista, então o botão Editar apenas aparecia após Voltar; agora é renderizado fora da condição lista/detalhes.
 - Verificação: typecheck, build frontend e testes existentes executados.
+## 2026-09-15 — PAD, vínculo de pacientes e relatório de repasse
+- Implementada a aba de pacientes no credenciamento de profissionais, com vínculo e valor padrão por plantão persistidos em `attendedPatients`.
+- Relatório profissional passou a separar valor da clínica e repasse devido, usando `baseValue`/valor do plantão e exportando ambas as colunas.
+- Verificação direta: TypeScript e Vite build passaram; Vitest bloqueado por erro de resolução/permissão do ambiente ao carregar `vite.config.ts`.
