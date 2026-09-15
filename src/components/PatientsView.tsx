@@ -32,6 +32,7 @@ import { Patient, PatientResponsible } from '../types';
 import { uploadFileToMinio } from '../lib/upload';
 import { toast } from 'sonner';
 import { findCurrentProfessional, getAssignedPatientIds } from '../lib/professionalContext';
+import { supabase } from '../lib/supabase';
 
 interface PatientsViewProps {
   searchQuery: string;
@@ -77,6 +78,7 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
 
   // AI loading and output
   const [isAiLoading, setIsAiLoading] = useState(false);
+  const [isExtractingPdf, setIsExtractingPdf] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
 
   // Form states
@@ -385,6 +387,80 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
       toast.error('Falha ao enviar arquivo. Verifique sua conexão e tente novamente.');
     } finally {
       setIsUploading(false);
+    }
+  };
+
+  const handleAiExtractPdf = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (!selectedPatientId || !pendingFile) return;
+    
+    // Check if it's a PDF
+    if (pendingFile.type !== 'application/pdf' && !pendingFile.name.toLowerCase().endsWith('.pdf')) {
+      toast.error('A extração com IA é suportada apenas para arquivos PDF.');
+      return;
+    }
+
+    setIsExtractingPdf(true);
+    try {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        try {
+          const base64Data = (reader.result as string).split(',')[1];
+          const { data: sessionData } = await supabase.auth.getSession();
+          const token = sessionData?.session?.access_token;
+          const API_URL = import.meta.env.VITE_API_URL || '';
+          
+          const res = await fetch(`${API_URL}/api/gemini/extract-pdf`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+              pdfBase64: base64Data,
+              mimeType: pendingFile.type || 'application/pdf',
+              patientId: selectedPatientId
+            })
+          });
+
+          if (!res.ok) throw new Error('Falha ao extrair PDF');
+
+          const data = await res.json();
+          
+          addTimelineEvent(selectedPatientId, {
+            title: 'Resumo Clínico Extraído (IA)',
+            description: data.extractedText,
+            type: 'clinical',
+            author: 'Copilot IA'
+          });
+          
+          toast.success('Prontuário extraído e adicionado ao histórico clínico.');
+          
+          // Also upload as attachment
+          const url = await uploadFileToMinio(pendingFile);
+          addPatientFile(
+            selectedPatientId,
+            pendingFile.name,
+            `${(pendingFile.size / (1024 * 1024)).toFixed(1)} MB`,
+            pendingFile.type || 'application/octet-stream',
+            url
+          );
+          setPendingFile(null);
+        } catch (error) {
+          console.error('Error in extraction fetch:', error);
+          toast.error('Falha ao processar o PDF com IA.');
+        } finally {
+          setIsExtractingPdf(false);
+        }
+      };
+      reader.onerror = () => {
+        toast.error('Falha ao ler arquivo PDF.');
+        setIsExtractingPdf(false);
+      };
+      reader.readAsDataURL(pendingFile);
+    } catch (error) {
+      console.error('Error starting extraction:', error);
+      setIsExtractingPdf(false);
     }
   };
 
@@ -718,14 +794,27 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
                       onChange={(e) => setPendingFile(e.target.files?.[0] ?? null)}
                     />
                   </label>
-                  <button
-                    type="submit"
-                    disabled={!pendingFile || isUploading}
-                    className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white font-semibold text-xs rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    {isUploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
-                    <span>{isUploading ? 'Enviando...' : 'Anexar'}</span>
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      type="submit"
+                      disabled={!pendingFile || isUploading || isExtractingPdf}
+                      className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white font-semibold text-xs rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      {isUploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+                      <span>{isUploading ? 'Enviando...' : 'Anexar'}</span>
+                    </button>
+                    {pendingFile && (pendingFile.type === 'application/pdf' || pendingFile.name.toLowerCase().endsWith('.pdf')) && (
+                      <button
+                        type="button"
+                        onClick={handleAiExtractPdf}
+                        disabled={isUploading || isExtractingPdf}
+                        className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold text-xs rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        {isExtractingPdf ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                        <span>{isExtractingPdf ? 'Lendo...' : 'Ler com IA'}</span>
+                      </button>
+                    )}
+                  </div>
                 </form>
 
                 {/* File list */}
