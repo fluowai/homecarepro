@@ -290,3 +290,7 @@
 - Implementada a aba de pacientes no credenciamento de profissionais, com vínculo e valor padrão por plantão persistidos em `attendedPatients`.
 - Relatório profissional passou a separar valor da clínica e repasse devido, usando `baseValue`/valor do plantão e exportando ambas as colunas.
 - Verificação direta: TypeScript e Vite build passaram; Vitest bloqueado por erro de resolução/permissão do ambiente ao carregar `vite.config.ts`.
+# 2026-09-15 — Login mobile e layout do aplicativo do funcionário
+- Reforçado o login mobile-first: campos e ações com área de toque maior, card responsivo e fundo adaptado para telas pequenas.
+- Revisado `ProfessionalApp` com cabeçalho próprio, data do dia, contador de agenda, cards semânticos e navegação inferior fixa para Agenda/Financeiro.
+- Verificação: TypeScript direto pelo runtime local, build Vite direto e `git diff --check` sem erros. `npm run` indisponível por npm global quebrado no ambiente.
