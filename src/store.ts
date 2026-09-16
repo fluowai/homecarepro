@@ -81,6 +81,7 @@ function patientToRow(p: Patient) {
     inventory: p.inventory,
     address: p.address,
     summary_ai: p.summaryAi ?? '',
+    care_schedule: p.careSchedule ?? null,
   };
 }
 
@@ -113,6 +114,7 @@ function patientFromRow(r: Record<string, unknown>): Patient {
     inventory: (r.inventory ?? []) as Patient['inventory'],
     address: (r.address ?? { street: '', number: '', city: '', state: '', zipCode: '' }) as Patient['address'],
     summaryAi: (r.summary_ai as string) || undefined,
+    careSchedule: (r.care_schedule as Patient['careSchedule']) || undefined,
   };
 }
 
@@ -584,7 +586,7 @@ interface HomeCareState {
   clearOfflineQueue: () => void;
 
   // Patient Actions
-  addPatient: (patient: Omit<Patient, 'id' | 'tenantId'>) => void;
+  addPatient: (patient: Omit<Patient, 'id' | 'tenantId'>) => Promise<Patient>;
   updatePatient: (id: string, patient: Partial<Patient>) => void;
   deletePatient: (id: string) => void;
   addPatientFile: (patientId: string, name: string, size: string, type: string, url?: string) => void;
@@ -739,9 +741,11 @@ async function upsertRow(table: string, row: Record<string, unknown>) {
   if (!isSupabaseConfigured) return;
 
   try {
-    await supabase.from(table).upsert(row, { onConflict: 'id' });
+    const { error } = await supabase.from(table).upsert(row, { onConflict: 'id' });
+    if (error) throw error;
   } catch (err) {
     console.error(`[Supabase] upsert ${table} failed`, err);
+    throw err;
   }
 }
 
@@ -1470,7 +1474,7 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
 
   // ── Patients ────────────────────────────────────────────────
 
-  addPatient: (patient) => {
+  addPatient: async (patient) => {
     const newPatient: Patient = {
       ...patient,
       id: `pat-${Date.now()}`,
@@ -1481,7 +1485,8 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
     const updated = [...get().patients, newPatient];
     set({ patients: updated });
     saveToStorage('patients', updated);
-    upsertRow('patients', patientToRow(newPatient));
+    await upsertRow('patients', patientToRow(newPatient));
+    return newPatient;
   },
 
   updatePatient: (id, data) => {

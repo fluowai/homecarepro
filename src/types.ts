@@ -161,6 +161,14 @@ export interface Patient {
   dailyPackageValue?: number;
   dailyPackageShifts?: number;
   contractDuration?: string;
+  careSchedule?: {
+    serviceName: string;
+    professionalIds: string[];
+    daysOfWeek: number[];
+    timeStart: string;
+    timeEnd: string;
+    shiftValue: number;
+  };
   avatar: string;
   diagnostic: string;
   allergies: string[];
@@ -445,6 +453,7 @@ export interface ContractService {
   billingValue: number;
   professionalValue: number;
   professionalId?: string;
+  professionalIds?: string[];
   startDate?: string;
   endDate?: string;
   active: boolean;

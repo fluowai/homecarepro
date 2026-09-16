@@ -200,3 +200,11 @@ Clínica lê apenas o próprio tenant; usuário com vínculo secundário lê som
 - `node node_modules/vite/bin/vite.js build` — ✅ passou.
 - `node node_modules/vitest/vitest.mjs run` — ⚠️ bloqueado pelo ambiente: `Access is denied` ao resolver `vite.config.ts`/diretório pai.
 - Validação visual no browser — ⏳ não executada nesta entrega.
+# Verificação 2026-09-15 — Cadastro, plantão e escala
+| Item | Resultado |
+|---|---|
+| Persistência de paciente | ✅ agora aguarda e propaga erro do Supabase |
+| Plantão no cadastro | ✅ serviço, recorrência, horário, valor e múltiplos profissionais |
+| Escala automática | ✅ cria atendimentos para cada dia/profissional selecionado |
+| Typecheck/build | ✅ passaram |
+| Migration no Supabase | ⚠️ pendente de aplicação |

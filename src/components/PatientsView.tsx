@@ -96,6 +96,12 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
   const [monthlyPackageValue, setMonthlyPackageValue] = useState<number | ''>('');
   const [padScope, setPadScope] = useState('');
   const [contractDuration, setContractDuration] = useState('');
+  const [scheduleServiceName, setScheduleServiceName] = useState('');
+  const [scheduleProfessionalIds, setScheduleProfessionalIds] = useState<string[]>([]);
+  const [scheduleDaysOfWeek, setScheduleDaysOfWeek] = useState<number[]>([1, 2, 3, 4, 5]);
+  const [scheduleStart, setScheduleStart] = useState('08:00');
+  const [scheduleEnd, setScheduleEnd] = useState('20:00');
+  const [scheduleShiftValue, setScheduleShiftValue] = useState(0);
   const [diagnostic, setDiagnostic] = useState('');
   const [allergiesText, setAllergiesText] = useState('');
   const [medicationsText, setMedicationsText] = useState('');
@@ -274,7 +280,7 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
     setShowAddModal(true);
   };
 
-  const handleCreatePatient = (e: React.FormEvent) => {
+  const handleCreatePatient = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !birthDate || !diagnostic) {
       toast.error("Por favor, preencha pelo menos Nome, Data de Nascimento e Diagnóstico.");
@@ -303,6 +309,7 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
       dailyPackageValue: Number(dailyPackageValue) || undefined,
       dailyPackageShifts: Number(dailyPackageShifts) || undefined,
       contractDuration,
+      careSchedule: scheduleServiceName.trim() && scheduleProfessionalIds.length > 0 ? { serviceName: scheduleServiceName.trim(), professionalIds: scheduleProfessionalIds, daysOfWeek: scheduleDaysOfWeek, timeStart: scheduleStart, timeEnd: scheduleEnd, shiftValue: scheduleShiftValue } : undefined,
       avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(name)}&backgroundColor=059669`,
       diagnostic,
       allergies: allergiesText.split(',').map(s => s.trim()).filter(Boolean),
@@ -322,7 +329,22 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
       updatePatient(editingPatientId, patientData);
       toast.success('Cadastro do paciente atualizado com sucesso.');
     } else {
-      addPatient(patientData);
+      try {
+        const savedPatient = await addPatient(patientData);
+        if (patientData.careSchedule) {
+          const start = new Date();
+          const end = new Date(start.getFullYear(), start.getMonth() + 1, 0);
+          for (let day = new Date(start); day <= end; day.setDate(day.getDate() + 1)) {
+            if (!patientData.careSchedule.daysOfWeek.includes(day.getDay())) continue;
+            for (const professionalId of patientData.careSchedule.professionalIds) {
+              addVisit({ patientId: savedPatient.id, professionalId, date: day.toISOString().slice(0, 10), timeStart: patientData.careSchedule.timeStart, timeEnd: patientData.careSchedule.timeEnd, status: 'agendada', value: patientData.careSchedule.shiftValue, baseValue: patientData.careSchedule.shiftValue, generatedFromContract: true });
+            }
+          }
+        }
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : 'Não foi possível salvar o paciente.');
+        return;
+      }
       toast.success('Prontuário criado com sucesso.');
     }
 
@@ -1407,7 +1429,21 @@ export default function PatientsView({ searchQuery }: PatientsViewProps) {
                     </div>
                   </div>
 
-                  {/* Seção 3: Responsáveis */}
+                  {/* Seção 3: Plantão e escala inicial */}
+                  <div>
+                    <h4 className="font-bold text-xs text-green-600 uppercase tracking-wider mb-4 border-b pb-1 border-slate-100">3. Plantão e escala inicial</h4>
+                    <p className="text-xs text-slate-500 mb-3">Opcional: ao salvar, o sistema cria automaticamente a escala do próximo mês. Se o serviço exigir dois profissionais, selecione os dois.</p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <input value={scheduleServiceName} onChange={e => setScheduleServiceName(e.target.value)} placeholder="Serviço contratado (ex.: Cuidador 12h)" className="bg-slate-50 border border-slate-200 rounded-lg text-xs px-3 py-2" />
+                      <label className="text-xs text-slate-500">Valor por plantão<input type="number" min="0" value={scheduleShiftValue} onChange={e => setScheduleShiftValue(Number(e.target.value))} className="mt-1 w-full bg-slate-50 border border-slate-200 rounded-lg text-xs px-3 py-2" /></label>
+                      <label className="text-xs text-slate-500">Início<input type="time" value={scheduleStart} onChange={e => setScheduleStart(e.target.value)} className="mt-1 w-full bg-slate-50 border border-slate-200 rounded-lg text-xs px-3 py-2" /></label>
+                      <label className="text-xs text-slate-500">Fim<input type="time" value={scheduleEnd} onChange={e => setScheduleEnd(e.target.value)} className="mt-1 w-full bg-slate-50 border border-slate-200 rounded-lg text-xs px-3 py-2" /></label>
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2">{[[1,'Seg'],[2,'Ter'],[3,'Qua'],[4,'Qui'],[5,'Sex'],[6,'Sáb'],[0,'Dom']].map(([day,label]) => <button type="button" key={day} onClick={() => setScheduleDaysOfWeek(current => current.includes(day as number) ? current.filter(item => item !== day) : [...current, day as number])} className={`px-2.5 py-1 rounded-md text-[11px] font-bold border ${scheduleDaysOfWeek.includes(day as number) ? 'bg-green-600 text-white border-green-600' : 'bg-white text-slate-500 border-slate-200'}`}>{label}</button>)}</div>
+                    <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2">{tenantProfessionals.map(professional => <label key={professional.id} className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs"><input type="checkbox" checked={scheduleProfessionalIds.includes(professional.id)} onChange={e => setScheduleProfessionalIds(current => e.target.checked ? [...current, professional.id] : current.filter(id => id !== professional.id))} />{professional.name} · {professional.specialty}</label>)}</div>
+                  </div>
+
+                  {/* Seção 4: Responsáveis */}
                   <div>
                     <div className="flex items-center justify-between border-b border-slate-100 pb-1 mb-4">
                       <h4 className="font-bold text-xs text-green-600 uppercase tracking-wider">3. Responsáveis pelo Paciente</h4>
