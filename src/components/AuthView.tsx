@@ -3,10 +3,12 @@ import { Mail, Phone, Lock, User, Building2, Eye, EyeOff, Loader2, Heart, ArrowR
 import { supabase } from '../lib/supabase';
 import { useHomeCareStore } from '../store';
 import { normalizeBrazilPhone, phoneToVirtualEmail, formatPhoneInput, formatPhoneForDisplay } from '../lib/formatters';
+import { getResolvedTenantInfo } from '../lib/whitelabel';
 
 type AuthMode = 'login' | 'signup' | 'first_access_check' | 'first_access_submit';
 
 export default function AuthView() {
+  const branding = getResolvedTenantInfo();
   const [mode, setMode] = useState<AuthMode>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -159,9 +161,8 @@ export default function AuthView() {
 
         <div className="auth-card-wrap">
           <div className="auth-card">
-            <div className="auth-logo" aria-label="Woodesk Home Care">
-              <span className="auth-logo-mark" aria-hidden="true" />
-              <strong>Woodesk</strong>
+            <div className="auth-logo" aria-label={branding.name}>
+              {branding.logo?.startsWith('http') ? <img src={branding.logo} alt={branding.name} className="h-12 max-w-[220px] object-contain" /> : <><span className="auth-logo-mark" aria-hidden="true" /><strong>{branding.name}</strong></>}
               <span>Home Care</span>
             </div>
 

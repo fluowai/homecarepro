@@ -16,6 +16,18 @@ export interface Tenant {
   subdomain?: string;
   primaryColor?: string;
   secondaryColor?: string;
+  faviconUrl?: string;
+  pwaIcon192Url?: string;
+  pwaIcon512Url?: string;
+  pwaShortName?: string;
+  pwaThemeColor?: string;
+  pwaBackgroundColor?: string;
+  faviconUrl?: string;
+  pwaIcon192Url?: string;
+  pwaIcon512Url?: string;
+  pwaShortName?: string;
+  pwaThemeColor?: string;
+  pwaBackgroundColor?: string;
   companyLegalName?: string;
   companyTradeName?: string;
   companyEmail?: string;

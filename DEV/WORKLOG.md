@@ -299,3 +299,8 @@
 - Adicionada configuração opcional de plantão no cadastro: serviço, dias, horários, valor e múltiplos profissionais; a escala do mês corrente é criada automaticamente após o paciente ser salvo.
 - Criada a migration `20260915000000_add_patient_care_schedule.sql` e ampliado o gerador de contratos para suportar mais de um profissional por serviço.
 - Verificação: `npm run typecheck` e `npm run build` passaram. Aplicação da migration e teste browser ainda são necessários.
+# 2026-09-16 — Branding individual por tenant e PWA dinâmico
+- Adicionada migration `20260916000000_add_tenant_pwa_branding.sql` com favicon, ícones PWA, nome curto e cores por tenant.
+- Manifesto `/manifest.webmanifest` e favicon `/api/tenant/favicon` agora resolvem a marca pelo domínio atual.
+- Tela de login e configuração Whitelabel passaram a suportar identidade PWA individual.
+- Verificação: `npx.cmd tsc --noEmit` executado com sucesso.

@@ -208,3 +208,6 @@ Clínica lê apenas o próprio tenant; usuário com vínculo secundário lê som
 | Escala automática | ✅ cria atendimentos para cada dia/profissional selecionado |
 | Typecheck/build | ✅ passaram |
 | Migration no Supabase | ⚠️ pendente de aplicação |
+# 2026-09-16
+- TypeScript: `npx.cmd tsc --noEmit` ✅
+- Pendentes pós-deploy: aplicar migration no Supabase e validar instalação PWA em cada domínio customizado.

@@ -28,7 +28,12 @@ export async function initWhitelabel() {
         logo: tenant.logo,
         subdomain: tenant.subdomain,
         customDomain: tenant.custom_domain,
+        faviconUrl: tenant.favicon_url,
+        pwaIcon192Url: tenant.pwa_icon_192_url,
+        pwaIcon512Url: tenant.pwa_icon_512_url,
+        pwaShortName: tenant.pwa_short_name,
       };
+      document.title = tenant.name || 'HomeCare Pro';
 
       // Also resolve and expose the subdomain for the store to use
       const subdomain = extractSubdomain(domain);
@@ -41,6 +46,6 @@ export async function initWhitelabel() {
   }
 }
 
-export function getResolvedTenantInfo(): { name: string; logo: string; subdomain?: string; customDomain?: string } {
+export function getResolvedTenantInfo(): { name: string; logo: string; subdomain?: string; customDomain?: string; faviconUrl?: string; pwaIcon192Url?: string; pwaIcon512Url?: string; pwaShortName?: string } {
   return (window as any)._tenantBranding || { name: 'HomeCare Pro', logo: '', subdomain: undefined, customDomain: undefined };
 }
