@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { MapPin, CheckCircle, Wallet, Clock, User, ChevronRight, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { MapPin, Wallet, Clock, User, CalendarDays, ReceiptText } from 'lucide-react';
 import { useHomeCareStore } from '../store';
 import { toast } from 'sonner';
 import { uploadFileToMinio } from '../lib/upload';
@@ -83,24 +83,21 @@ export function ProfessionalApp() {
   };
 
   return (
-    <div className="flex flex-col h-full bg-gray-50 pb-20 md:pb-0">
-      <div className="bg-green-600 text-white p-6 shadow-md rounded-b-3xl">
+    <div className="professional-app flex flex-col h-full bg-gray-50 pb-20 md:pb-0">
+      <header className="professional-header bg-green-600 text-white p-5 shadow-md rounded-b-3xl">
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-2xl font-bold">Olá, {profile?.full_name?.split(' ')[0] || currentProfessional?.name?.split(' ')[0] || 'Profissional'}</h1>
             <p className="text-green-100">Bem-vindo(a) ao seu plantão</p>
           </div>
-          <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center border-2 border-white/40">
-             {profile?.avatar_url || currentProfessional?.avatar ? (
-                <img src={profile?.avatar_url || currentProfessional?.avatar} alt="Profile" className="w-full h-full rounded-full object-cover" />
-             ) : (
-                <User className="w-6 h-6 text-white" />
-             )}
-          </div>
+          <button type="button" className="professional-avatar" aria-label="Abrir perfil">
+            {profile?.avatar_url || currentProfessional?.avatar ? <img src={profile?.avatar_url || currentProfessional?.avatar} alt="" /> : <User className="w-5 h-5" />}
+          </button>
         </div>
-      </div>
+        <div className="professional-today"><CalendarDays className="w-4 h-4" /> {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })}</div>
+      </header>
 
-      <div className="flex p-4 gap-2">
+      <nav className="professional-tabs flex p-4 gap-2" aria-label="Área do funcionário">
         <button 
           onClick={() => setActiveTab('agenda')}
           className={`flex-1 py-3 rounded-xl font-medium transition-colors ${activeTab === 'agenda' ? 'bg-green-600 text-white shadow-md' : 'bg-white text-gray-600 border border-gray-200'}`}
@@ -113,19 +110,19 @@ export function ProfessionalApp() {
         >
           Financeiro
         </button>
-      </div>
+      </nav>
 
       <div className="flex-1 overflow-y-auto px-4">
         {activeTab === 'agenda' && (
           <div className="space-y-4">
-            <h2 className="text-lg font-bold text-gray-800 mb-2">Plantões de Hoje</h2>
+            <div className="professional-section-title"><div><span className="professional-eyebrow">Sua rotina</span><h2>Plantões de hoje</h2></div><span className="professional-count">{profTodayVisits.length}</span></div>
             {profTodayVisits.length > 0 ? (
               profTodayVisits.map(visit => {
                 const patient = patients.find(p => p.id === visit.patientId);
                 const addressStr = patient?.address ? `${patient.address.street}, ${patient.address.number} - ${patient.address.city}` : 'Endereço residencial';
 
                 return (
-                  <div key={visit.id} className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col gap-3">
+                  <article key={visit.id} className="professional-visit bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col gap-3">
                     <div className="flex justify-between items-start">
                       <div>
                         <h3 className="font-bold text-gray-800 text-lg">{patient?.name || 'Paciente'}</h3>
@@ -160,7 +157,7 @@ export function ProfessionalApp() {
                         )}
                       </button>
                     )}
-                  </div>
+                  </article>
                 );
               })
             ) : (
@@ -198,7 +195,7 @@ export function ProfessionalApp() {
             </div>
             
             <div>
-               <h3 className="font-bold text-gray-800 mb-4">Histórico de Plantões Realizados</h3>
+               <h3 className="professional-section-heading"><ReceiptText className="w-4 h-4" /> Histórico de plantões realizados</h3>
                <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm divide-y divide-gray-100">
                   {allProfVisits.filter(v => v.status === 'concluida').length > 0 ? (
                     allProfVisits.filter(v => v.status === 'concluida').slice(0, 10).map(v => {
@@ -222,6 +219,10 @@ export function ProfessionalApp() {
             </div>
           </div>
         )}
+      </div>
+      <div className="professional-bottom-nav" role="navigation" aria-label="Navegação do funcionário">
+        <button type="button" className={activeTab === 'agenda' ? 'is-active' : ''} onClick={() => setActiveTab('agenda')}><CalendarDays /> Agenda</button>
+        <button type="button" className={activeTab === 'finance' ? 'is-active' : ''} onClick={() => setActiveTab('finance')}><Wallet /> Financeiro</button>
       </div>
     </div>
   );
