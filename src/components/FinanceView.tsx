@@ -17,7 +17,8 @@ import { useHomeCareStore } from '../store';
 type StatusFilter = 'all' | 'PENDING' | 'PAID' | 'CANCELED';
 
 export default function FinanceView() {
-  const { patients, visits, insurances, invoices, activeTenantId, addInvoice, updateInvoice } = useHomeCareStore();
+  const { patients, visits, insurances, invoices, contracts, tenants, activeTenantId, updateTenant, addInvoice, updateInvoice } = useHomeCareStore();
+  const [activeFinanceTab, setActiveFinanceTab] = useState<'faturamento' | 'contratos' | 'cobranca'>('faturamento');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [generating, setGenerating] = useState(false);
@@ -27,6 +28,12 @@ export default function FinanceView() {
   const tenantInvoices = invoices
     .filter(i => i.tenantId === activeTenantId)
     .sort((a, b) => new Date(b.issueDate).getTime() - new Date(a.issueDate).getTime());
+  const tenantContracts = contracts.filter(c => c.tenantId === activeTenantId);
+  const activeContracts = tenantContracts.filter(c => c.status === 'active');
+  const contractedRevenue = activeContracts.reduce((sum, c) => sum + (c.value || c.services?.reduce((total, service) => total + service.billingValue, 0) || 0), 0);
+  const contractedProfessionalCost = activeContracts.reduce((sum, c) => sum + (c.services?.reduce((total, service) => total + service.professionalValue * (service.professionalIds?.length || (service.professionalId ? 1 : 0)), 0) || 0), 0);
+  const activeTenant = tenants.find(t => t.id === activeTenantId);
+  const billingSettings = activeTenant?.billingSettings || { collectionMode: 'manual' as const, dueDay: 5, autoGenerate: false };
 
   // Billing analytics based on real visit data
   const totalBilled = tenantVisits.filter(v => v.status === 'concluida').reduce((acc, curr) => acc + curr.value, 0);
@@ -217,6 +224,21 @@ export default function FinanceView() {
         </div>
       )}
 
+      <div className="flex flex-wrap gap-2 rounded-xl border border-slate-200 bg-white p-2 shadow-sm">
+        {[['faturamento', 'Faturamento'], ['contratos', 'Contratos e totais'], ['cobranca', 'Configuração de cobrança']].map(([key, label]) => <button key={key} type="button" onClick={() => setActiveFinanceTab(key as typeof activeFinanceTab)} className={`rounded-lg px-4 py-2 text-sm font-semibold ${activeFinanceTab === key ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}>{label}</button>)}
+      </div>
+
+      {activeFinanceTab === 'contratos' && <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="rounded-2xl border border-slate-200 bg-white p-5"><span className="text-xs font-semibold uppercase text-slate-500">Contratos ativos</span><strong className="mt-2 block text-2xl text-slate-900">{activeContracts.length}</strong></div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-5"><span className="text-xs font-semibold uppercase text-slate-500">Faturamento contratado</span><strong className="mt-2 block text-2xl text-emerald-700">R$ {contractedRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong></div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-5"><span className="text-xs font-semibold uppercase text-slate-500">Custo profissional</span><strong className="mt-2 block text-2xl text-amber-700">R$ {contractedProfessionalCost.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong></div>
+        <div className="md:col-span-3 rounded-2xl border border-slate-200 bg-white overflow-hidden"><div className="p-5 border-b border-slate-100 font-bold text-slate-800">Resumo por contrato</div>{activeContracts.length === 0 ? <p className="p-5 text-sm text-slate-500">Nenhum contrato ativo cadastrado.</p> : <div className="divide-y divide-slate-100">{activeContracts.map(contract => <div key={contract.id} className="flex flex-wrap items-center justify-between gap-3 p-5"><div><strong className="text-sm text-slate-800">{contract.title}</strong><p className="text-xs text-slate-500">{contract.services?.length || 0} serviço(s) · paciente {tenantPatients.find(p => p.id === contract.patientId)?.name || 'não encontrado'}</p></div><span className="font-bold text-emerald-700">R$ {(contract.value || contract.services?.reduce((sum, service) => sum + service.billingValue, 0) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>)}</div>}</div>
+      </div>}
+
+      {activeFinanceTab === 'cobranca' && <div className="rounded-2xl border border-slate-200 bg-white p-6 space-y-5"><div><h3 className="font-bold text-slate-800">Como a clínica quer cobrar?</h3><p className="mt-1 text-sm text-slate-500">Escolha se as faturas serão geradas automaticamente ou revisadas manualmente.</p></div><div className="grid grid-cols-1 md:grid-cols-2 gap-3">{(['manual', 'automatic'] as const).map(mode => <button type="button" key={mode} onClick={() => updateTenant(activeTenantId, { billingSettings: { ...billingSettings, collectionMode: mode, autoGenerate: mode === 'automatic' } })} className={`rounded-xl border p-4 text-left ${billingSettings.collectionMode === mode ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200'}`}><strong className="block text-sm text-slate-800">{mode === 'automatic' ? 'Cobrança automática' : 'Cobrança manual'}</strong><span className="mt-1 block text-xs text-slate-500">{mode === 'automatic' ? 'Gera faturas mensais conforme as visitas concluídas.' : 'A equipe revisa e gera as faturas pelo botão do financeiro.'}</span></button>)}</div><label className="block max-w-xs text-sm font-semibold text-slate-700">Dia de vencimento<input type="number" min="1" max="28" value={billingSettings.dueDay} onChange={event => updateTenant(activeTenantId, { billingSettings: { ...billingSettings, dueDay: Number(event.target.value) || 5 } })} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2" /></label><div className="rounded-lg bg-slate-50 p-3 text-xs text-slate-600">Modo atual: <strong>{billingSettings.collectionMode === 'automatic' ? 'automático' : 'manual'}</strong>.</div></div>}
+
+      {activeFinanceTab === 'faturamento' && <>
+
       {/* Finance KPI cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
@@ -269,6 +291,7 @@ export default function FinanceView() {
           <p className="text-[11px] text-slate-400 mt-1.5 font-medium">Faturas marcadas como recebidas</p>
         </div>
       </div>
+      </>}
 
       {/* Invoices & plans breakdown */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

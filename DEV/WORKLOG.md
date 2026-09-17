@@ -304,3 +304,8 @@
 - Manifesto `/manifest.webmanifest` e favicon `/api/tenant/favicon` agora resolvem a marca pelo domínio atual.
 - Tela de login e configuração Whitelabel passaram a suportar identidade PWA individual.
 - Verificação: `npx.cmd tsc --noEmit` executado com sucesso.
+## 2026-09-17 — Financeiro consolidado e preços por profissional
+- Adicionadas subabas no Financeiro para faturamento, contratos/totais e configuração de cobrança manual/automática.
+- Adicionados `billingSettings` por tenant e `pricingRules` por profissional, com migration `20260917000000_billing_and_professional_pricing.sql`.
+- Cadastro de profissional agora suporta preço por paciente/serviço, duração e valor individual.
+- Validação TypeScript executada com `npx.cmd tsc --noEmit`.

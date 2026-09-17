@@ -22,6 +22,11 @@ export interface Tenant {
   pwaShortName?: string;
   pwaThemeColor?: string;
   pwaBackgroundColor?: string;
+  billingSettings?: {
+    collectionMode: 'manual' | 'automatic';
+    dueDay: number;
+    autoGenerate: boolean;
+  };
   faviconUrl?: string;
   pwaIcon192Url?: string;
   pwaIcon512Url?: string;
@@ -250,6 +255,13 @@ export interface Professional {
   tier?: 'Bronze' | 'Prata' | 'Ouro' | 'Diamante';
   balance?: number;
   attendedPatients?: AttendedPatient[];
+  pricingRules?: {
+    id: string;
+    patientId?: string;
+    serviceName: string;
+    durationHours: number;
+    value: number;
+  }[];
 }
 
 export interface Visit {

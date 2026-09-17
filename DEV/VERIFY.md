@@ -211,3 +211,12 @@ Clínica lê apenas o próprio tenant; usuário com vínculo secundário lê som
 # 2026-09-16
 - TypeScript: `npx.cmd tsc --noEmit` ✅
 - Pendentes pós-deploy: aplicar migration no Supabase e validar instalação PWA em cada domínio customizado.
+# Verificação 2026-09-17 — Financeiro e preços profissionais
+| Item | Resultado |
+|---|---|
+| Subabas financeiras | ✅ faturamento, contratos/totais e cobrança |
+| Configuração manual/automática | ✅ persistência por tenant implementada |
+| Totais de contratos | ✅ ativos, faturamento contratado e custo profissional |
+| Preços profissionais | ✅ por paciente/serviço, duração e valor |
+| TypeScript | ✅ `npx.cmd tsc --noEmit` passou |
+| Migration | ⚠️ criada; aplicar no Supabase antes do uso em produção |
