@@ -31,10 +31,10 @@ body {
 /* Woodesk Home Care login composition */
 .auth-screen {
   min-height: 100vh;
-  display: flex;
-  justify-content: center;
-  overflow: auto;
-  background: color-mix(in srgb, var(--auth-primary) 5%, #f8fbff);
+  display: grid;
+  grid-template-columns: minmax(0, 1.08fr) minmax(520px, 0.92fr);
+  overflow: hidden;
+  background: #f8fbff;
   color: #07163a;
 }
 
@@ -60,7 +60,6 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: min(100%, 620px);
   min-height: 100vh;
   padding: 76px 5vw 42px;
   background: #f8fbff;
@@ -476,6 +475,10 @@ body {
 }
 
 @media (max-width: 1050px) {
+  .auth-screen {
+    grid-template-columns: minmax(0, 0.9fr) minmax(470px, 1.1fr);
+  }
+
   .auth-content {
     padding-right: 32px;
     padding-left: 32px;
@@ -486,7 +489,10 @@ body {
   .auth-screen {
     display: block;
     min-height: 100svh;
+    overflow: auto;
   }
+
+  .auth-visual { display: none; }
 
   .auth-content {
     min-height: 100svh;

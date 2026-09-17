@@ -148,6 +148,9 @@ export default function AuthView() {
 
   return (
     <main className="auth-screen" style={{ '--auth-primary': branding.primaryColor || '#0876e7' } as React.CSSProperties}>
+      <section className="auth-visual" aria-label="Apresentação do produto">
+        <div className="auth-visual-wash" />
+      </section>
       <section className="auth-content">
         <div className="auth-language" aria-label="Idioma atual">
           <span aria-hidden="true">🇧🇷</span>
