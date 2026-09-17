@@ -894,7 +894,7 @@ Apenas o objeto JSON valido, sem formatacao Markdown adicional nem blocos de cod
   app.put("/api/tenant/config", requireAuth, globalLimiter, async (req, res) => {
     try {
       const userId = (req as any).userId;
-       const { customDomain, primaryColor, secondaryColor, logo, subdomain, tenantId, emailFromName, emailFromAddress, supportEmail } = req.body;
+       const { customDomain, primaryColor, secondaryColor, logo, faviconUrl, pwaIcon192Url, pwaIcon512Url, pwaShortName, pwaThemeColor, pwaBackgroundColor, subdomain, tenantId, emailFromName, emailFromAddress, supportEmail } = req.body;
 
       const { data: profile } = await supabaseAdmin
         .from("user_profiles")
@@ -946,6 +946,12 @@ Apenas o objeto JSON valido, sem formatacao Markdown adicional nem blocos de cod
         primary_color: primaryColor || null,
         secondary_color: secondaryColor || null,
         logo: logo || null,
+        favicon_url: faviconUrl || null,
+        pwa_icon_192_url: pwaIcon192Url || null,
+        pwa_icon_512_url: pwaIcon512Url || null,
+        pwa_short_name: pwaShortName || null,
+        pwa_theme_color: pwaThemeColor || null,
+        pwa_background_color: pwaBackgroundColor || null,
         email_from_name: emailFromName || null,
         email_from_address: emailFromAddress || null,
         support_email: supportEmail || null,
@@ -1019,6 +1025,36 @@ Apenas o objeto JSON valido, sem formatacao Markdown adicional nem blocos de cod
     }
   });
 
+  async function getTenantBrandingForHost(host: string) {
+    const domain = normalizeCustomDomain(host);
+    const subdomain = extractSubdomain(domain);
+    const query = supabaseAdmin.from("tenants").select("id,name,logo,favicon_url,pwa_icon_192_url,pwa_icon_512_url,pwa_short_name,pwa_theme_color,pwa_background_color,primary_color,secondary_color,status,custom_domain,subdomain").eq("status", "active");
+    const { data } = subdomain
+      ? await query.or(`custom_domain.eq.${domain},subdomain.eq.${subdomain}`).limit(1).maybeSingle()
+      : await query.eq("custom_domain", domain).maybeSingle();
+    return data;
+  }
+
+  app.get("/manifest.webmanifest", async (req, res) => {
+    const tenant = await getTenantBrandingForHost(req.hostname);
+    const name = tenant?.name || "HomeCare Pro";
+    res.setHeader("Cache-Control", "no-store");
+    res.type("application/manifest+json").json({
+      name, short_name: tenant?.pwa_short_name || name.slice(0, 20), start_url: "/", scope: "/", display: "standalone",
+      theme_color: tenant?.pwa_theme_color || tenant?.primary_color || "#0066FF",
+      background_color: tenant?.pwa_background_color || "#FFFFFF", lang: "pt-BR", orientation: "portrait-primary",
+      icons: [
+        ...(tenant?.pwa_icon_192_url ? [{ src: tenant.pwa_icon_192_url, sizes: "192x192", type: "image/png" }] : []),
+        ...(tenant?.pwa_icon_512_url ? [{ src: tenant.pwa_icon_512_url, sizes: "512x512", type: "image/png" }] : []),
+      ],
+    });
+  });
+
+  app.get("/api/tenant/favicon", async (req, res) => {
+    const tenant = await getTenantBrandingForHost(req.hostname);
+    return res.redirect(302, tenant?.favicon_url || "/pwa-192x192.png");
+  });
+
   app.get("/api/tenant/resolve", globalLimiter, async (req, res) => {
     try {
       const domain = req.query.domain as string;
@@ -1037,7 +1073,7 @@ Apenas o objeto JSON valido, sem formatacao Markdown adicional nem blocos de cod
       // Try to find tenant by custom_domain first
       let { data: tenant } = await supabaseAdmin
         .from("tenants")
-        .select("id, name, logo, primary_color, secondary_color, status, custom_domain, subdomain")
+        .select("id, name, logo, favicon_url, pwa_icon_192_url, pwa_icon_512_url, pwa_short_name, pwa_theme_color, pwa_background_color, primary_color, secondary_color, status, custom_domain, subdomain")
         .eq("custom_domain", domain)
         .single();
 
@@ -1047,7 +1083,7 @@ Apenas o objeto JSON valido, sem formatacao Markdown adicional nem blocos de cod
         if (subdomain) {
           const { data: subTenant } = await supabaseAdmin
             .from("tenants")
-            .select("id, name, logo, primary_color, secondary_color, status, custom_domain, subdomain")
+            .select("id, name, logo, favicon_url, pwa_icon_192_url, pwa_icon_512_url, pwa_short_name, pwa_theme_color, pwa_background_color, primary_color, secondary_color, status, custom_domain, subdomain")
             .eq("subdomain", subdomain)
             .single();
           if (subTenant) {
@@ -1060,7 +1096,7 @@ Apenas o objeto JSON valido, sem formatacao Markdown adicional nem blocos de cod
       if (!tenant) {
         const { data: defaultTenant } = await supabaseAdmin
           .from("tenants")
-          .select("id, name, logo, primary_color, secondary_color, status, custom_domain, subdomain")
+          .select("id, name, logo, favicon_url, pwa_icon_192_url, pwa_icon_512_url, pwa_short_name, pwa_theme_color, pwa_background_color, primary_color, secondary_color, status, custom_domain, subdomain")
           .eq("id", "system")
           .single();
         tenant = defaultTenant;

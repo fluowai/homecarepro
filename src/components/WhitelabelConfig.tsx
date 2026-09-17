@@ -16,6 +16,12 @@ export function WhitelabelConfig() {
     primaryColor: '#0066FF',
     secondaryColor: '#E6F0FF',
     logo: '',
+    faviconUrl: '',
+    pwaIcon192Url: '',
+    pwaIcon512Url: '',
+    pwaShortName: '',
+    pwaThemeColor: '#0066FF',
+    pwaBackgroundColor: '#FFFFFF',
     emailFromName: '',
     emailFromAddress: '',
     supportEmail: ''
@@ -30,7 +36,7 @@ export function WhitelabelConfig() {
       setLoading(true);
       const { data, error } = await supabase
         .from('tenants')
-        .select('custom_domain, subdomain, primary_color, secondary_color, logo, email_from_name, email_from_address, support_email')
+        .select('custom_domain, subdomain, primary_color, secondary_color, logo, favicon_url, pwa_icon_192_url, pwa_icon_512_url, pwa_short_name, pwa_theme_color, pwa_background_color, email_from_name, email_from_address, support_email')
         .eq('id', profile?.tenant_id)
         .single();
         
@@ -43,6 +49,8 @@ export function WhitelabelConfig() {
           primaryColor: data.primary_color || '#0066FF',
           secondaryColor: data.secondary_color || '#E6F0FF',
           logo: data.logo || '',
+          faviconUrl: data.favicon_url || '', pwaIcon192Url: data.pwa_icon_192_url || '', pwaIcon512Url: data.pwa_icon_512_url || '',
+          pwaShortName: data.pwa_short_name || '', pwaThemeColor: data.pwa_theme_color || '#0066FF', pwaBackgroundColor: data.pwa_background_color || '#FFFFFF',
           emailFromName: data.email_from_name || '',
           emailFromAddress: data.email_from_address || '',
           supportEmail: data.support_email || ''
@@ -155,6 +163,19 @@ export function WhitelabelConfig() {
                   No seu painel de DNS, crie um registro <strong>CNAME</strong> apontando para <strong>{getAppBaseDomain()}</strong> (ou um registro <strong>A</strong> para o IP do servidor). O certificado HTTPS (Let's Encrypt) é emitido automaticamente.
                 </p>
               </div>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <div className="flex items-center space-x-2 border-b pb-2"><Palette className="h-5 w-5 text-gray-400" /><h3 className="text-lg font-medium text-gray-900">Aplicativo PWA</h3></div>
+            <p className="text-sm text-gray-500">Use URLs HTTPS para as imagens. O nome e os ícones serão usados quando esta marca for instalada como aplicativo.</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <input className="w-full rounded-lg border-gray-300" placeholder="Nome curto do app" value={config.pwaShortName} onChange={e => setConfig({...config, pwaShortName: e.target.value})} />
+              <input className="w-full rounded-lg border-gray-300" placeholder="URL do favicon" value={config.faviconUrl} onChange={e => setConfig({...config, faviconUrl: e.target.value})} />
+              <input className="w-full rounded-lg border-gray-300" placeholder="URL do ícone PWA 192x192" value={config.pwaIcon192Url} onChange={e => setConfig({...config, pwaIcon192Url: e.target.value})} />
+              <input className="w-full rounded-lg border-gray-300" placeholder="URL do ícone PWA 512x512" value={config.pwaIcon512Url} onChange={e => setConfig({...config, pwaIcon512Url: e.target.value})} />
+              <label className="text-sm text-gray-600">Cor do tema <input type="color" className="ml-3 h-8 w-12" value={config.pwaThemeColor} onChange={e => setConfig({...config, pwaThemeColor: e.target.value})} /></label>
+              <label className="text-sm text-gray-600">Cor de fundo <input type="color" className="ml-3 h-8 w-12" value={config.pwaBackgroundColor} onChange={e => setConfig({...config, pwaBackgroundColor: e.target.value})} /></label>
             </div>
           </div>
 

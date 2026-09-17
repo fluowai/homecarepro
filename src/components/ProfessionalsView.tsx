@@ -42,8 +42,9 @@ export default function ProfessionalsView() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'busy' | 'offline'>('all');
 
   // Form states
-  const [modalTab, setModalTab] = useState<'personal' | 'professional' | 'address' | 'docs' | 'patients'>('personal');
+  const [modalTab, setModalTab] = useState<'personal' | 'professional' | 'address' | 'docs' | 'patients' | 'pricing'>('personal');
   const [attendedPatients, setAttendedPatients] = useState<{patientId: string, shiftValue: number}[]>([]);
+  const [pricingRules, setPricingRules] = useState<{id: string; patientId?: string; serviceName: string; durationHours: number; value: number}[]>([]);
   const { patients } = useHomeCareStore();
   const [name, setName] = useState('');
   const [cpf, setCpf] = useState('');
@@ -77,7 +78,7 @@ export default function ProfessionalsView() {
   const resetForm = () => {
     setName(''); setCpf(''); setGender('F'); setSpecialty('Enfermeiro'); setRegistration('');
     setEmail(''); setPhone(''); setStreet(''); setNumber(''); setCity(''); setState('SP'); setZipCode('');
-    setDocsUploaded([]); setDocsFiles({}); setCredentialNotice(''); setAccessPassword(''); setModalTab('personal'); setAttendedPatients([]);
+    setDocsUploaded([]); setDocsFiles({}); setCredentialNotice(''); setAccessPassword(''); setModalTab('personal'); setAttendedPatients([]); setPricingRules([]);
   };
 
   const openEditor = (professional: typeof professionals[number]) => {
@@ -91,6 +92,7 @@ export default function ProfessionalsView() {
     setDocsFiles(Object.fromEntries(professional.documents.map(d => [d.name, d.url])));
     setCredentialNotice('');
     setAttendedPatients(professional.attendedPatients || []);
+    setPricingRules(professional.pricingRules || []);
     setModalTab('personal'); setShowAddModal(true);
   };
 
@@ -137,6 +139,7 @@ export default function ProfessionalsView() {
       rating: professionals.find(p => p.id === editingProfessionalId)?.rating ?? 5.0,
       address: { street, number, city, state, zipCode },
       attendedPatients,
+      pricingRules,
       documents: docsUploaded.map(d => ({ type: 'document', name: d, url: docsFiles[d] || '' }))
     };
     const savedProfessional = editingProfessionalId
@@ -392,6 +395,7 @@ export default function ProfessionalsView() {
                 { id: 'address', label: 'Endereço', icon: MapPin },
                 { id: 'docs', label: 'Documentos', icon: FileText },
                 { id: 'patients', label: 'Pacientes', icon: Users },
+                { id: 'pricing', label: 'Valores por plantão', icon: Award },
               ].map(tab => {
                 const Icon = tab.icon;
                 return (
@@ -551,6 +555,14 @@ export default function ProfessionalsView() {
                       Gerar Login e Senha para o App
                     </button>
                   </div>
+                </div>
+              )}
+
+              {modalTab === 'pricing' && (
+                <div className="space-y-4 animate-fade-in">
+                  <div><h4 className="text-sm font-bold text-slate-800">Tabela de preços do profissional</h4><p className="mt-1 text-xs text-slate-500">Cadastre valores diferentes por paciente ou serviço e defina a duração do plantão.</p></div>
+                  {pricingRules.map((rule, index) => <div key={rule.id} className="grid grid-cols-1 md:grid-cols-[1fr_1fr_120px_120px_auto] gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3"><select value={rule.patientId || ''} onChange={event => setPricingRules(current => current.map((item, itemIndex) => itemIndex === index ? { ...item, patientId: event.target.value || undefined } : item))} className="rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs"><option value="">Todos os pacientes</option>{patients.filter(patient => patient.status === 'active').map(patient => <option key={patient.id} value={patient.id}>{patient.name}</option>)}</select><input value={rule.serviceName} onChange={event => setPricingRules(current => current.map((item, itemIndex) => itemIndex === index ? { ...item, serviceName: event.target.value } : item))} placeholder="Serviço" className="rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs" /><input type="number" min="1" value={rule.durationHours} onChange={event => setPricingRules(current => current.map((item, itemIndex) => itemIndex === index ? { ...item, durationHours: Number(event.target.value) } : item))} placeholder="Horas" className="rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs" /><input type="number" min="0" step="0.01" value={rule.value} onChange={event => setPricingRules(current => current.map((item, itemIndex) => itemIndex === index ? { ...item, value: Number(event.target.value) } : item))} placeholder="Valor" className="rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs" /><button type="button" onClick={() => setPricingRules(current => current.filter(item => item.id !== rule.id))} className="text-xs font-bold text-red-600">Remover</button></div>)}
+                  <button type="button" onClick={() => setPricingRules(current => [...current, { id: `price-${Date.now()}`, serviceName: '', durationHours: 12, value: 0 }])} className="w-full rounded-lg border border-dashed border-green-300 bg-green-50 px-3 py-2 text-xs font-bold text-green-700">Adicionar regra de preço</button>
                 </div>
               )}
 

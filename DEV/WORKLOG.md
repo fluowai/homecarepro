@@ -294,3 +294,18 @@
 - Reforçado o login mobile-first: campos e ações com área de toque maior, card responsivo e fundo adaptado para telas pequenas.
 - Revisado `ProfessionalApp` com cabeçalho próprio, data do dia, contador de agenda, cards semânticos e navegação inferior fixa para Agenda/Financeiro.
 - Verificação: TypeScript direto pelo runtime local, build Vite direto e `git diff --check` sem erros. `npm run` indisponível por npm global quebrado no ambiente.
+## 2026-09-15 — Cadastro de paciente com plantão e escala automática
+- O cadastro de paciente agora aguarda a persistência no Supabase e exibe erro quando o salvamento falha.
+- Adicionada configuração opcional de plantão no cadastro: serviço, dias, horários, valor e múltiplos profissionais; a escala do mês corrente é criada automaticamente após o paciente ser salvo.
+- Criada a migration `20260915000000_add_patient_care_schedule.sql` e ampliado o gerador de contratos para suportar mais de um profissional por serviço.
+- Verificação: `npm run typecheck` e `npm run build` passaram. Aplicação da migration e teste browser ainda são necessários.
+# 2026-09-16 — Branding individual por tenant e PWA dinâmico
+- Adicionada migration `20260916000000_add_tenant_pwa_branding.sql` com favicon, ícones PWA, nome curto e cores por tenant.
+- Manifesto `/manifest.webmanifest` e favicon `/api/tenant/favicon` agora resolvem a marca pelo domínio atual.
+- Tela de login e configuração Whitelabel passaram a suportar identidade PWA individual.
+- Verificação: `npx.cmd tsc --noEmit` executado com sucesso.
+## 2026-09-17 — Financeiro consolidado e preços por profissional
+- Adicionadas subabas no Financeiro para faturamento, contratos/totais e configuração de cobrança manual/automática.
+- Adicionados `billingSettings` por tenant e `pricingRules` por profissional, com migration `20260917000000_billing_and_professional_pricing.sql`.
+- Cadastro de profissional agora suporta preço por paciente/serviço, duração e valor individual.
+- Validação TypeScript executada com `npx.cmd tsc --noEmit`.

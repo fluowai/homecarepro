@@ -98,3 +98,7 @@
 
 ## Próximo cuidado operacional
 - Após deploy do frontend, pedir logout/login ou atualizar a página; o código agora limpa automaticamente o cache antigo da sessão.
+# 2026-09-16 — Whitelabel PWA
+- Implementado manifest/favicons dinâmicos por domínio e campos de branding PWA por tenant.
+- Aplicar `supabase/migrations/20260916000000_add_tenant_pwa_branding.sql` antes de abrir a configuração PWA.
+- A configuração atual aceita URLs HTTPS para logo, favicon e ícones PWA; próximo aprimoramento recomendado é substituir URLs manuais por upload dedicado com redimensionamento.

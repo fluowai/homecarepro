@@ -16,6 +16,23 @@ export interface Tenant {
   subdomain?: string;
   primaryColor?: string;
   secondaryColor?: string;
+  faviconUrl?: string;
+  pwaIcon192Url?: string;
+  pwaIcon512Url?: string;
+  pwaShortName?: string;
+  pwaThemeColor?: string;
+  pwaBackgroundColor?: string;
+  billingSettings?: {
+    collectionMode: 'manual' | 'automatic';
+    dueDay: number;
+    autoGenerate: boolean;
+  };
+  faviconUrl?: string;
+  pwaIcon192Url?: string;
+  pwaIcon512Url?: string;
+  pwaShortName?: string;
+  pwaThemeColor?: string;
+  pwaBackgroundColor?: string;
   companyLegalName?: string;
   companyTradeName?: string;
   companyEmail?: string;
@@ -161,6 +178,14 @@ export interface Patient {
   dailyPackageValue?: number;
   dailyPackageShifts?: number;
   contractDuration?: string;
+  careSchedule?: {
+    serviceName: string;
+    professionalIds: string[];
+    daysOfWeek: number[];
+    timeStart: string;
+    timeEnd: string;
+    shiftValue: number;
+  };
   avatar: string;
   diagnostic: string;
   allergies: string[];
@@ -230,6 +255,13 @@ export interface Professional {
   tier?: 'Bronze' | 'Prata' | 'Ouro' | 'Diamante';
   balance?: number;
   attendedPatients?: AttendedPatient[];
+  pricingRules?: {
+    id: string;
+    patientId?: string;
+    serviceName: string;
+    durationHours: number;
+    value: number;
+  }[];
 }
 
 export interface Visit {
@@ -445,6 +477,7 @@ export interface ContractService {
   billingValue: number;
   professionalValue: number;
   professionalId?: string;
+  professionalIds?: string[];
   startDate?: string;
   endDate?: string;
   active: boolean;

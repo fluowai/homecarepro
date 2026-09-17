@@ -3,10 +3,12 @@ import { Mail, Phone, Lock, User, Building2, Eye, EyeOff, Loader2, Heart, ArrowR
 import { supabase } from '../lib/supabase';
 import { useHomeCareStore } from '../store';
 import { normalizeBrazilPhone, phoneToVirtualEmail, formatPhoneInput, formatPhoneForDisplay } from '../lib/formatters';
+import { getResolvedTenantInfo } from '../lib/whitelabel';
 
 type AuthMode = 'login' | 'signup' | 'first_access_check' | 'first_access_submit';
 
 export default function AuthView() {
+  const branding = getResolvedTenantInfo();
   const [mode, setMode] = useState<AuthMode>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -145,11 +147,7 @@ export default function AuthView() {
   const isFirstAccess = mode === 'first_access_check' || mode === 'first_access_submit';
 
   return (
-    <main className="auth-screen">
-      <section className="auth-visual" aria-label="Woodesk Home Care">
-        <div className="auth-visual-wash" />
-      </section>
-
+    <main className="auth-screen" style={{ '--auth-primary': branding.primaryColor || '#0876e7' } as React.CSSProperties}>
       <section className="auth-content">
         <div className="auth-language" aria-label="Idioma atual">
           <span aria-hidden="true">🇧🇷</span>
@@ -159,10 +157,8 @@ export default function AuthView() {
 
         <div className="auth-card-wrap">
           <div className="auth-card">
-            <div className="auth-logo" aria-label="Woodesk Home Care">
-              <span className="auth-logo-mark" aria-hidden="true" />
-              <strong>Woodesk</strong>
-              <span>Home Care</span>
+            <div className="auth-logo" aria-label={branding.name}>
+              {branding.logo?.startsWith('http') ? <img src={branding.logo} alt={branding.name} className="auth-logo-image" /> : <><span className="auth-logo-mark" aria-hidden="true" /><strong>{branding.name}</strong></>}
             </div>
 
             {isFirstAccess && (

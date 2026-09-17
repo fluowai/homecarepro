@@ -81,6 +81,7 @@ function patientToRow(p: Patient) {
     inventory: p.inventory,
     address: p.address,
     summary_ai: p.summaryAi ?? '',
+    care_schedule: p.careSchedule ?? null,
   };
 }
 
@@ -113,6 +114,7 @@ function patientFromRow(r: Record<string, unknown>): Patient {
     inventory: (r.inventory ?? []) as Patient['inventory'],
     address: (r.address ?? { street: '', number: '', city: '', state: '', zipCode: '' }) as Patient['address'],
     summaryAi: (r.summary_ai as string) || undefined,
+    careSchedule: (r.care_schedule as Patient['careSchedule']) || undefined,
   };
 }
 
@@ -133,6 +135,7 @@ function professionalToRow(p: Professional) {
     rating: p.rating,
     address: p.address,
     attended_patients: p.attendedPatients ?? [],
+    pricing_rules: p.pricingRules ?? [],
     documents: p.documents,
     stamp_signature_url: p.stampSignatureUrl,
   };
@@ -155,6 +158,7 @@ function professionalFromRow(r: Record<string, unknown>): Professional {
     rating: Number(r.rating) || 5.0,
     address: (r.address ?? { street: '', number: '', city: '', state: '', zipCode: '' }) as Professional['address'],
     attendedPatients: (r.attended_patients ?? []) as Professional['attendedPatients'],
+    pricingRules: (r.pricing_rules ?? []) as Professional['pricingRules'],
     documents: (r.documents ?? []) as Professional['documents'],
     stampSignatureUrl: r.stamp_signature_url as string | undefined,
   };
@@ -584,7 +588,7 @@ interface HomeCareState {
   clearOfflineQueue: () => void;
 
   // Patient Actions
-  addPatient: (patient: Omit<Patient, 'id' | 'tenantId'>) => void;
+  addPatient: (patient: Omit<Patient, 'id' | 'tenantId'>) => Promise<Patient>;
   updatePatient: (id: string, patient: Partial<Patient>) => void;
   deletePatient: (id: string) => void;
   addPatientFile: (patientId: string, name: string, size: string, type: string, url?: string) => void;
@@ -739,9 +743,11 @@ async function upsertRow(table: string, row: Record<string, unknown>) {
   if (!isSupabaseConfigured) return;
 
   try {
-    await supabase.from(table).upsert(row, { onConflict: 'id' });
+    const { error } = await supabase.from(table).upsert(row, { onConflict: 'id' });
+    if (error) throw error;
   } catch (err) {
     console.error(`[Supabase] upsert ${table} failed`, err);
+    throw err;
   }
 }
 
@@ -1016,6 +1022,7 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
         subdomain: (r.subdomain as string) || undefined,
         primaryColor: (r.primary_color as string) || undefined,
         secondaryColor: (r.secondary_color as string) || undefined,
+        billingSettings: (r.billing_settings as Tenant['billingSettings']) || undefined,
         companyLegalName: (r.company_legal_name as string) || undefined,
         companyTradeName: (r.company_trade_name as string) || undefined,
         companyEmail: (r.company_email as string) || undefined,
@@ -1257,6 +1264,7 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
         subdomain: updated.subdomain || null,
         primary_color: updated.primaryColor || null,
         secondary_color: updated.secondaryColor || null,
+        billing_settings: updated.billingSettings || { collectionMode: 'manual', dueDay: 5, autoGenerate: false },
         company_legal_name: updated.companyLegalName || null,
         company_trade_name: updated.companyTradeName || null,
         company_email: updated.companyEmail || null,
@@ -1291,6 +1299,7 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
         subdomain: (r.subdomain as string) || undefined,
         primaryColor: (r.primary_color as string) || undefined,
         secondaryColor: (r.secondary_color as string) || undefined,
+        billingSettings: (r.billing_settings as Tenant['billingSettings']) || undefined,
         companyLegalName: (r.company_legal_name as string) || undefined,
         companyTradeName: (r.company_trade_name as string) || undefined,
         companyEmail: (r.company_email as string) || undefined,
@@ -1470,7 +1479,7 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
 
   // ── Patients ────────────────────────────────────────────────
 
-  addPatient: (patient) => {
+  addPatient: async (patient) => {
     const newPatient: Patient = {
       ...patient,
       id: `pat-${Date.now()}`,
@@ -1481,7 +1490,8 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
     const updated = [...get().patients, newPatient];
     set({ patients: updated });
     saveToStorage('patients', updated);
-    upsertRow('patients', patientToRow(newPatient));
+    await upsertRow('patients', patientToRow(newPatient));
+    return newPatient;
   },
 
   updatePatient: (id, data) => {
@@ -1902,7 +1912,7 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
     const patient = get().patients.find((p) => p.id === patientId);
     if (!patient) return 'Paciente não encontrado.';
     try {
-      const res = await aiFetch('/api/gemini/summarize-patient', { patient });
+      const res = await aiFetch('/api/ai/summarize-patient', { patient });
       const data = await res.json();
       if (data.summary) {
         get().updatePatient(patientId, { summaryAi: data.summary });
@@ -1920,7 +1930,7 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
     const patient = get().patients.find((p) => p.id === visit.patientId);
     const professional = get().professionals.find((p) => p.id === visit.professionalId);
     try {
-      const res = await aiFetch('/api/gemini/generate-visit-report', { patientName: patient?.name, professionalName: professional?.name, rawNotes, vitals });
+      const res = await aiFetch('/api/ai/generate-visit-report', { patientName: patient?.name, professionalName: professional?.name, rawNotes, vitals });
       const data = await res.json();
       return data.report || data.error || 'Erro ao gerar relatório.';
     } catch {
@@ -1931,7 +1941,7 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
   suggestScheduleAi: async () => {
     const tid = get().activeTenantId;
     try {
-      const res = await aiFetch('/api/gemini/suggest-schedule', { visits: get().visits.filter((v) => v.tenantId === tid), professionals: get().professionals.filter((p) => p.tenantId === tid), patients: get().patients.filter((p) => p.tenantId === tid) });
+      const res = await aiFetch('/api/ai/suggest-schedule', { visits: get().visits.filter((v) => v.tenantId === tid), professionals: get().professionals.filter((p) => p.tenantId === tid), patients: get().patients.filter((p) => p.tenantId === tid) });
       const data = await res.json();
       return data.suggestion || data.error || 'Sem sugestões disponíveis.';
     } catch {
@@ -1941,7 +1951,7 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
 
   analyzeTriageAi: async (description, patientAge?, mainCondition?) => {
     try {
-      const res = await aiFetch('/api/gemini/triage', { description, patientAge, mainCondition });
+      const res = await aiFetch('/api/ai/triage', { description, patientAge, mainCondition });
       const data = await res.json();
       if (data.urgency && data.specialty) return data as TriageResult;
       throw new Error(data.error || 'Formato inválido');
@@ -1953,7 +1963,7 @@ export const useHomeCareStore = create<HomeCareState>((set, get) => ({
 
   transcribeAudioAi: async (audioData, mimeType?) => {
     try {
-      const res = await aiFetch('/api/gemini/transcribe', { audioData, mimeType });
+      const res = await aiFetch('/api/ai/transcribe', { audioData, mimeType });
       const data = await res.json();
       if (!res.ok) {
         const detail = data.details
