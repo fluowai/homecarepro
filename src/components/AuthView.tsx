@@ -5,11 +5,11 @@ import { useHomeCareStore } from '../store';
 import { normalizeBrazilPhone, phoneToVirtualEmail, formatPhoneInput, formatPhoneForDisplay } from '../lib/formatters';
 import { getResolvedTenantInfo } from '../lib/whitelabel';
 
-type AuthMode = 'login' | 'signup' | 'first_access_check' | 'first_access_submit';
+type AuthMode = 'login' | 'signup' | 'first_access_check' | 'first_access_submit' | 'password_request' | 'password_reset';
 
 export default function AuthView() {
   const branding = getResolvedTenantInfo();
-  const [mode, setMode] = useState<AuthMode>('login');
+  const [mode, setMode] = useState<AuthMode>(() => window.location.hash.includes('type=recovery') ? 'password_reset' : 'login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
@@ -46,12 +46,58 @@ export default function AuthView() {
     }
   };
 
+  const handlePasswordResetRequest = async () => {
+    setError('');
+    if (!email.trim()) {
+      setError('Informe seu e-mail para receber o link de recuperação.');
+      return;
+    }
+    setLoading(true);
+    try {
+      const { error: authError } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
+        redirectTo: window.location.origin,
+      });
+      if (authError) throw authError;
+      setError('Se o e-mail estiver cadastrado, enviaremos um link para redefinir sua senha.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Não foi possível enviar o link de recuperação.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleNewPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    if (password.length < 6) {
+      setError('A senha deve ter pelo menos 6 caracteres.');
+      return;
+    }
+    setLoading(true);
+    try {
+      const { error: authError } = await supabase.auth.updateUser({ password });
+      if (authError) throw authError;
+      window.history.replaceState({}, document.title, window.location.pathname);
+      setPassword('');
+      setMode('login');
+      setError('Senha atualizada com sucesso. Faça login para continuar.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Não foi possível atualizar a senha.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
 
     try {
+      if (mode === 'password_request') {
+        await handlePasswordResetRequest();
+        return;
+      }
       if (mode === 'first_access_check') {
         const res = await fetch('/api/auth/check-first-access', {
           method: 'POST',
@@ -146,6 +192,22 @@ export default function AuthView() {
 
   const isFirstAccess = mode === 'first_access_check' || mode === 'first_access_submit';
 
+  if (mode === 'password_reset') {
+    return (
+      <main className="auth-screen" style={{ '--auth-primary': branding.primaryColor || '#0876e7' } as React.CSSProperties}>
+        <section className="auth-content"><div className="auth-card-wrap"><div className="auth-card">
+          <div className="auth-logo" aria-label={branding.name}>{branding.logo?.startsWith('http') ? <img src={branding.logo} alt={branding.name} className="auth-logo-image" /> : <><span className="auth-logo-mark" aria-hidden="true" /><strong>{branding.name}</strong></>}</div>
+          <div className="auth-heading"><h1>Nova senha</h1><p>Defina uma nova senha para acessar sua conta.</p></div>
+          {error && <div className="auth-error" role="alert">{error}</div>}
+          <form onSubmit={handleNewPassword} className="auth-form">
+            <label className="auth-field"><span>Nova senha</span><span className="auth-input-wrap"><Lock /><input type={showPassword ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} autoComplete="new-password" placeholder="Mínimo 6 caracteres" /></span></label>
+            <button type="submit" disabled={loading} className="auth-submit">{loading ? 'Aguarde...' : 'Atualizar senha'}</button>
+          </form>
+        </div></div></section>
+      </main>
+    );
+  }
+
   return (
     <main className="auth-screen" style={{ '--auth-primary': branding.primaryColor || '#0876e7' } as React.CSSProperties}>
       <section className="auth-visual" aria-label="Apresentação do produto">
@@ -179,6 +241,7 @@ export default function AuthView() {
               <h1>{mode === 'login' ? 'Olá!' : mode === 'signup' ? 'Criar conta' : 'Primeiro acesso'}</h1>
               <p>
                 {mode === 'login' && 'Faça seu login para continuar'}
+                {mode === 'password_request' && 'Informe seu e-mail para receber o link'}
                 {mode === 'signup' && 'Cadastre-se para começar'}
                 {mode === 'first_access_check' && 'Informe o seu e-mail para validar o convite'}
                 {mode === 'first_access_submit' && 'Crie sua senha para ativar sua conta'}
@@ -218,7 +281,7 @@ export default function AuthView() {
                   </>
                 )}
 
-                {(mode === 'login' || mode === 'signup' || isFirstAccess) && (
+                {(mode === 'login' || mode === 'signup' || isFirstAccess || mode === 'password_request') && (
                   <label className="auth-field">
                     <span>{mode === 'login' && loginType === 'professional' ? 'Telefone' : 'E-mail'}</span>
                     <span className="auth-input-wrap">{mode === 'login' && loginType === 'professional' ? <Phone /> : <Mail />}<input type={mode === 'login' && loginType === 'professional' ? 'tel' : 'email'} value={mode === 'login' && loginType === 'professional' ? formatPhoneForDisplay(email) : email} onChange={(e) => setEmail(mode === 'login' && loginType === 'professional' ? formatPhoneInput(e.target.value) : e.target.value)} required disabled={mode === 'first_access_submit'} autoComplete={mode === 'login' && loginType === 'professional' ? 'tel' : 'email'} placeholder={mode === 'login' && loginType === 'professional' ? '(11) 99999-9999' : 'seu@email.com'} /></span>
@@ -242,12 +305,12 @@ export default function AuthView() {
                 {mode === 'login' && (
                   <div className="auth-options">
                     <label><input type="checkbox" /> <span>Lembrar de mim</span></label>
-                    <button type="button" onClick={() => { setMode('first_access_check'); setError(''); setPassword(''); }}>Esqueceu sua senha?</button>
+                    <button type="button" onClick={() => { setMode('password_request'); setError(''); setPassword(''); }}>Esqueceu sua senha?</button>
                   </div>
                 )}
 
                 <button type="submit" disabled={loading} className="auth-submit">
-                  {loading ? <><Loader2 className="h-5 w-5 animate-spin" /> Aguarde...</> : mode === 'first_access_check' ? <>Continuar <ArrowRight className="h-5 w-5" /></> : mode === 'first_access_submit' ? 'Ativar conta e entrar' : mode === 'login' ? <>Entrar <ArrowRight className="h-5 w-5" /></> : 'Criar conta'}
+                  {loading ? <><Loader2 className="h-5 w-5 animate-spin" /> Aguarde...</> : mode === 'password_request' ? 'Enviar link de recuperação' : mode === 'first_access_check' ? <>Continuar <ArrowRight className="h-5 w-5" /></> : mode === 'first_access_submit' ? 'Ativar conta e entrar' : mode === 'login' ? <>Entrar <ArrowRight className="h-5 w-5" /></> : 'Criar conta'}
                 </button>
               </form>
             )}

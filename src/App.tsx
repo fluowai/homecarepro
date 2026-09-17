@@ -176,9 +176,14 @@ export default function App() {
   }, [currentUserRole, currentView]);
 
   const inviteToken = new URLSearchParams(window.location.search).get('invite');
+  const isPasswordRecovery = new URLSearchParams(window.location.hash.slice(1)).get('type') === 'recovery';
 
   if (inviteToken) {
     return <InviteAcceptView token={inviteToken} />;
+  }
+
+  if (isPasswordRecovery) {
+    return <AuthView />;
   }
 
   if (isLoading) {
