@@ -147,11 +147,7 @@ export default function AuthView() {
   const isFirstAccess = mode === 'first_access_check' || mode === 'first_access_submit';
 
   return (
-    <main className="auth-screen">
-      <section className="auth-visual" aria-label="Woodesk Home Care">
-        <div className="auth-visual-wash" />
-      </section>
-
+    <main className="auth-screen" style={{ '--auth-primary': branding.primaryColor || '#0876e7' } as React.CSSProperties}>
       <section className="auth-content">
         <div className="auth-language" aria-label="Idioma atual">
           <span aria-hidden="true">🇧🇷</span>
@@ -162,8 +158,7 @@ export default function AuthView() {
         <div className="auth-card-wrap">
           <div className="auth-card">
             <div className="auth-logo" aria-label={branding.name}>
-              {branding.logo?.startsWith('http') ? <img src={branding.logo} alt={branding.name} className="h-12 max-w-[220px] object-contain" /> : <><span className="auth-logo-mark" aria-hidden="true" /><strong>{branding.name}</strong></>}
-              <span>Home Care</span>
+              {branding.logo?.startsWith('http') ? <img src={branding.logo} alt={branding.name} className="auth-logo-image" /> : <><span className="auth-logo-mark" aria-hidden="true" /><strong>{branding.name}</strong></>}
             </div>
 
             {isFirstAccess && (

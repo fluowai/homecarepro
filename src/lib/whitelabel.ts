@@ -26,6 +26,8 @@ export async function initWhitelabel() {
       (window as any)._tenantBranding = {
         name: tenant.name,
         logo: tenant.logo,
+        primaryColor: tenant.primary_color,
+        secondaryColor: tenant.secondary_color,
         subdomain: tenant.subdomain,
         customDomain: tenant.custom_domain,
         faviconUrl: tenant.favicon_url,
@@ -46,6 +48,6 @@ export async function initWhitelabel() {
   }
 }
 
-export function getResolvedTenantInfo(): { name: string; logo: string; subdomain?: string; customDomain?: string; faviconUrl?: string; pwaIcon192Url?: string; pwaIcon512Url?: string; pwaShortName?: string } {
-  return (window as any)._tenantBranding || { name: 'HomeCare Pro', logo: '', subdomain: undefined, customDomain: undefined };
+export function getResolvedTenantInfo(): { name: string; logo: string; primaryColor?: string; secondaryColor?: string; subdomain?: string; customDomain?: string; faviconUrl?: string; pwaIcon192Url?: string; pwaIcon512Url?: string; pwaShortName?: string } {
+  return (window as any)._tenantBranding || { name: 'HomeCare Pro', logo: '', primaryColor: undefined, secondaryColor: undefined, subdomain: undefined, customDomain: undefined };
 }

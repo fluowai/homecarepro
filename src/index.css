@@ -31,10 +31,10 @@ body {
 /* Woodesk Home Care login composition */
 .auth-screen {
   min-height: 100vh;
-  display: grid;
-  grid-template-columns: minmax(0, 1.08fr) minmax(520px, 0.92fr);
-  overflow: hidden;
-  background: #f8fbff;
+  display: flex;
+  justify-content: center;
+  overflow: auto;
+  background: color-mix(in srgb, var(--auth-primary) 5%, #f8fbff);
   color: #07163a;
 }
 
@@ -60,6 +60,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+  width: min(100%, 620px);
   min-height: 100vh;
   padding: 76px 5vw 42px;
   background: #f8fbff;
@@ -102,12 +103,20 @@ body {
   grid-template-rows: 1fr 20px;
   column-gap: 8px;
   align-items: end;
-  width: 246px;
+  width: min(100%, 300px);
   height: 72px;
   margin: 0 auto 21px;
   color: #63718d;
   line-height: 1;
   text-align: center;
+}
+
+.auth-logo-image {
+  grid-column: 1 / -1;
+  width: min(100%, 260px);
+  height: 72px;
+  margin: 0 auto;
+  object-fit: contain;
 }
 
 .auth-logo-mark {
@@ -123,7 +132,7 @@ body {
   content: 'W';
   position: absolute;
   inset: -8px 0 auto;
-  color: #0876e7;
+  color: var(--auth-primary);
   font-family: Arial, sans-serif;
   font-size: 51px;
   font-style: italic;
@@ -338,7 +347,7 @@ body {
   min-height: 52px;
   margin-top: 2px;
   border-radius: 12px;
-  background: #0968e8;
+  background: var(--auth-primary);
   color: #fff;
   font-size: 16px;
   font-weight: 800;
@@ -467,10 +476,6 @@ body {
 }
 
 @media (max-width: 1050px) {
-  .auth-screen {
-    grid-template-columns: minmax(0, 0.9fr) minmax(470px, 1.1fr);
-  }
-
   .auth-content {
     padding-right: 32px;
     padding-left: 32px;
@@ -481,10 +486,6 @@ body {
   .auth-screen {
     display: block;
     min-height: 100svh;
-  }
-
-  .auth-visual {
-    display: none;
   }
 
   .auth-content {
@@ -502,6 +503,8 @@ body {
     border-radius: 18px;
     box-shadow: 0 12px 36px rgba(49, 101, 164, 0.08);
   }
+
+  .auth-card-wrap { width: 100%; }
 
   .auth-screen { background: linear-gradient(160deg, #f2f8ff 0%, #fbfdff 48%, #eef8f4 100%); }
   .auth-content { align-items: flex-start; }
